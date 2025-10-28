@@ -483,3 +483,428 @@ const LandingPage = () => {
             </div>
           </div>
         </section>
+        {/* How It Works Section */}
+        <section id="how-it-works" className="py-20 bg-gray-50 dark:bg-gray-900">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                How It Works
+              </h2>
+              <p className="text-xl text-gray-600 dark:text-gray-400">
+                Simple, secure, and transparent process
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {howItWorks.map((step, index) => (
+                <div key={index} className="relative">
+                  <div className="text-center">
+                    <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 shadow-lg">
+                      {step.icon}
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                      Step {step.step}: {step.title}
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {step.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="text-center mt-12">
+              <button
+                onClick={() => navigate('/signup')}
+                className="px-8 py-4 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition text-lg inline-flex items-center gap-2"
+              >
+                Start Your First Escrow
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Pricing Section */}
+        <section id="pricing" className="py-20 bg-white dark:bg-gray-950">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                Simple, Transparent Pricing
+              </h2>
+              <p className="text-xl text-gray-600 dark:text-gray-400">
+                Choose the plan that fits your business
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {pricing.map((plan, index) => (
+                <div
+                  key={index}
+                  className={`relative p-8 rounded-2xl border-2 transition ${
+                    plan.highlight
+                      ? 'border-blue-500 shadow-2xl scale-105 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20'
+                      : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
+                  }`}
+                >
+                  {plan.highlight && (
+                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                      <span className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-1 rounded-full text-sm font-semibold shadow-lg">
+                        Most Popular
+                      </span>
+                    </div>
+                  )}
+
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                    {plan.name}
+                  </h3>
+
+                  <div className="mb-6">
+                    {typeof plan.price === 'number' ? (
+                      <>
+                        <span className="text-5xl font-bold text-gray-900 dark:text-white">
+                          ${plan.price}
+                        </span>
+                        <span className="text-gray-600 dark:text-gray-400">/{plan.period}</span>
+                      </>
+                    ) : (
+                      <span className="text-5xl font-bold text-gray-900 dark:text-white">
+                        {plan.price}
+                      </span>
+                    )}
+                  </div>
+
+                  <ul className="space-y-3 mb-8">
+                    {plan.features.map((feature, i) => (
+                      <li key={i} className="flex items-start gap-3">
+                        <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                        <span className="text-gray-600 dark:text-gray-400">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    onClick={() => navigate('/signup')}
+                    className={`w-full py-3 rounded-lg font-semibold transition ${
+                      plan.highlight
+                        ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Get Started
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Payment Methods Section */}
+        <section className="py-20 bg-gray-50 dark:bg-gray-900">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                Accept All Payment Methods
+              </h2>
+              <p className="text-xl text-gray-600 dark:text-gray-400">
+                We support every way your customers want to pay
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="bg-white dark:bg-gray-950 rounded-xl p-6 text-center border border-gray-200 dark:border-gray-800 hover:shadow-lg transition">
+                <div className="text-5xl mb-3">💳</div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Credit Cards</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Visa, Mastercard, Amex</p>
+              </div>
+
+              <div className="bg-white dark:bg-gray-950 rounded-xl p-6 text-center border border-gray-200 dark:border-gray-800 hover:shadow-lg transition">
+                <div className="text-5xl mb-3">🏦</div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Bank Transfer</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Direct bank payments</p>
+              </div>
+
+              <div className="bg-white dark:bg-gray-950 rounded-xl p-6 text-center border border-gray-200 dark:border-gray-800 hover:shadow-lg transition">
+                <div className="text-5xl mb-3">₿</div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Cryptocurrency</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Bitcoin, Ethereum, USDT</p>
+              </div>
+
+              <div className="bg-white dark:bg-gray-950 rounded-xl p-6 text-center border border-gray-200 dark:border-gray-800 hover:shadow-lg transition">
+                <div className="text-5xl mb-3">📱</div>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Mobile Money</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">M-Pesa, Airtel Money</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Testimonials Section */}
+        <section className="py-20 bg-white dark:bg-gray-950">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                Trusted by Thousands
+              </h2>
+              <p className="text-xl text-gray-600 dark:text-gray-400">
+                See what our users are saying
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {testimonials.map((testimonial, index) => (
+                <div
+                  key={index}
+                  className="p-6 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 hover:shadow-lg transition"
+                >
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="text-5xl">{testimonial.image}</div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 dark:text-white">
+                        {testimonial.name}
+                      </h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {testimonial.role}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 dark:text-gray-400 italic">
+                    "{testimonial.quote}"
+                  </p>
+                  <div className="flex gap-1 mt-4">
+                    {[...Array(5)].map((_, i) => (
+                      <span key={i} className="text-yellow-500">⭐</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* API Section - PROFESSIONAL REDESIGN */}
+        <section id="api" className="py-20 bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 dark:from-black dark:via-blue-950 dark:to-black text-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+              <div>
+                <div className="inline-flex items-center gap-2 bg-blue-500/20 px-4 py-2 rounded-full mb-6 border border-blue-500/30">
+                  <Code className="w-5 h-5 text-blue-400" />
+                  <span className="text-sm font-semibold text-blue-300">For Developers</span>
+                </div>
+                <h2 className="text-4xl font-bold mb-6">
+                  Powerful API for Your Platform
+                </h2>
+                <p className="text-xl text-gray-300 mb-8">
+                  Integrate Dealcross escrow into your marketplace or e-commerce platform in minutes. Simple REST API with comprehensive documentation.
+                </p>
+                <ul className="space-y-4 mb-8">
+                  <li className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center">
+                      <CheckCircle className="w-4 h-4 text-green-400" />
+                    </div>
+                    <span className="text-gray-200">Easy integration in any language</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center">
+                      <CheckCircle className="w-4 h-4 text-green-400" />
+                    </div>
+                    <span className="text-gray-200">Webhook support for real-time updates</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center">
+                      <CheckCircle className="w-4 h-4 text-green-400" />
+                    </div>
+                    <span className="text-gray-200">Sandbox environment for testing</span>
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center">
+                      <CheckCircle className="w-4 h-4 text-green-400" />
+                    </div>
+                    <span className="text-gray-200">24/7 developer support</span>
+                  </li>
+                </ul>
+                <button
+                  onClick={() => navigate('/signup')}
+                  className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition text-lg shadow-lg"
+                >
+                  Get API Access
+                </button>
+              </div>
+
+              <div className="bg-gray-950 rounded-2xl p-6 overflow-hidden shadow-2xl border border-gray-800">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="flex gap-2">
+                    <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  </div>
+                  <span className="text-gray-400 text-sm ml-4">api-example.js</span>
+                </div>
+                <pre className="text-sm text-green-400 overflow-x-auto">
+{`// Create an escrow transaction
+const response = await fetch(
+  'https://api.dealcross.com/v1/escrow',
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer YOUR_API_KEY',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      seller: 'seller@example.com',
+      item: 'MacBook Pro',
+      amount: 2500,
+      currency: 'USD'
+    })
+  }
+);
+
+const escrow = await response.json();
+console.log(escrow.id); // ESC123456`}
+                </pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* FAQ Section */}
+        <section id="faq" className="py-20 bg-white dark:bg-gray-950">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                Frequently Asked Questions
+              </h2>
+              <p className="text-xl text-gray-600 dark:text-gray-400">
+                Everything you need to know
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {faqs.map((faq, index) => (
+                <details
+                  key={index}
+                  className="group bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden"
+                >
+                  <summary className="flex justify-between items-center cursor-pointer p-6 font-semibold text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+                    {faq.question}
+                    <ChevronRight className="w-5 h-5 group-open:rotate-90 transition-transform" />
+                  </summary>
+                  <div className="px-6 pb-6 text-gray-600 dark:text-gray-400">
+                    {faq.answer}
+                  </div>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Final CTA Section - NEW BACKGROUND */}
+        <section className="py-20 bg-gray-900 dark:bg-black text-white">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">
+              Ready to Secure Your Transactions?
+            </h2>
+            <p className="text-xl text-gray-300 mb-8">
+              Join thousands of businesses and individuals who trust Dealcross for safe online transactions.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={() => navigate('/signup')}
+                className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition text-lg shadow-lg"
+              >
+                Start for Free
+              </button>
+              <button
+                onClick={() => navigate('/login')}
+                className="px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white rounded-lg font-semibold hover:bg-white/20 transition text-lg"
+              >
+                Login to Dashboard
+              </button>
+            </div>
+            <p className="text-gray-400 mt-6 text-sm">
+              No credit card required • Free tier available forever
+            </p>
+          </div>
+        </section>
+
+        {/* Footer - OLD VERSION STYLE */}
+        <footer id="contact" className="bg-gray-950 dark:bg-black text-white py-12 border-t border-gray-800">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+              {/* Company Info */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Shield className="w-8 h-8 text-blue-400" />
+                  <span className="text-2xl font-bold">Dealcross</span>
+                </div>
+                <p className="text-gray-400 mb-4 text-sm">
+                  Secure escrow payments for global trade. Buy and sell with confidence.
+                </p>
+                <div className="flex gap-4">
+                  <a href="#" className="text-gray-400 hover:text-white transition">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/></svg>
+                  </a>
+                  <a href="#" className="text-gray-400 hover:text-white transition">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+                  </a>
+                  <a href="#" className="text-gray-400 hover:text-white transition">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+                  </a>
+                </div>
+              </div>
+
+              {/* Product */}
+              <div>
+                <h3 className="font-semibold text-lg mb-4">Product</h3>
+                <ul className="space-y-2 text-sm">
+                  <li><a href="#features" className="text-gray-400 hover:text-white transition">Features</a></li>
+                  <li><a href="#pricing" className="text-gray-400 hover:text-white transition">Pricing</a></li>
+                  <li><a href="#api" className="text-gray-400 hover:text-white transition">API</a></li>
+                  <li><a href="#docs" className="text-gray-400 hover:text-white transition">Documentation</a></li>
+                </ul>
+              </div>
+
+              {/* Company */}
+              <div>
+                <h3 className="font-semibold text-lg mb-4">Company</h3>
+                <ul className="space-y-2 text-sm">
+                  <li><a href="#" className="text-gray-400 hover:text-white transition">About Us</a></li>
+                  <li><a href="#" className="text-gray-400 hover:text-white transition">Careers</a></li>
+                  <li><a href="#" className="text-gray-400 hover:text-white transition">Blog</a></li>
+                  <li><a href="#contact" className="text-gray-400 hover:text-white transition">Contact</a></li>
+                </ul>
+              </div>
+
+              {/* Legal */}
+              <div>
+                <h3 className="font-semibold text-lg mb-4">Legal</h3>
+                <ul className="space-y-2 text-sm">
+                  <li><a href="#" className="text-gray-400 hover:text-white transition">Terms of Service</a></li>
+                  <li><a href="#" className="text-gray-400 hover:text-white transition">Privacy Policy</a></li>
+                  <li><a href="#" className="text-gray-400 hover:text-white transition">Cookie Policy</a></li>
+                  <li><a href="/admin/login" className="text-gray-400 hover:text-blue-400 transition">Admin Portal</a></li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Bottom Bar */}
+            <div className="border-t border-gray-800 pt-8">
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                <p className="text-gray-400 text-sm">
+                  © 2025 Dealcross. All rights reserved.
+                </p>
+                <div className="flex gap-6 text-sm text-gray-400">
+                  <span>🌍 150+ Countries</span>
+                  <span>💳 Secure Payments</span>
+                  <span>🔒 SSL Encrypted</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
+};
+
+export default LandingPage;
