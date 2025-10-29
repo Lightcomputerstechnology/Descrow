@@ -7,8 +7,7 @@ import Login from './pages/Login';
 import SignUpPage from './pages/SignUpPage';
 
 // User Pages
-import BuyerDashboard from './pages/BuyerDashboard';
-import SellerDashboard from './pages/SellerDashboard';
+import UnifiedDashboard from './pages/UnifiedDashboard';
 import EscrowDetails from './pages/EscrowDetails';
 
 // Admin Pages
@@ -23,7 +22,7 @@ import APIManagementPage from './pages/admin/APIManagementPage';
 import AdminManagementPage from './pages/admin/AdminManagementPage';
 
 function App() {
-  const [user, setUser] = useState(null); // { id, name, role: 'buyer' | 'seller', tier: 'free' | 'basic' | 'pro' }
+  const [user, setUser] = useState(null); // { id, name, role: 'dual', tier: 'free' | 'basic' | 'pro' }
   const [admin, setAdmin] = useState(null); // { id, name, role: 'master' | 'sub_admin', permissions: {} }
 
   return (
@@ -34,19 +33,19 @@ function App() {
         <Route path="/login" element={<Login setUser={setUser} />} />
         <Route path="/signup" element={<SignUpPage setUser={setUser} />} />
 
-        {/* User Routes */}
+        {/* User Routes - Unified Dashboard */}
         <Route 
-          path="/buyer-dashboard" 
-          element={user?.role === 'buyer' ? <BuyerDashboard user={user} /> : <Navigate to="/login" />} 
-        />
-        <Route 
-          path="/seller-dashboard" 
-          element={user?.role === 'seller' ? <SellerDashboard user={user} /> : <Navigate to="/login" />} 
+          path="/dashboard" 
+          element={user ? <UnifiedDashboard user={user} /> : <Navigate to="/login" />} 
         />
         <Route 
           path="/escrow/:id" 
           element={user ? <EscrowDetails user={user} /> : <Navigate to="/login" />} 
         />
+
+        {/* Legacy routes redirect to unified dashboard */}
+        <Route path="/buyer-dashboard" element={<Navigate to="/dashboard" />} />
+        <Route path="/seller-dashboard" element={<Navigate to="/dashboard" />} />
 
         {/* Admin Routes */}
         <Route path="/admin/login" element={<AdminLogin setAdmin={setAdmin} />} />
