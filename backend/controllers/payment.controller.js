@@ -15,7 +15,7 @@ exports.initializePayment = async (req, res) => {
       });
     }
 
-    const { escrowId, paymentMethod } = req.body;
+    const { escrowId, paymentMethod, cryptocurrency } = req.body;
 
     // Find escrow
     const escrow = await Escrow.findOne({ escrowId }).populate('buyer', 'email name');
@@ -47,6 +47,7 @@ exports.initializePayment = async (req, res) => {
     const metadata = {
       escrowId: escrow.escrowId,
       buyerId: escrow.buyer._id.toString(),
+      buyerName: escrow.buyer.name,
       itemName: escrow.itemName
     };
 
@@ -62,15 +63,6 @@ exports.initializePayment = async (req, res) => {
         );
         break;
 
-      case 'stripe':
-        paymentData = await paymentService.initializeStripe(
-          escrow.amount,
-          escrow.currency,
-          escrow.buyer.email,
-          metadata
-        );
-        break;
-
       case 'flutterwave':
         paymentData = await paymentService.initializeFlutterwave(
           escrow.buyer.email,
@@ -81,36 +73,41 @@ exports.initializePayment = async (req, res) => {
         );
         break;
 
-      case 'bank_transfer':
-        paymentData = paymentService.generateBankTransferInstructions(
-          reference,
-          escrow.amount,
-          escrow.currency
-        );
-        break;
-
       case 'crypto':
-        const cryptocurrency = req.body.cryptocurrency || 'BTC';
-        paymentData = paymentService.generateCryptoAddress(cryptocurrency, reference);
+        if (!cryptocurrency || !['BTC', 'ETH', 'USDT'].includes(cryptocurrency)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid cryptocurrency. Choose BTC, ETH, or USDT'
+          });
+        }
+        paymentData = paymentService.generateCryptoPayment(
+          cryptocurrency,
+          escrow.amount,
+          reference
+        );
         break;
 
       default:
         return res.status(400).json({
           success: false,
-          message: 'Invalid payment method'
+          message: 'Invalid payment method. Choose: paystack, flutterwave, or crypto'
         });
     }
 
     // Save payment reference to escrow
     escrow.paymentReference = reference;
     escrow.paymentMethod = paymentMethod;
+    if (paymentMethod === 'crypto') {
+      escrow.cryptoCurrency = cryptocurrency;
+    }
     await escrow.save();
 
     res.status(200).json({
       success: true,
       message: 'Payment initialized successfully',
       paymentData,
-      reference
+      reference,
+      escrowId: escrow.escrowId
     });
 
   } catch (error) {
@@ -123,7 +120,7 @@ exports.initializePayment = async (req, res) => {
   }
 };
 
-// Verify Payment
+// Verify Payment (Paystack/Flutterwave only)
 exports.verifyPayment = async (req, res) => {
   try {
     const { reference, paymentMethod, transactionId } = req.body;
@@ -140,15 +137,19 @@ exports.verifyPayment = async (req, res) => {
       });
     }
 
+    // Crypto payments require manual admin verification
+    if (paymentMethod === 'crypto') {
+      return res.status(400).json({
+        success: false,
+        message: 'Crypto payments require manual verification by admin'
+      });
+    }
+
     let verificationResult;
 
     switch (paymentMethod) {
       case 'paystack':
         verificationResult = await paymentService.verifyPaystack(reference);
-        break;
-
-      case 'stripe':
-        verificationResult = await paymentService.verifyStripe(transactionId);
         break;
 
       case 'flutterwave':
@@ -170,7 +171,7 @@ exports.verifyPayment = async (req, res) => {
     }
 
     // Verify amount matches
-    if (verificationResult.amount !== escrow.amount) {
+    if (Math.abs(verificationResult.amount - escrow.amount) > 0.01) {
       return res.status(400).json({
         success: false,
         message: 'Payment amount mismatch'
@@ -222,19 +223,75 @@ exports.verifyPayment = async (req, res) => {
   }
 };
 
-// Payment Webhook Handler (Paystack/Stripe/Flutterwave)
+// Upload Crypto Payment Proof (Buyer uploads transaction hash/screenshot)
+exports.uploadCryptoProof = async (req, res) => {
+  try {
+    const { escrowId, transactionHash, proofImageUrl } = req.body;
+
+    const escrow = await Escrow.findOne({ escrowId });
+    if (!escrow) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escrow not found'
+      });
+    }
+
+    // Verify user is the buyer
+    if (escrow.buyer.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the buyer can upload payment proof'
+      });
+    }
+
+    // Check if payment method is crypto
+    if (escrow.paymentMethod !== 'crypto') {
+      return res.status(400).json({
+        success: false,
+        message: 'This escrow is not using crypto payment'
+      });
+    }
+
+    // Save proof
+    escrow.cryptoPaymentProof = {
+      transactionHash,
+      proofImageUrl,
+      uploadedAt: new Date(),
+      status: 'pending_verification'
+    };
+    await escrow.save();
+
+    // Notify admin (will implement notification service later)
+    console.log(`Admin notification: Crypto payment proof uploaded for escrow ${escrowId}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Payment proof uploaded. Admin will verify within 1-2 hours.',
+      escrow: {
+        escrowId: escrow.escrowId,
+        cryptoPaymentProof: escrow.cryptoPaymentProof
+      }
+    });
+
+  } catch (error) {
+    console.error('Upload crypto proof error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to upload payment proof',
+      error: error.message
+    });
+  }
+};
+
+// Payment Webhook Handler (Paystack/Flutterwave only)
 exports.paymentWebhook = async (req, res) => {
   try {
-    const signature = req.headers['x-paystack-signature'] || 
-                      req.headers['stripe-signature'] || 
-                      req.headers['verif-hash'];
+    const signature = req.headers['x-paystack-signature'] || req.headers['verif-hash'];
 
     // Determine payment provider
     let provider;
     if (req.headers['x-paystack-signature']) {
       provider = 'paystack';
-    } else if (req.headers['stripe-signature']) {
-      provider = 'stripe';
     } else if (req.headers['verif-hash']) {
       provider = 'flutterwave';
     } else {
@@ -268,20 +325,6 @@ exports.paymentWebhook = async (req, res) => {
       }
     }
 
-    // Handle Stripe webhook
-    if (provider === 'stripe' && event.type === 'payment_intent.succeeded') {
-      const paymentIntent = event.data.object;
-      const escrowId = paymentIntent.metadata.escrowId;
-
-      const escrow = await Escrow.findOne({ escrowId });
-      if (escrow && escrow.status === 'pending_payment') {
-        escrow.status = 'in_escrow';
-        escrow.chatUnlocked = true;
-        escrow.paymentVerifiedAt = new Date();
-        await escrow.save();
-      }
-    }
-
     // Handle Flutterwave webhook
     if (provider === 'flutterwave' && event.event === 'charge.completed') {
       const reference = event.data.tx_ref;
@@ -292,6 +335,12 @@ exports.paymentWebhook = async (req, res) => {
         escrow.chatUnlocked = true;
         escrow.paymentVerifiedAt = new Date();
         await escrow.save();
+
+        // Update buyer stats
+        const buyer = await User.findById(escrow.buyer);
+        buyer.totalTransactions += 1;
+        buyer.totalSpent += escrow.amount;
+        await buyer.save();
       }
     }
 
@@ -314,20 +363,6 @@ exports.verifyWebhookSignature = (payload, signature, provider) => {
       return hash === signature;
     }
 
-    if (provider === 'stripe') {
-      const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-      try {
-        stripe.webhooks.constructEvent(
-          payload,
-          signature,
-          process.env.STRIPE_WEBHOOK_SECRET
-        );
-        return true;
-      } catch (err) {
-        return false;
-      }
-    }
-
     if (provider === 'flutterwave') {
       return signature === process.env.FLUTTERWAVE_SECRET_HASH;
     }
@@ -339,12 +374,15 @@ exports.verifyWebhookSignature = (payload, signature, provider) => {
   }
 };
 
-// Manual Payment Confirmation (Admin only - for bank transfer/crypto)
-exports.confirmManualPayment = async (req, res) => {
+// Admin: Confirm Crypto Payment Manually
+exports.confirmCryptoPayment = async (req, res) => {
   try {
-    const { escrowId, proofUrl } = req.body;
+    const { escrowId } = req.body;
 
-    const escrow = await Escrow.findOne({ escrowId });
+    const escrow = await Escrow.findOne({ escrowId })
+      .populate('buyer', 'name email')
+      .populate('seller', 'name email');
+
     if (!escrow) {
       return res.status(404).json({
         success: false,
@@ -352,22 +390,95 @@ exports.confirmManualPayment = async (req, res) => {
       });
     }
 
+    // Check if crypto payment
+    if (escrow.paymentMethod !== 'crypto') {
+      return res.status(400).json({
+        success: false,
+        message: 'This is not a crypto payment'
+      });
+    }
+
+    // Update escrow
     escrow.status = 'in_escrow';
     escrow.chatUnlocked = true;
     escrow.paymentVerifiedAt = new Date();
-    escrow.paymentProof = proofUrl;
+    if (escrow.cryptoPaymentProof) {
+      escrow.cryptoPaymentProof.status = 'verified';
+    }
     await escrow.save();
+
+    // Update buyer stats
+    const buyer = await User.findById(escrow.buyer._id);
+    buyer.totalTransactions += 1;
+    buyer.totalSpent += escrow.amount;
+    await buyer.save();
+
+    // Send confirmation email
+    const emailService = require('../services/email.service');
+    await emailService.sendPaymentConfirmedEmail(
+      escrow.buyer.email,
+      escrow.seller.email,
+      {
+        escrowId: escrow.escrowId,
+        itemName: escrow.itemName,
+        amount: escrow.amount,
+        currency: escrow.cryptoCurrency
+      }
+    );
 
     res.status(200).json({
       success: true,
-      message: 'Payment confirmed manually'
+      message: 'Crypto payment confirmed successfully',
+      escrow
     });
 
   } catch (error) {
-    console.error('Manual payment confirmation error:', error);
+    console.error('Confirm crypto payment error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to confirm payment',
+      message: 'Failed to confirm crypto payment',
+      error: error.message
+    });
+  }
+};
+
+// Admin: Reject Crypto Payment
+exports.rejectCryptoPayment = async (req, res) => {
+  try {
+    const { escrowId, reason } = req.body;
+
+    const escrow = await Escrow.findOne({ escrowId }).populate('buyer', 'email name');
+    if (!escrow) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escrow not found'
+      });
+    }
+
+    if (escrow.cryptoPaymentProof) {
+      escrow.cryptoPaymentProof.status = 'rejected';
+      escrow.cryptoPaymentProof.rejectionReason = reason;
+    }
+    await escrow.save();
+
+    // Notify buyer
+    const emailService = require('../services/email.service');
+    await emailService.sendEmail(
+      escrow.buyer.email,
+      'Crypto Payment Rejected',
+      `Your crypto payment proof for escrow ${escrowId} was rejected. Reason: ${reason}. Please upload valid proof.`
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Crypto payment rejected'
+    });
+
+  } catch (error) {
+    console.error('Reject crypto payment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reject crypto payment',
       error: error.message
     });
   }
