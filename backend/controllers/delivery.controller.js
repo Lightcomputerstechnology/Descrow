@@ -1,23 +1,23 @@
 const Escrow = require('../models/Escrow.model');
-const path = require('path');
+const { validationResult } = require('express-validator');
+const emailService = require('../services/email.service');
 
-// Upload delivery proof
+// Upload Delivery Proof
 exports.uploadDeliveryProof = async (req, res) => {
   try {
-    const { escrowId } = req.params;
-    const {
-      method,
-      courierName,
-      trackingNumber,
-      vehicleType,
-      plateNumber,
-      driverName,
-      methodDescription,
-      estimatedDelivery,
-      enableGPS
-    } = req.body;
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
 
-    const escrow = await Escrow.findOne({ escrowId });
+    const { escrowId, trackingNumber, carrier, estimatedDelivery, notes } = req.body;
+
+    const escrow = await Escrow.findOne({ escrowId })
+      .populate('buyer', 'name email')
+      .populate('seller', 'name email');
 
     if (!escrow) {
       return res.status(404).json({
@@ -27,7 +27,7 @@ exports.uploadDeliveryProof = async (req, res) => {
     }
 
     // Verify user is the seller
-    if (escrow.seller.toString() !== req.user._id.toString()) {
+    if (escrow.seller._id.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'Only the seller can upload delivery proof'
@@ -38,50 +38,53 @@ exports.uploadDeliveryProof = async (req, res) => {
     if (escrow.status !== 'in_escrow') {
       return res.status(400).json({
         success: false,
-        message: 'Delivery proof can only be uploaded for escrows in "in_escrow" status'
+        message: 'Can only upload delivery proof after payment is confirmed'
       });
     }
 
     // Get uploaded file URLs
-    const photoUrls = req.files ? req.files.map(file => `/uploads/delivery-proof/${file.filename}`) : [];
+    const proofImages = req.fileUrls || [];
 
-    // Build delivery proof object based on method
-    const deliveryProof = {
-      method: method,
+    // Update escrow with delivery proof
+    escrow.deliveryProof = {
+      trackingNumber,
+      carrier,
       estimatedDelivery: estimatedDelivery ? new Date(estimatedDelivery) : null,
-      photos: photoUrls,
-      gpsEnabled: enableGPS === 'true' || enableGPS === true
+      proofImages,
+      notes,
+      uploadedAt: new Date()
     };
 
-    if (method === 'courier') {
-      deliveryProof.courierName = courierName;
-      deliveryProof.trackingNumber = trackingNumber;
-    } else if (method === 'personal') {
-      deliveryProof.vehicleType = vehicleType;
-      deliveryProof.plateNumber = plateNumber;
-      deliveryProof.driverName = driverName;
-    } else if (method === 'other') {
-      deliveryProof.methodDescription = methodDescription;
-    }
-
-    // Update escrow
-    escrow.deliveryProof = deliveryProof;
     escrow.status = 'awaiting_delivery';
-    
-    // Set auto-release date (3 days after estimated delivery)
-    escrow.setAutoReleaseDate();
-    
+
+    // Set auto-release date (7 days after estimated delivery or 14 days from now)
+    const autoReleaseDate = new Date();
+    if (estimatedDelivery) {
+      autoReleaseDate.setTime(new Date(estimatedDelivery).getTime() + (7 * 24 * 60 * 60 * 1000));
+    } else {
+      autoReleaseDate.setDate(autoReleaseDate.getDate() + 14);
+    }
+    escrow.autoReleaseDate = autoReleaseDate;
+
     await escrow.save();
+
+    // Send notification to buyer
+    await emailService.sendDeliveryProofEmail(
+      escrow.buyer.email,
+      {
+        escrowId: escrow.escrowId,
+        itemName: escrow.itemName,
+        trackingNumber,
+        carrier,
+        estimatedDelivery
+      }
+    );
 
     res.status(200).json({
       success: true,
       message: 'Delivery proof uploaded successfully',
-      escrow: {
-        escrowId: escrow.escrowId,
-        status: escrow.status,
-        deliveryProof: escrow.deliveryProof,
-        autoReleaseDate: escrow.autoReleaseDate
-      }
+      deliveryProof: escrow.deliveryProof,
+      autoReleaseDate: escrow.autoReleaseDate
     });
 
   } catch (error) {
@@ -94,13 +97,14 @@ exports.uploadDeliveryProof = async (req, res) => {
   }
 };
 
-// Get delivery tracking info
-exports.getDeliveryTracking = async (req, res) => {
+// Get Delivery Details
+exports.getDeliveryDetails = async (req, res) => {
   try {
     const { escrowId } = req.params;
 
     const escrow = await Escrow.findOne({ escrowId })
-      .select('escrowId deliveryProof status autoReleaseDate');
+      .populate('buyer', 'name email')
+      .populate('seller', 'name email');
 
     if (!escrow) {
       return res.status(404).json({
@@ -111,45 +115,34 @@ exports.getDeliveryTracking = async (req, res) => {
 
     // Verify user is part of this escrow
     const userId = req.user._id.toString();
-    if (escrow.buyer.toString() !== userId && escrow.seller.toString() !== userId) {
+    if (escrow.buyer._id.toString() !== userId && escrow.seller._id.toString() !== userId) {
       return res.status(403).json({
         success: false,
-        message: 'Not authorized to access this information'
+        message: 'Not authorized to view delivery details'
       });
     }
 
     res.status(200).json({
       success: true,
-      tracking: {
-        escrowId: escrow.escrowId,
-        status: escrow.status,
-        deliveryProof: escrow.deliveryProof,
-        autoReleaseDate: escrow.autoReleaseDate
-      }
+      deliveryProof: escrow.deliveryProof,
+      status: escrow.status,
+      autoReleaseDate: escrow.autoReleaseDate
     });
 
   } catch (error) {
-    console.error('Get delivery tracking error:', error);
+    console.error('Get delivery details error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch tracking information',
+      message: 'Failed to fetch delivery details',
       error: error.message
     });
   }
 };
 
-// Update GPS location (for personal delivery with GPS tracking)
-exports.updateGPSLocation = async (req, res) => {
+// Update Tracking Info
+exports.updateTracking = async (req, res) => {
   try {
-    const { escrowId } = req.params;
-    const { latitude, longitude } = req.body;
-
-    if (!latitude || !longitude) {
-      return res.status(400).json({
-        success: false,
-        message: 'Latitude and longitude are required'
-      });
-    }
+    const { escrowId, trackingNumber, carrier, status, location } = req.body;
 
     const escrow = await Escrow.findOne({ escrowId });
 
@@ -164,26 +157,26 @@ exports.updateGPSLocation = async (req, res) => {
     if (escrow.seller.toString() !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Only the seller can update GPS location'
+        message: 'Only the seller can update tracking'
       });
     }
 
-    // Check if GPS is enabled for this delivery
-    if (!escrow.deliveryProof || !escrow.deliveryProof.gpsEnabled) {
-      return res.status(400).json({
-        success: false,
-        message: 'GPS tracking is not enabled for this delivery'
-      });
+    // Update tracking info
+    if (!escrow.deliveryProof) {
+      escrow.deliveryProof = {};
     }
 
-    // Add GPS coordinate
-    if (!escrow.deliveryProof.gpsCoordinates) {
-      escrow.deliveryProof.gpsCoordinates = [];
+    if (trackingNumber) escrow.deliveryProof.trackingNumber = trackingNumber;
+    if (carrier) escrow.deliveryProof.carrier = carrier;
+    
+    // Add tracking update
+    if (!escrow.deliveryProof.trackingUpdates) {
+      escrow.deliveryProof.trackingUpdates = [];
     }
-
-    escrow.deliveryProof.gpsCoordinates.push({
-      lat: parseFloat(latitude),
-      lng: parseFloat(longitude),
+    
+    escrow.deliveryProof.trackingUpdates.push({
+      status: status || 'in_transit',
+      location,
       timestamp: new Date()
     });
 
@@ -191,19 +184,15 @@ exports.updateGPSLocation = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'GPS location updated',
-      location: {
-        lat: parseFloat(latitude),
-        lng: parseFloat(longitude),
-        timestamp: new Date()
-      }
+      message: 'Tracking updated successfully',
+      deliveryProof: escrow.deliveryProof
     });
 
   } catch (error) {
-    console.error('Update GPS location error:', error);
+    console.error('Update tracking error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update GPS location',
+      message: 'Failed to update tracking',
       error: error.message
     });
   }
