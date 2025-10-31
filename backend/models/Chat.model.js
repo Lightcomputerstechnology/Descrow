@@ -4,37 +4,42 @@ const chatSchema = new mongoose.Schema({
   escrow: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Escrow',
-    required: true
+    required: true,
+    unique: true
   },
-  sender: {
+  participants: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  message: {
-    type: String,
-    required: true
-  },
-  messageType: {
-    type: String,
-    enum: ['text', 'file', 'image'],
-    default: 'text'
-  },
-  fileUrl: {
-    type: String // For file/image messages
-  },
-  fileName: {
+    ref: 'User'
+  }],
+  messages: [{
+    sender: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    message: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    attachments: [String],
+    read: {
+      type: Boolean,
+      default: false
+    },
+    timestamp: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  lastMessage: {
     type: String
   },
-  isRead: {
-    type: Boolean,
-    default: false
+  lastMessageAt: {
+    type: Date
   }
 }, {
   timestamps: true
 });
-
-// Index for faster queries
-chatSchema.index({ escrow: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Chat', chatSchema);
