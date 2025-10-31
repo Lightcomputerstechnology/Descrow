@@ -4,6 +4,7 @@ class PaymentService {
   constructor() {
     this.paystackSecretKey = process.env.PAYSTACK_SECRET_KEY;
     this.flutterwaveSecretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+    this.nowpaymentsApiKey = process.env.NOWPAYMENTS_API_KEY;
   }
 
   // Initialize Paystack Payment
@@ -13,7 +14,7 @@ class PaymentService {
         'https://api.paystack.co/transaction/initialize',
         {
           email,
-          amount: amount * 100, // Convert to kobo
+          amount: amount * 100,
           reference,
           metadata,
           callback_url: `${process.env.FRONTEND_URL}/payment/verify`,
@@ -34,27 +35,24 @@ class PaymentService {
         reference: response.data.data.reference
       };
     } catch (error) {
-      console.error('Paystack initialization error:', error.response?.data || error.message);
+      console.error('Paystack error:', error.response?.data || error.message);
       throw new Error('Failed to initialize Paystack payment');
     }
   }
 
-  // Verify Paystack Payment
   async verifyPaystack(reference) {
     try {
       const response = await axios.get(
         `https://api.paystack.co/transaction/verify/${reference}`,
         {
-          headers: {
-            Authorization: `Bearer ${this.paystackSecretKey}`
-          }
+          headers: { Authorization: `Bearer ${this.paystackSecretKey}` }
         }
       );
 
       const data = response.data.data;
       return {
         success: data.status === 'success',
-        amount: data.amount / 100, // Convert from kobo
+        amount: data.amount / 100,
         currency: data.currency,
         reference: data.reference,
         paidAt: data.paid_at,
@@ -78,10 +76,7 @@ class PaymentService {
           currency,
           redirect_url: `${process.env.FRONTEND_URL}/payment/verify`,
           payment_options: 'card,banktransfer,ussd,mobilemoney',
-          customer: {
-            email,
-            name: metadata.buyerName || 'Customer'
-          },
+          customer: { email, name: metadata.buyerName || 'Customer' },
           customizations: {
             title: 'Dealcross Escrow Payment',
             description: `Payment for ${metadata.itemName}`,
@@ -103,20 +98,17 @@ class PaymentService {
         reference: reference
       };
     } catch (error) {
-      console.error('Flutterwave initialization error:', error.response?.data || error.message);
+      console.error('Flutterwave error:', error.response?.data || error.message);
       throw new Error('Failed to initialize Flutterwave payment');
     }
   }
 
-  // Verify Flutterwave Payment
   async verifyFlutterwave(transactionId) {
     try {
       const response = await axios.get(
         `https://api.flutterwave.com/v3/transactions/${transactionId}/verify`,
         {
-          headers: {
-            Authorization: `Bearer ${this.flutterwaveSecretKey}`
-          }
+          headers: { Authorization: `Bearer ${this.flutterwaveSecretKey}` }
         }
       );
 
@@ -136,50 +128,74 @@ class PaymentService {
     }
   }
 
-  // Generate Crypto Payment Instructions (Manual - No API)
-  generateCryptoPayment(cryptocurrency, amount, reference) {
-    const walletAddresses = {
-      BTC: {
-        address: process.env.BTC_WALLET_ADDRESS || '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
-        network: 'Bitcoin Network',
-        confirmations: 3
-      },
-      ETH: {
-        address: process.env.ETH_WALLET_ADDRESS || '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
-        network: 'Ethereum Network (ERC-20)',
-        confirmations: 12
-      },
-      USDT: {
-        address: process.env.USDT_WALLET_ADDRESS || '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
-        network: 'Ethereum Network (ERC-20)',
-        confirmations: 12
-      }
-    };
+  // ============== NOWPAYMENTS CRYPTO (CORRECTED) ==============
 
-    const wallet = walletAddresses[cryptocurrency];
-    if (!wallet) {
-      throw new Error('Unsupported cryptocurrency');
+  // Initialize Nowpayments Crypto Payment
+  async initializeNowpayments(amount, currency, orderId, orderDescription) {
+    try {
+      const response = await axios.post(
+        'https://api.nowpayments.io/v1/payment',
+        {
+          price_amount: amount,
+          price_currency: currency,
+          pay_currency: 'btc', // User can change on payment page
+          order_id: orderId,
+          order_description: orderDescription,
+          ipn_callback_url: `${process.env.BACKEND_URL}/api/payments/nowpayments/webhook`,
+          success_url: `${process.env.FRONTEND_URL}/payment/success`,
+          cancel_url: `${process.env.FRONTEND_URL}/payment/cancel`
+        },
+        {
+          headers: {
+            'x-api-key': this.nowpaymentsApiKey,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      return {
+        success: true,
+        paymentId: response.data.payment_id,
+        paymentUrl: response.data.invoice_url,
+        payAddress: response.data.pay_address,
+        payCurrency: response.data.pay_currency,
+        payAmount: response.data.pay_amount,
+        orderId: response.data.order_id
+      };
+    } catch (error) {
+      console.error('Nowpayments error:', error.response?.data || error.message);
+      throw new Error('Failed to initialize Nowpayments');
     }
+  }
 
-    return {
-      success: true,
-      cryptocurrency,
-      walletAddress: wallet.address,
-      network: wallet.network,
-      amount,
-      reference,
-      qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${wallet.address}`,
-      instructions: [
-        `1. Send exactly ${amount} ${cryptocurrency} to the address above`,
-        `2. Network: ${wallet.network}`,
-        `3. Include reference: ${reference} in transaction memo (if possible)`,
-        `4. Wait for ${wallet.confirmations} confirmations`,
-        `5. Upload transaction hash/screenshot as proof`,
-        `6. Payment will be verified by admin within 1-2 hours`
-      ],
-      warning: 'IMPORTANT: Send only to the correct network. Wrong network = permanent loss of funds.',
-      note: 'Manual verification required. Do not close this page until you upload proof.'
-    };
+  // Verify Nowpayments Payment Status
+  async verifyNowpayments(paymentId) {
+    try {
+      const response = await axios.get(
+        `https://api.nowpayments.io/v1/payment/${paymentId}`,
+        {
+          headers: { 'x-api-key': this.nowpaymentsApiKey }
+        }
+      );
+
+      const data = response.data;
+      return {
+        success: data.payment_status === 'finished',
+        paymentId: data.payment_id,
+        paymentStatus: data.payment_status,
+        payAddress: data.pay_address,
+        payCurrency: data.pay_currency,
+        payAmount: data.pay_amount,
+        priceAmount: data.price_amount,
+        priceCurrency: data.price_currency,
+        orderId: data.order_id,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
+    } catch (error) {
+      console.error('Nowpayments verification error:', error.response?.data || error.message);
+      throw new Error('Failed to verify Nowpayments');
+    }
   }
 }
 
