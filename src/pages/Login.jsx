@@ -1,130 +1,183 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { User, Lock, Shield, Eye, EyeOff } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Shield, Mail, Lock, Eye, EyeOff, Loader, AlertCircle } from 'lucide-react';
+import { authService } from '../services/authService';
 
 const Login = ({ setUser }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
   const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleLogin = (e) => {
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+    setError('');
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
-    // Mock login - Replace with actual API call
-    const mockUser = {
-      id: '12345',
-      name: email.split('@')[0],
-      email: email,
-      role: 'dual', // User can be both buyer AND seller
-      tier: 'free'
-    };
-    
-    setUser(mockUser);
-    navigate('/dashboard'); // Go to unified dashboard
+
+    // Validation
+    if (!formData.email || !formData.password) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await authService.login({
+        email: formData.email,
+        password: formData.password
+      });
+
+      if (response.success) {
+        setUser(response.user);
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-gray-900 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-md overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white text-center">
-          <div 
-            className="flex items-center justify-center gap-2 mb-2 cursor-pointer"
-            onClick={() => navigate('/')}
-          >
-            <Shield className="w-8 h-8" />
-            <h1 className="text-3xl font-bold">Dealcross</h1>
+      <div className="max-w-md w-full">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Shield className="w-12 h-12 text-blue-400" />
+            <span className="text-3xl font-bold text-white">Dealcross</span>
           </div>
-          <p className="text-blue-100">Secure escrow payments worldwide</p>
+          <h1 className="text-2xl font-bold text-white mb-2">Welcome Back</h1>
+          <p className="text-blue-200">Login to access your dashboard</p>
         </div>
 
-        <div className="p-8">
-          <h2 className="text-2xl font-bold text-center mb-2 text-gray-900 dark:text-white">Welcome Back</h2>
-          <p className="text-center text-gray-600 dark:text-gray-400 mb-8">Login to your account</p>
-          
+        {/* Login Form */}
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-              {error}
+            <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Email Address
+              </label>
               <div className="relative">
-                <User className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  placeholder="your@email.com"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                  placeholder="you@example.com"
                   required
+                  autoComplete="email"
                 />
               </div>
             </div>
 
+            {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Password
+              </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  placeholder="••••••••"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                  placeholder="Enter your password"
                   required
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
 
+            {/* Forgot Password */}
             <div className="flex items-center justify-between">
-              <label className="flex items-center cursor-pointer">
-                <input type="checkbox" className="mr-2 w-4 h-4 text-blue-600 rounded" />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Remember me</span>
-              </label>
-              <a href="#" className="text-sm text-blue-600 hover:underline">
+              <div className="flex items-center">
+                <input
+                  id="remember-me"
+                  name="remember-me"
+                  type="checkbox"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                  Remember me
+                </label>
+              </div>
+              <Link
+                to="/forgot-password"
+                className="text-sm font-medium text-blue-600 hover:text-blue-500"
+              >
                 Forgot password?
-              </a>
+              </Link>
             </div>
 
+            {/* Submit Button */}
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition duration-200"
+              disabled={loading}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Login
+              {loading ? (
+                <>
+                  <Loader className="w-5 h-5 animate-spin" />
+                  Logging in...
+                </>
+              ) : (
+                'Login'
+              )}
             </button>
           </form>
 
-          <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-6">
-            Don't have an account?{' '}
-            <button
-              onClick={() => navigate('/signup')}
-              className="text-blue-600 hover:underline font-semibold"
-            >
-              Sign up
-            </button>
-          </p>
-
-          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800 text-center">
-            <button
-              onClick={() => navigate('/')}
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 transition"
-            >
-              ← Back to Home
-            </button>
+          {/* Divider */}
+          <div className="mt-6 mb-6 flex items-center">
+            <div className="flex-1 border-t border-gray-300 dark:border-gray-700"></div>
+            <span className="px-4 text-sm text-gray-500 dark:text-gray-400">OR</span>
+            <div className="flex-1 border-t border-gray-300 dark:border-gray-700"></div>
           </div>
+
+          {/* Sign Up Link */}
+          <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+            Don't have an account?{' '}
+            <Link to="/signup" className="font-medium text-blue-600 hover:text-blue-500">
+              Sign up for free
+            </Link>
+          </p>
+        </div>
+
+        {/* Back to Home */}
+        <div className="text-center mt-6">
+          <Link to="/" className="text-sm text-blue-200 hover:text-white transition">
+            ← Back to Home
+          </Link>
         </div>
       </div>
     </div>
