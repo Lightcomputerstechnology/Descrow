@@ -35,16 +35,25 @@ const upload = multer({
 });
 
 // Upload delivery proof
-router.post('/:escrowId/proof',
+router.post(
+  '/:escrowId/proof',
   protect,
-  upload.array('photos', 5), // Max 5 photos
+  upload.array('photos', 5),
   deliveryController.uploadDeliveryProof
 );
 
-// Get delivery tracking info
-router.get('/:escrowId/tracking', protect, deliveryController.getDeliveryTracking);
+// ✅ FIXED: Correct function name
+router.get(
+  '/:escrowId/tracking',
+  protect,
+  deliveryController.getDeliveryDetails
+);
 
-// Update GPS location (for personal delivery)
-router.post('/:escrowId/gps', protect, deliveryController.updateGPSLocation);
+// ✅ FIXED: Updated endpoint name for consistency
+router.post(
+  '/:escrowId/gps',
+  protect,
+  deliveryController.updateTracking
+);
 
 module.exports = router;
