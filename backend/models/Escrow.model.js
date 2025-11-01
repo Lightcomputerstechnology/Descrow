@@ -32,11 +32,11 @@ const escrowSchema = new mongoose.Schema({
   },
   adminFee: {
     type: Number,
-    required: true // Fee deducted immediately when escrow is funded
+    required: true
   },
   netAmount: {
     type: Number,
-    required: true // Amount after admin fee deduction (amount - adminFee)
+    required: true
   },
   currency: {
     type: String,
@@ -54,7 +54,7 @@ const escrowSchema = new mongoose.Schema({
     required: true
   },
   paymentReference: {
-    type: String // Payment gateway reference
+    type: String
   },
   deliveryProof: {
     method: {
@@ -68,7 +68,7 @@ const escrowSchema = new mongoose.Schema({
     driverName: String,
     methodDescription: String,
     estimatedDelivery: Date,
-    photos: [String], // URLs to delivery photos
+    photos: [String],
     gpsEnabled: {
       type: Boolean,
       default: false
@@ -84,11 +84,11 @@ const escrowSchema = new mongoose.Schema({
       type: String,
       enum: ['drawn', 'typed', 'photo']
     },
-    data: String, // Base64 or URL
+    data: String,
     timestamp: Date
   },
   autoReleaseDate: {
-    type: Date // 3 days after delivery date
+    type: Date
   },
   chatUnlocked: {
     type: Boolean,
@@ -116,113 +116,6 @@ escrowSchema.methods.setAutoReleaseDate = function() {
     const deliveryDate = new Date(this.deliveryProof.estimatedDelivery);
     this.autoReleaseDate = new Date(deliveryDate.getTime() + (3 * 24 * 60 * 60 * 1000)); // +3 days
   }
-};const mongoose = require('mongoose');
-
-const escrowSchema = new mongoose.Schema({
-  escrowId: {
-    type: String,
-    unique: true,
-    required: true
-  },
-  buyer: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  seller: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  itemName: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  itemDescription: {
-    type: String,
-    trim: true
-  },
-  amount: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  adminFee: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  netAmount: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  currency: {
-    type: String,
-    enum: ['USD', 'EUR', 'GBP', 'NGN'],
-    default: 'USD'
-  },
-  status: {
-    type: String,
-    enum: ['pending_payment', 'in_escrow', 'awaiting_delivery', 'completed', 'cancelled', 'disputed'],
-    default: 'pending_payment'
-  },
-  paymentMethod: {
-    type: String,
-    enum: ['paystack', 'flutterwave', 'crypto'],
-    required: true
-  },
-  paymentReference: {
-    type: String
-  },
-  nowpaymentsId: {
-    type: String
-  },
-  paymentVerifiedAt: {
-    type: Date
-  },
-  chatUnlocked: {
-    type: Boolean,
-    default: false
-  },
-  deliveryProof: {
-    trackingNumber: String,
-    carrier: String,
-    estimatedDelivery: Date,
-    proofImages: [String],
-    notes: String,
-    uploadedAt: Date,
-    trackingUpdates: [{
-      status: String,
-      location: String,
-      timestamp: Date
-    }]
-  },
-  deliverySignature: {
-    signatureData: String,
-    timestamp: Date
-  },
-  autoReleaseDate: {
-    type: Date
-  },
-  dispute: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Dispute'
-  }
-}, {
-  timestamps: true
-});
-
-// Generate unique escrow ID before saving
-escrowSchema.pre('save', async function(next) {
-  if (!this.escrowId) {
-    const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase();
-    this.escrowId = `ESC${Date.now()}${randomStr}`;
-  }
-  next();
-});
-
-module.exports = mongoose.model('Escrow', escrowSchema);
+};
 
 module.exports = mongoose.model('Escrow', escrowSchema);
