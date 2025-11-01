@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
@@ -9,75 +9,82 @@ import {
   LogOut,
   ShoppingCart,
   Store,
-  TrendingUp,
-  DollarSign
+  DollarSign,
+  Loader
 } from 'lucide-react';
 import CreateEscrowModal from '../components/CreateEscrowModal';
+import { authService } from '../services/authService';
+import { escrowService } from '../services/escrowService';
+import { userService } from '../services/userService';
 
-const UnifiedDashboard = ({ user }) => {
+const UnifiedDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('buying'); // 'buying' or 'selling'
   const [showCreateModal, setShowCreateModal] = useState(false);
-  
-  // Mock transactions - Replace with API call
-  const [buyingTransactions] = useState([
-    {
-      id: 'ESC001',
-      sellerName: 'TechStore Ltd',
-      itemName: 'MacBook Pro 16"',
-      amount: 2500,
-      currency: 'USD',
-      status: 'awaiting_delivery',
-      createdAt: '2025-10-25',
-      deliveryDate: '2025-10-28',
-      type: 'buying'
-    },
-    {
-      id: 'ESC002',
-      sellerName: 'Fashion Hub',
-      itemName: 'Designer Jacket',
-      amount: 450,
-      currency: 'USD',
-      status: 'in_escrow',
-      createdAt: '2025-10-26',
-      deliveryDate: null,
-      type: 'buying'
-    }
-  ]);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [buyingTransactions, setBuyingTransactions] = useState([]);
+  const [sellingTransactions, setSellingTransactions] = useState([]);
+  const [statistics, setStatistics] = useState(null);
 
-  const [sellingTransactions] = useState([
-    {
-      id: 'ESC004',
-      buyerName: 'John Doe',
-      itemName: 'Gaming Laptop',
-      amount: 1800,
-      currency: 'USD',
-      status: 'in_escrow',
-      createdAt: '2025-10-26',
-      deliveryDate: null,
-      type: 'selling'
-    },
-    {
-      id: 'ESC005',
-      buyerName: 'Sarah Smith',
-      itemName: 'iPhone 15 Pro',
-      amount: 1200,
-      currency: 'USD',
-      status: 'awaiting_delivery',
-      createdAt: '2025-10-24',
-      deliveryDate: '2025-10-29',
-      type: 'selling'
+  // Fetch user data and transactions on mount
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      // Get current user from localStorage
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser) {
+        navigate('/login');
+        return;
+      }
+      setUser(currentUser);
+
+      // Fetch user profile (updated info)
+      const profileResponse = await userService.getProfile();
+      setUser(profileResponse.user);
+      localStorage.setItem('user', JSON.stringify(profileResponse.user));
+
+      // Fetch buying transactions
+      const buyingResponse = await escrowService.getUserEscrows(currentUser.id, 'buying');
+      setBuyingTransactions(buyingResponse.escrows || []);
+
+      // Fetch selling transactions
+      const sellingResponse = await escrowService.getUserEscrows(currentUser.id, 'selling');
+      setSellingTransactions(sellingResponse.escrows || []);
+
+      // Fetch user statistics
+      const statsResponse = await userService.getStatistics();
+      setStatistics(statsResponse.statistics);
+
+    } catch (error) {
+      console.error('Dashboard data fetch error:', error);
+      if (error.response?.status === 401) {
+        authService.logout();
+      }
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+  };
 
   const getStatusBadge = (status) => {
     const badges = {
+      'pending_payment': { color: 'bg-orange-100 text-orange-800', icon: Clock, text: 'Pending Payment' },
       'in_escrow': { color: 'bg-yellow-100 text-yellow-800', icon: Clock, text: 'Awaiting Shipment' },
       'awaiting_delivery': { color: 'bg-blue-100 text-blue-800', icon: Package, text: 'In Transit' },
       'completed': { color: 'bg-green-100 text-green-800', icon: CheckCircle, text: 'Completed' },
-      'disputed': { color: 'bg-red-100 text-red-800', icon: AlertCircle, text: 'Disputed' }
+      'disputed': { color: 'bg-red-100 text-red-800', icon: AlertCircle, text: 'Disputed' },
+      'cancelled': { color: 'bg-gray-100 text-gray-800', icon: AlertCircle, text: 'Cancelled' }
     };
-    const badge = badges[status];
+    const badge = badges[status] || badges['in_escrow'];
     const Icon = badge.icon;
     return (
       <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${badge.color}`}>
@@ -87,17 +94,40 @@ const UnifiedDashboard = ({ user }) => {
     );
   };
 
-  const buyingStats = {
-    total: buyingTransactions.length,
-    inEscrow: buyingTransactions.filter(t => t.status === 'in_escrow').length,
-    inTransit: buyingTransactions.filter(t => t.status === 'awaiting_delivery').length,
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  const buyingStats = statistics?.buying || {
+    total: 0,
+    inEscrow: 0,
+    inTransit: 0,
     completed: 0
   };
 
-  const sellingStats = {
-    total: sellingTransactions.length,
-    pending: sellingTransactions.filter(t => t.status === 'in_escrow').length,
-    shipped: sellingTransactions.filter(t => t.status === 'awaiting_delivery').length,
+  const sellingStats = statistics?.selling || {
+    total: 0,
+    pending: 0,
+    shipped: 0,
     completed: 0
   };
 
@@ -117,7 +147,7 @@ const UnifiedDashboard = ({ user }) => {
                 <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 uppercase">{user.tier}</p>
               </div>
               <button
-                onClick={() => navigate('/')}
+                onClick={handleLogout}
                 className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
               >
                 <LogOut className="w-4 h-4" />
@@ -178,6 +208,16 @@ const UnifiedDashboard = ({ user }) => {
               </div>
             </div>
 
+            {/* Tier Limits Info */}
+            {statistics?.monthlyTransactions && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+                <p className="text-sm text-blue-900 dark:text-blue-200">
+                  <strong>Monthly Transactions:</strong> {statistics.monthlyTransactions.count} / {statistics.monthlyTransactions.limit === -1 ? 'Unlimited' : statistics.monthlyTransactions.limit}
+                  {statistics.monthlyTransactions.remaining !== 'Unlimited' && ` (${statistics.monthlyTransactions.remaining} remaining)`}
+                </p>
+              </div>
+            )}
+
             {/* Create New Escrow Button */}
             <div className="mb-6">
               <button
@@ -198,8 +238,8 @@ const UnifiedDashboard = ({ user }) => {
                 {buyingTransactions.length > 0 ? (
                   buyingTransactions.map((transaction) => (
                     <div
-                      key={transaction.id}
-                      onClick={() => navigate(`/escrow/${transaction.id}`)}
+                      key={transaction.escrowId}
+                      onClick={() => navigate(`/escrow/${transaction.escrowId}`)}
                       className="p-6 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition"
                     >
                       <div className="flex justify-between items-start mb-3">
@@ -207,8 +247,10 @@ const UnifiedDashboard = ({ user }) => {
                           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
                             {transaction.itemName}
                           </h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Seller: {transaction.sellerName}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">ID: {transaction.id}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Seller: {transaction.seller?.name || transaction.seller?.email}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">ID: {transaction.escrowId}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -218,9 +260,9 @@ const UnifiedDashboard = ({ user }) => {
                         </div>
                       </div>
                       <div className="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
-                        <span>Created: {transaction.createdAt}</span>
+                        <span>Created: {formatDate(transaction.createdAt)}</span>
                         {transaction.deliveryDate && (
-                          <span>Expected Delivery: {transaction.deliveryDate}</span>
+                          <span>Expected Delivery: {formatDate(transaction.deliveryDate)}</span>
                         )}
                       </div>
                     </div>
@@ -256,7 +298,9 @@ const UnifiedDashboard = ({ user }) => {
                   <DollarSign className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Earnings</p>
                 </div>
-                <p className="text-3xl font-bold text-green-600">$3,000</p>
+                <p className="text-3xl font-bold text-green-600">
+                  ${(user.totalEarned || 0).toLocaleString()}
+                </p>
               </div>
               <div className="bg-white dark:bg-gray-900 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-800">
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Pending</p>
@@ -268,17 +312,19 @@ const UnifiedDashboard = ({ user }) => {
               </div>
             </div>
 
-            {/* Upgrade Prompt */}
-            <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 mb-8 text-white">
-              <h2 className="text-xl font-semibold mb-2">Upgrade Your Account</h2>
-              <p className="mb-4 text-purple-100">Unlock higher transaction limits and more features</p>
-              <button 
-                onClick={() => navigate('/#pricing')}
-                className="bg-white text-purple-600 px-6 py-2 rounded-lg font-semibold hover:bg-purple-50 transition"
-              >
-                View Plans
-              </button>
-            </div>
+            {/* Upgrade Prompt (only for free/basic tier) */}
+            {(user.tier === 'free' || user.tier === 'basic') && (
+              <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 mb-8 text-white">
+                <h2 className="text-xl font-semibold mb-2">Upgrade Your Account</h2>
+                <p className="mb-4 text-purple-100">Unlock higher transaction limits and more features</p>
+                <button 
+                  onClick={() => navigate('/#pricing')}
+                  className="bg-white text-purple-600 px-6 py-2 rounded-lg font-semibold hover:bg-purple-50 transition"
+                >
+                  View Plans
+                </button>
+              </div>
+            )}
 
             {/* Transactions List */}
             <div className="bg-white dark:bg-gray-900 rounded-lg shadow overflow-hidden border border-gray-200 dark:border-gray-800">
@@ -289,8 +335,8 @@ const UnifiedDashboard = ({ user }) => {
                 {sellingTransactions.length > 0 ? (
                   sellingTransactions.map((transaction) => (
                     <div
-                      key={transaction.id}
-                      onClick={() => navigate(`/escrow/${transaction.id}`)}
+                      key={transaction.escrowId}
+                      onClick={() => navigate(`/escrow/${transaction.escrowId}`)}
                       className="p-6 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition"
                     >
                       <div className="flex justify-between items-start mb-3">
@@ -298,27 +344,32 @@ const UnifiedDashboard = ({ user }) => {
                           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
                             {transaction.itemName}
                           </h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Buyer: {transaction.buyerName}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">ID: {transaction.id}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Buyer: {transaction.buyer?.name || transaction.buyer?.email}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">ID: {transaction.escrowId}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                            {transaction.currency} ${transaction.amount.toLocaleString()}
+                            {transaction.currency} ${transaction.netAmount.toLocaleString()}
                           </p>
                           {getStatusBadge(transaction.status)}
                         </div>
                       </div>
                       <div className="flex justify-between items-center text-sm text-gray-600 dark:text-gray-400">
-                        <span>Created: {transaction.createdAt}</span>
+                        <span>Created: {formatDate(transaction.createdAt)}</span>
                         {transaction.deliveryDate && (
-                          <span>Expected Delivery: {transaction.deliveryDate}</span>
+                          <span>Expected Delivery: {formatDate(transaction.deliveryDate)}</span>
                         )}
                       </div>
                       
                       {transaction.status === 'in_escrow' && (
-                        <div className="mt-4">
-                          <button className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition">
-                            Mark as Shipped
+                        <div className="mt-4" onClick={(e) => e.stopPropagation()}>
+                          <button 
+                            onClick={() => navigate(`/escrow/${transaction.escrowId}`)}
+                            className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition"
+                          >
+                            Upload Delivery Proof
                           </button>
                         </div>
                       )}
@@ -344,9 +395,9 @@ const UnifiedDashboard = ({ user }) => {
         <CreateEscrowModal
           user={user}
           onClose={() => setShowCreateModal(false)}
-          onSuccess={(newEscrow) => {
+          onSuccess={() => {
             setShowCreateModal(false);
-            // Refresh transactions
+            fetchDashboardData(); // Refresh data
           }}
         />
       )}
