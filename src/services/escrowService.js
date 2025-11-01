@@ -6,7 +6,6 @@ export const escrowService = {
     const response = await api.post('/escrow/create', escrowData);
     return response.data;
   },
-
   // Get user escrows
   getUserEscrows: async (userId, role) => {
     const response = await api.get(`/escrow/user/${userId}?role=${role || ''}`);
