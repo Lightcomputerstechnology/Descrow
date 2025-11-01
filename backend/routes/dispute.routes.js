@@ -15,7 +15,8 @@ router.post(
     body('reason').notEmpty().withMessage('Reason required'),
     body('description').notEmpty().withMessage('Description required')
   ],
-  (req, res) => {​​​​​​​​​​​​​​​​req.body.evidence = req.fileUrls || [];
+  (req, res) => {
+    req.body.evidence = req.fileUrls || [];
     disputeController.createDispute(req, res);
   }
 );
