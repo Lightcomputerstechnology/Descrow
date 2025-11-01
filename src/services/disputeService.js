@@ -7,7 +7,7 @@ export const disputeService = {
     formData.append('escrowId', escrowId);
     formData.append('reason', disputeData.reason);
     formData.append('description', disputeData.description);
-
+    
     if (evidence && evidence.length > 0) {
       evidence.forEach(file => {
         formData.append('evidence', file);
