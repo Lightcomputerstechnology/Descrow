@@ -32,10 +32,10 @@ app.use(helmet({
 // Compression
 app.use(compression());
 
-// CORS Configuration
+// CORS Configuration - Allow all origins temporarily
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true,
+  origin: '*',
+  credentials: false,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
 }));
