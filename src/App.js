@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 // Public Pages
+import VerifyEmail from './pages/VerifyEmail';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import SignUpPage from './pages/SignUpPage';
@@ -120,7 +121,11 @@ function App() {
           element={user ? <Navigate to="/dashboard" replace /> : <SignUpPage setUser={setUser} />} 
         />
 
-        {/* ==================== USER ROUTES (Protected) ==================== */}
+        <Route 
+            path="/verify-email" element={<VerifyEmail />} 
+            />
+            
+          {/* ==================== USER ROUTES (Protected) ==================== */}
         <Route 
           path="/dashboard" 
           element={
