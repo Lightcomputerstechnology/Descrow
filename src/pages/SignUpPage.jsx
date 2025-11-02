@@ -53,44 +53,62 @@ const SignUpPage = ({ setUser }) => {
     return 'Strong';
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
+  // Replace the handleSubmit function with this:
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError('');
 
-    // Validation
-    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
-      setError('Please fill in all fields');
-      return;
+  // Validation
+  if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
+    setError('Please fill in all fields');
+    return;
+  }
+
+  if (formData.password.length < 8) {
+    setError('Password must be at least 8 characters long');
+    return;
+  }
+
+  if (formData.password !== formData.confirmPassword) {
+    setError('Passwords do not match');
+    return;
+  }
+
+  try {
+    setLoading(true);
+    console.log('Attempting registration...'); // Debug
+    
+    const response = await authService.register({
+      name: formData.name,
+      email: formData.email,
+      password: formData.password
+    });
+
+    console.log('Registration response:', response); // Debug
+
+    if (response.success) {
+      setUser(response.user);
+      navigate('/dashboard');
     }
-
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
-      return;
+  } catch (err) {
+    console.error('Registration error:', err); // Debug
+    
+    // Extract error message
+    let errorMessage = 'Registration failed. Please try again.';
+    
+    if (err.response?.data?.message) {
+      errorMessage = err.response.data.message;
+    } else if (err.response?.data?.errors) {
+      errorMessage = err.response.data.errors.map(e => e.msg || e.message).join(', ');
+    } else if (err.message) {
+      errorMessage = err.message;
     }
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await authService.register({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password
-      });
-
-      if (response.success) {
-        setUser(response.user);
-        navigate('/dashboard');
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    
+    setError(errorMessage);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-gray-900 flex items-center justify-center p-4">
