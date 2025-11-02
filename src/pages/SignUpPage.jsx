@@ -76,23 +76,30 @@ const handleSubmit = async (e) => {
 
   try {
     setLoading(true);
-    console.log('Attempting registration...'); // Debug
-    
     const response = await authService.register({
       name: formData.name,
       email: formData.email,
       password: formData.password
     });
 
-    console.log('Registration response:', response); // Debug
-
     if (response.success) {
-      setUser(response.user);
-      navigate('/dashboard');
+      // Check if verification is required
+      if (response.requiresVerification) {
+        // Show success message and redirect to login
+        alert('Registration successful! Please check your email to verify your account before logging in.');
+        navigate('/login');
+      } else {
+        // Old behavior (if verification not required)
+        setUser(response.user);
+        navigate('/dashboard');
+      }
     }
   } catch (err) {
-    console.error('Registration error:', err); // Debug
-    
+    setError(err.message || 'Registration failed. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
     // Extract error message
     let errorMessage = 'Registration failed. Please try again.';
     
