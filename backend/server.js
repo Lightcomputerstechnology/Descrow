@@ -33,12 +33,17 @@ app.use(helmet({
 app.use(compression());
 
 // CORS Configuration
+// Replace the existing CORS section with this:
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: ['http://localhost:3000', 'http://localhost:3001', process.env.FRONTEND_URL],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
 }));
+
+// Add OPTIONS handling for preflight requests
+app.options('*', cors());
+
 
 // Body Parsers
 app.use(express.json({ limit: '10mb' }));
