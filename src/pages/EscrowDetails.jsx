@@ -1014,3 +1014,7 @@ const EscrowDetails = () => {
         </div>
       )}
     </div>
+  );
+};
+
+export default EscrowDetails;
