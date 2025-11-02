@@ -47,9 +47,11 @@ exports.register = async (req, res) => {
     // Generate token
     const token = generateToken(user._id);
 
-    // Send welcome email
-    await emailService.sendWelcomeEmail(user.email, user.name);
+    // Send welcome email (NON-BLOCKING - don't wait, don't fail registration if email fails)
+    emailService.sendWelcomeEmail(user.email, user.name)
+      .catch(err => console.log('⚠️ Welcome email failed (non-critical):', err.message));
 
+    // Return success immediately (don't wait for email)
     res.status(201).json({
       success: true,
       message: 'Registration successful',
@@ -195,8 +197,9 @@ exports.forgotPassword = async (req, res) => {
     // Generate reset token
     const resetToken = generateToken(user._id);
 
-    // Send reset email
-    await emailService.sendPasswordResetEmail(user.email, user.name, resetToken);
+    // Send reset email (NON-BLOCKING)
+    emailService.sendPasswordResetEmail(user.email, user.name, resetToken)
+      .catch(err => console.log('⚠️ Password reset email failed:', err.message));
 
     res.status(200).json({
       success: true,
@@ -231,6 +234,10 @@ exports.resetPassword = async (req, res) => {
     // Update password
     user.password = password;
     await user.save();
+
+    // Send password changed email (NON-BLOCKING)
+    emailService.sendPasswordChangedEmail(user.email, user.name)
+      .catch(err => console.log('⚠️ Password changed email failed:', err.message));
 
     res.status(200).json({
       success: true,
