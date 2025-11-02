@@ -17,7 +17,8 @@ import {
   User,
   Calendar,
   Truck,
-  X
+  X,
+  Lock
 } from 'lucide-react';
 import { escrowService } from '../services/escrowService';
 import { chatService } from '../services/chatService';
