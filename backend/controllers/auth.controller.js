@@ -35,35 +35,29 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Create new user
+    // Create new user (NOT VERIFIED by default)
     const user = await User.create({
       name,
       email,
       password,
-      role: 'dual', // All users can buy and sell
-      tier: 'free'
+      role: 'dual',
+      tier: 'free',
+      verified: false // Must verify email
     });
 
-    // Generate token
-    const token = generateToken(user._id);
+    // Generate verification token
+    const verificationToken = generateToken(user._id);
 
-    // Send welcome email (NON-BLOCKING - don't wait, don't fail registration if email fails)
-    emailService.sendWelcomeEmail(user.email, user.name)
-      .catch(err => console.log('⚠️ Welcome email failed (non-critical):', err.message));
+    // Send verification email (NON-BLOCKING)
+    emailService.sendVerificationEmail(user.email, user.name, verificationToken)
+      .catch(err => console.log('⚠️ Verification email failed:', err.message));
 
-    // Return success immediately (don't wait for email)
+    // DON'T return JWT token - user must verify email first
     res.status(201).json({
       success: true,
-      message: 'Registration successful',
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        tier: user.tier,
-        verified: user.verified
-      }
+      message: 'Registration successful! Please check your email to verify your account.',
+      requiresVerification: true,
+      email: user.email
     });
 
   } catch (error) {
@@ -96,6 +90,16 @@ exports.login = async (req, res) => {
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
+      });
+    }
+
+    // Check if email is verified
+    if (!user.verified) {
+      return res.status(403).json({
+        success: false,
+        message: 'Please verify your email before logging in. Check your inbox for the verification link.',
+        requiresVerification: true,
+        email: user.email
       });
     }
 
@@ -153,6 +157,13 @@ exports.verifyEmail = async (req, res) => {
   try {
     const { token } = req.body;
 
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification token is required'
+      });
+    }
+
     // Verify token and get user ID
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
@@ -164,19 +175,94 @@ exports.verifyEmail = async (req, res) => {
       });
     }
 
+    // Check if already verified
+    if (user.verified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already verified. You can login now.'
+      });
+    }
+
+    // Verify the user
     user.verified = true;
     await user.save();
 
+    // Send welcome email after verification
+    emailService.sendWelcomeEmail(user.email, user.name)
+      .catch(err => console.log('⚠️ Welcome email failed:', err.message));
+
     res.status(200).json({
       success: true,
-      message: 'Email verified successfully'
+      message: 'Email verified successfully! You can now login.'
     });
 
   } catch (error) {
     console.error('Verify email error:', error);
+    
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification token'
+      });
+    }
+    
+    if (error.name === 'TokenExpiredError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification token has expired. Please request a new one.'
+      });
+    }
+    
     res.status(400).json({
       success: false,
-      message: 'Invalid or expired token'
+      message: 'Email verification failed'
+    });
+  }
+};
+
+// Resend verification email
+exports.resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No account found with that email'
+      });
+    }
+
+    if (user.verified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email already verified. You can login now.'
+      });
+    }
+
+    // Generate new verification token
+    const verificationToken = generateToken(user._id);
+
+    // Send verification email
+    await emailService.sendVerificationEmail(user.email, user.name, verificationToken);
+
+    res.status(200).json({
+      success: true,
+      message: 'Verification email sent! Please check your inbox.'
+    });
+
+  } catch (error) {
+    console.error('Resend verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send verification email'
     });
   }
 };
