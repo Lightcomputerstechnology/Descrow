@@ -641,68 +641,49 @@ const EscrowDetails = () => {
               </div>
             )}
 
-            {/* Delivery Tab */}
-            {activeTab === 'delivery' && (
-              <div>
-                {escrow.deliveryProof ? (
-                  <div className="space-y-6">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-                      <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-200 mb-4">
-                        Delivery Information
-                      </h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-blue-700 dark:text-blue-300 mb-1">Tracking Number</p>
-                          <p className="font-mono font-semibold text-blue-900 dark:text-blue-100">
-                            {escrow.deliveryProof.trackingNumber}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-blue-700 dark:text-blue-300 mb-1">Carrier</p>
-                          <p className="font-semibold text-blue-900 dark:text-blue-100">
-                            {escrow.deliveryProof.carrier}
-                          </p>
-                        </div>
-                      </div>
+            {/* ================= DELIVERY TAB ================= */}
+{activeTab === 'delivery' && (
+  <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg shadow-sm">
+    <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">
+      Delivery Proof
+    </h2>
 
-                      {escrow.deliveryProof.notes && (​​​​​​​​​​​​​​​​
-                        <div className="mt-4">
-                          <p className="text-sm text-blue-700 dark:text-blue-300 mb-1">Notes</p>
-                          <p className="text-blue-900 dark:text-blue-100">{escrow.deliveryProof.notes}</p>
-                        </div>
-                      )}
-                    </div>
+    {escrow?.deliveryProof ? (
+      <div>
+        {escrow.deliveryProof.images && escrow.deliveryProof.images.length > 0 && (
+          <div className="mb-4">
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+              Uploaded Images
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {escrow.deliveryProof.images.map((img, index) => (
+                <img
+                  key={index}
+                  src={img}
+                  alt={`Proof ${index + 1}`}
+                  className="rounded-md border border-gray-200 dark:border-gray-700 hover:scale-105 transition-transform duration-200"
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
-                    {escrow.deliveryProof.proofImages && escrow.deliveryProof.proofImages.length > 0 && (
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                          Delivery Proof Images
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                          {escrow.deliveryProof.proofImages.map((img, index) => (
-                            <img
-                              key={index}
-                              src={img}
-                              alt={`Delivery proof ${index + 1}`}
-                              className="w-full h-48 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600 dark:text-gray-400 mb-2">No delivery information yet</p>
-                    <p className="text-sm text-gray-500">
-                      {isSeller ? 'Upload delivery proof once item is shipped' : 'Waiting for seller to ship the item'}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
+        {escrow.deliveryProof.notes && (
+          <div className="mt-4">
+            <p className="text-sm text-blue-700 dark:text-blue-300 mb-1">Notes</p>
+            <p className="text-blue-900 dark:text-blue-100">
+              {escrow.deliveryProof.notes}
+            </p>
+          </div>
+        )}
+      </div>
+    ) : (
+      <p className="text-gray-500 dark:text-gray-400 italic">
+        No delivery proof submitted yet.
+      </p>
+    )}
+  </div>
+)}
             {/* Dispute Tab */}
             {activeTab === 'dispute' && (
               <div>
