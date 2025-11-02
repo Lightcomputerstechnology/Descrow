@@ -1,290 +1,346 @@
-import React, { useState } from 'react';
-import { AlertTriangle, Eye, CheckCircle, XCircle, Clock, MessageSquare } from 'lucide-react';
-import AdminSidebar from '../../components/admin/AdminSidebar';
-import AdminHeader from '../../components/admin/AdminHeader';
-import DisputeDetailsModal from '../../components/admin/DisputeDetailsModal';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft,
+  AlertCircle,
+  Search,
+  Filter,
+  Loader,
+  Eye,
+  CheckCircle,
+  XCircle,
+  Clock
+} from 'lucide-react';
+import { adminService } from '../../services/adminService';
 
 const DisputesPage = ({ admin }) => {
+  const navigate = useNavigate();
+  const [disputes, setDisputes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [selectedDispute, setSelectedDispute] = useState(null);
-  const [statusFilter, setStatusFilter] = useState('pending');
+  const [showResolveModal, setShowResolveModal] = useState(false);
+  const [resolutionData, setResolutionData] = useState({
+    resolution: '',
+    winner: '',
+    refundAmount: '',
+    notes: ''
+  });
+  const [resolving, setResolving] = useState(false);
 
-  // Mock data - Replace with API call
-  const [disputes] = useState([
-    {
-      id: 'DIS001',
-      escrowId: 'ESC12347',
-      buyer: { name: 'Mike Johnson', email: 'mike@example.com' },
-      seller: { name: 'AutoParts Direct', email: 'sales@autoparts.com' },
-      itemName: 'Car Battery',
-      amount: 450,
-      reason: 'damaged',
-      description: 'The battery arrived with visible damage on the terminals. It does not hold charge properly.',
-      evidence: ['photo1.jpg', 'photo2.jpg'],
-      status: 'pending',
-      createdAt: '2025-10-27T08:45:00Z',
-      priority: 'high'
-    },
-    {
-      id: 'DIS002',
-      escrowId: 'ESC12340',
-      buyer: { name: 'Sarah Lee', email: 'sarah@example.com' },
-      seller: { name: 'Electronics Depot', email: 'info@electronics.com' },
-      itemName: 'Wireless Headphones',
-      amount: 280,
-      reason: 'not_as_described',
-      description: 'The headphones are not the original brand as advertised. They appear to be counterfeit.',
-      evidence: ['photo3.jpg', 'receipt.pdf'],
-      status: 'under_review',
-      createdAt: '2025-10-26T14:20:00Z',
-      priority: 'medium'
-    },
-    {
-      id: 'DIS003',
-      escrowId: 'ESC12335',
-      buyer: { name: 'Tom Brown', email: 'tom@example.com' },
-      seller: { name: 'Fashion Store', email: 'sales@fashion.com' },
-      itemName: 'Designer Watch',
-      amount: 1500,
-      reason: 'counterfeit',
-      description: 'Watch is fake. Serial number does not match manufacturer records.',
-      evidence: ['watch_front.jpg', 'watch_back.jpg', 'serial_check.pdf'],
-      status: 'resolved',
-      resolution: 'refund_to_buyer',
-      resolvedAt: '2025-10-25T16:30:00Z',
-      priority: 'high'
+  useEffect(() => {
+    fetchDisputes();
+  }, [statusFilter, currentPage]);
+
+  const fetchDisputes = async () => {
+    try {
+      setLoading(true);
+      const response = await adminService.getDisputes({
+        status: statusFilter,
+        page: currentPage,
+        limit: 20
+      });
+      setDisputes(response.disputes || []);
+      setTotalPages(response.totalPages || 1);
+    } catch (error) {
+      console.error('Failed to fetch disputes:', error);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  const handleResolveDispute = async (e) => {
+    e.preventDefault();
+    try {
+      setResolving(true);
+      await adminService.resolveDispute(selectedDispute._id, {
+        resolution: resolutionData.resolution,
+        winner: resolutionData.winner,
+        refundAmount: parseFloat(resolutionData.refundAmount) || 0,
+        notes: resolutionData.notes
+      });
+      alert('Dispute resolved successfully');
+      setShowResolveModal(false);
+      setSelectedDispute(null);
+      setResolutionData({ resolution: '', winner: '', refundAmount: '', notes: '' });
+      fetchDisputes();
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to resolve dispute');
+    } finally {
+      setResolving(false);
+    }
+  };
 
   const getStatusBadge = (status) => {
     const badges = {
-      pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, text: 'Pending' },
-      under_review: { color: 'bg-blue-100 text-blue-800', icon: MessageSquare, text: 'Under Review' },
-      resolved: { color: 'bg-green-100 text-green-800', icon: CheckCircle, text: 'Resolved' },
-      rejected: { color: 'bg-red-100 text-red-800', icon: XCircle, text: 'Rejected' }
+      open: { color: 'bg-red-500/20 text-red-400', icon: AlertCircle, text: 'Open' },
+      under_review: { color: 'bg-yellow-500/20 text-yellow-400', icon: Clock, text: 'Under Review' },
+      resolved: { color: 'bg-green-500/20 text-green-400', icon: CheckCircle, text: 'Resolved' }
     };
-    const badge = badges[status];
+    const badge = badges[status] || badges.open;
     const Icon = badge.icon;
     return (
-      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}>
-        <Icon className="w-3 h-3 mr-1" />
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}>
+        <Icon className="w-3 h-3" />
         {badge.text}
       </span>
     );
   };
 
-  const getPriorityBadge = (priority) => {
-    const colors = {
-      high: 'bg-red-100 text-red-800',
-      medium: 'bg-yellow-100 text-yellow-800',
-      low: 'bg-green-100 text-green-800'
-    };
-    return (
-      <span className={`px-2 py-1 rounded text-xs font-medium ${colors[priority]}`}>
-        {priority.toUpperCase()}
-      </span>
-    );
-  };
-
-  const filteredDisputes = disputes.filter(d => {
-    if (statusFilter === 'all') return true;
-    return d.status === statusFilter;
-  });
-
   return (
-    <div className="flex h-screen bg-gray-100">
-      <AdminSidebar admin={admin} activePage="disputes" />
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader admin={admin} title="Dispute Management" />
-        
-        <main className="flex-1 overflow-y-auto p-6">
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Total Disputes</p>
-                  <p className="text-2xl font-bold text-gray-900">{disputes.length}</p>
-                </div>
-                <AlertTriangle className="w-8 h-8 text-gray-400" />
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Pending</p>
-                  <p className="text-2xl font-bold text-yellow-600">
-                    {disputes.filter(d => d.status === 'pending').length}
-                  </p>
-                </div>
-                <Clock className="w-8 h-8 text-yellow-400" />
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Under Review</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {disputes.filter(d => d.status === 'under_review').length}
-                  </p>
-                </div>
-                <MessageSquare className="w-8 h-8 text-blue-400" />
-              </div>
-            </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Resolved</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {disputes.filter(d => d.status === 'resolved').length}
-                  </p>
-                </div>
-                <CheckCircle className="w-8 h-8 text-green-400" />
-              </div>
+    <div className="min-h-screen bg-gray-900">
+      {/* Header */}
+      <header className="bg-gray-800 border-b border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate('/admin/dashboard')}
+              className="p-2 hover:bg-gray-700 rounded-lg transition"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-400" />
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Dispute Management</h1>
+              <p className="text-sm text-gray-400">Review and resolve user disputes</p>
             </div>
           </div>
+        </div>
+      </header>
 
-          {/* Filter */}
-          <div className="bg-white rounded-lg shadow p-4 mb-6">
-            <div className="flex items-center gap-4">
-              <span className="text-sm font-medium text-gray-700">Filter by Status:</span>
-              <div className="flex gap-2">
-                {['all', 'pending', 'under_review', 'resolved'].map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setStatusFilter(status)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                      statusFilter === status
-                        ? 'bg-red-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {status === 'all' ? 'All' : status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                  </button>
-                ))}
-              </div>
-            </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Filters */}
+        <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 mb-6">
+          <div className="flex gap-4">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-red-500"
+            >
+              <option value="">All Statuses</option>
+              <option value="open">Open</option>
+              <option value="under_review">Under Review</option>
+              <option value="resolved">Resolved</option>
+            </select>
           </div>
+        </div>
 
-          {/* Disputes List */}
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
+        {/* Disputes Table */}
+        <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-900 border-b border-gray-700">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Escrow ID</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Reason</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Initiated By</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-400 uppercase">Date</th>
+                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {loading ? (
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Dispute ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Escrow ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Buyer
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Seller
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Item
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Reason
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Priority
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <td colSpan="6" className="px-6 py-12 text-center">
+                      <Loader className="w-8 h-8 text-red-600 animate-spin mx-auto" />
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredDisputes.map((dispute) => (
-                    <tr key={dispute.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-medium text-red-600">{dispute.id}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-blue-600">{dispute.escrowId}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{dispute.buyer.name}</p>
-                          <p className="text-xs text-gray-500">{dispute.buyer.email}</p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{dispute.seller.name}</p>
-                          <p className="text-xs text-gray-500">{dispute.seller.email}</p>
-                        </div>
+                ) : disputes.length > 0 ? (
+                  disputes.map((dispute) => (
+                    <tr key={dispute._id} className="hover:bg-gray-700/50 transition">
+                      <td className="px-6 py-4">
+                        <span className="font-mono text-sm text-white">
+                          {dispute.escrow?.escrowId || 'N/A'}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-sm text-gray-900">{dispute.itemName}</span>
+                        <p className="text-white font-medium">{dispute.reason}</p>
+                        <p className="text-gray-400 text-xs line-clamp-1">{dispute.description}</p>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-semibold text-gray-900">
-                          ${dispute.amount.toLocaleString()}
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="text-white text-sm">{dispute.initiatedBy?.name}</p>
+                          <p className="text-gray-400 text-xs">{dispute.initiatedBy?.email}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">{getStatusBadge(dispute.status)}</td>
+                      <td className="px-6 py-4">
+                        <span className="text-gray-400 text-sm">
+                          {new Date(dispute.createdAt).toLocaleDateString()}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-700 capitalize">
-                          {dispute.reason.replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getPriorityBadge(dispute.priority)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(dispute.status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(dispute.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 text-right">
                         <button
-                          onClick={() => setSelectedDispute(dispute)}
-                          className="text-blue-600 hover:text-blue-900 transition"
+                          onClick={() => {
+                            setSelectedDispute(dispute);
+                            setShowResolveModal(true);
+                          }}
+                          disabled={dispute.status === 'resolved'}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <Eye className="w-5 h-5" />
+                          {dispute.status === 'resolved' ? 'Resolved' : 'Resolve'}
                         </button>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                      No disputes found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-gray-700 flex items-center justify-between">
+              <p className="text-sm text-gray-400">
+                Page {currentPage} of {totalPages}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Resolve Dispute Modal */}
+      {showResolveModal && selectedDispute && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-700">
+            <div className="p-6 border-b border-gray-700">
+              <h2 className="text-2xl font-bold text-white">Resolve Dispute</h2>
+              <p className="text-sm text-gray-400 mt-1">Escrow: {selectedDispute.escrow?.escrowId}</p>
             </div>
 
-            {filteredDisputes.length === 0 && (
-              <div className="text-center py-12">
-                <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No disputes found</p>
+            <form onSubmit={handleResolveDispute} className="p-6 space-y-6">
+              {/* Dispute Details */}
+              <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
+                <h3 className="font-semibold text-white mb-2">Dispute Details</h3>
+                <p className="text-sm text-gray-400 mb-2">
+                  <strong>Reason:</strong> {selectedDispute.reason}
+                </p>
+                <p className="text-sm text-gray-400">
+                  <strong>Description:</strong> {selectedDispute.description}
+                </p>
               </div>
-            )}
-          </div>
-        </main>
-      </div>
 
-      {/* Dispute Details Modal */}
-      {selectedDispute && (
-        <DisputeDetailsModal
-          dispute={selectedDispute}
-          onClose={() => setSelectedDispute(null)}
-          onResolve={(resolution) => {
-            // API call to resolve dispute
-            console.log('Resolving dispute:', resolution);
-            setSelectedDispute(null);
-          }}
-        />
+              {/* Resolution */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Resolution Summary *
+                </label>
+                <textarea
+                  value={resolutionData.resolution}
+                  onChange={(e) => setResolutionData({ ...resolutionData, resolution: e.target.value })}
+                  rows="4"
+                  className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-red-500"
+                  placeholder="Explain your decision..."
+                  required
+                ></textarea>
+              </div>
+
+              {/* Winner */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Who wins the dispute? *
+                </label>
+                <select
+                  value={resolutionData.winner}
+                  onChange={(e) => setResolutionData({ ...resolutionData, winner: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-red-500"
+                  required
+                >
+                  <option value="">Select winner</option>
+                  <option value="buyer">Buyer</option>
+                  <option value="seller">Seller</option>
+                </select>
+              </div>
+
+              {/* Refund Amount */}
+              {resolutionData.winner === 'buyer' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Refund Amount (optional)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={resolutionData.refundAmount}
+                    onChange={(e) => setResolutionData({ ...resolutionData, refundAmount: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-red-500"
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
+
+              {/* Admin Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Internal Notes (optional)
+                </label>
+                <textarea
+                  value={resolutionData.notes}
+                  onChange={(e) => setResolutionData({ ...resolutionData, notes: e.target.value })}
+                  rows="3"
+                  className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-red-500"
+                  placeholder="Notes for internal records..."
+                ></textarea>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowResolveModal(false);
+                    setSelectedDispute(null);
+                    setResolutionData({ resolution: '', winner: '', refundAmount: '', notes: '' });
+                  }}
+                  className="flex-1 px-6 py-3 border-2 border-gray-700 text-gray-300 rounded-lg hover:bg-gray-700 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resolving}
+                  className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {resolving ? (
+                    <>
+                      <Loader className="w-5 h-5 animate-spin" />
+                      Resolving...
+                    </>
+                  ) : (
+                    'Resolve Dispute'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
