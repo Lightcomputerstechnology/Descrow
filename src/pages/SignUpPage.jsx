@@ -83,16 +83,11 @@ const handleSubmit = async (e) => {
     });
 
     if (response.success) {
-      // Check if verification is required
-      if (response.requiresVerification) {
-        // Show success message and redirect to login
-        alert('Registration successful! Please check your email to verify your account before logging in.');
-        navigate('/login');
-      } else {
-        // Old behavior (if verification not required)
-        setUser(response.user);
-        navigate('/dashboard');
-      }
+      // Show success message
+      alert(`Registration successful!\n\nA verification email has been sent to ${response.email}.\n\nPlease check your inbox and click the verification link to activate your account before logging in.`);
+      
+      // Redirect to login page
+      navigate('/login');
     }
   } catch (err) {
     setError(err.message || 'Registration failed. Please try again.');
