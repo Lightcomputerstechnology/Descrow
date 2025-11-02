@@ -1,23 +1,25 @@
 const express = require('express');
 const router = express.Router();
-const { body } = require('express-validator');
 const authController = require('../controllers/auth.controller');
+const { body } = require('express-validator');
 
-// Register new user
-router.post('/register',
+// Register
+router.post(
+  '/register',
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Valid email is required'),
+    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
   ],
   authController.register
 );
 
-// Login user
-router.post('/login',
+// Login
+router.post(
+  '/login',
   [
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('password').notEmpty().withMessage('Password is required')
+    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
+    body('password').notEmpty().withMessage('Password required')
   ],
   authController.login
 );
@@ -25,16 +27,18 @@ router.post('/login',
 // Verify email
 router.post('/verify-email', authController.verifyEmail);
 
-// Request password reset
-router.post('/forgot-password',
-  [body('email').isEmail().withMessage('Valid email is required')],
+// Forgot password
+router.post(
+  '/forgot-password',
+  [body('email').isEmail().normalizeEmail().withMessage('Valid email required')],
   authController.forgotPassword
 );
 
 // Reset password
-router.post('/reset-password',
+router.post(
+  '/reset-password',
   [
-    body('token').notEmpty().withMessage('Reset token is required'),
+    body('token').notEmpty().withMessage('Reset token required'),
     body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
   ],
   authController.resetPassword
