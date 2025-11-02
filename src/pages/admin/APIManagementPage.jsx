@@ -1,324 +1,249 @@
-import React, { useState } from 'react';
-import { Key, Plus, Copy, Eye, EyeOff, Trash2, RefreshCw, TrendingUp } from 'lucide-react';
-import AdminSidebar from '../../components/admin/AdminSidebar';
-import AdminHeader from '../../components/admin/AdminHeader';
-import CreateAPIKeyModal from '../../components/admin/CreateAPIKeyModal';
+React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft,
+  Code,
+  Key,
+  Copy,
+  ExternalLink,
+  Book,
+  AlertCircle
+} from 'lucide-react';
 
 const APIManagementPage = ({ admin }) => {
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [visibleKeys, setVisibleKeys] = useState({});
+  const navigate = useNavigate();
+  const [copiedEndpoint, setCopiedEndpoint] = useState('');
 
-  // Mock data - Replace with API call
-  const [apiKeys, setApiKeys] = useState([
+  const apiEndpoints = [
     {
-      id: 'api_001',
-      businessName: 'TechStore Marketplace',
-      businessEmail: 'dev@techstore.com',
-      apiKey: 'sk live 4eC39HqLyjWDarjtT1zdp7dc',
-      environment: 'production',
-      createdAt: '2025-09-15T10:30:00Z',
-      lastUsed: '2025-10-27T14:20:00Z',
-      requestsToday: 1247,
-      requestsThisMonth: 45678,
-      transactionsCount: 342,
-      status: 'active',
-      permissions: ['create_escrow', 'view_transactions', 'webhooks'],
-      rateLimit: 1000 // requests per hour
+      category: 'Authentication',
+      endpoints: [
+        { method: 'POST', path: '/api/auth/register', description: 'Register new user' },
+        { method: 'POST', path: '/api/auth/login', description: 'User login' },
+        { method: 'POST', path: '/api/auth/refresh-token', description: 'Refresh JWT token' }
+      ]
     },
     {
-      id: 'api_002',
-      businessName: 'Fashion E-commerce',
-      businessEmail: 'api@fashion.com',
-      apiKey: 'sk live 7pL92MnBxTqWzRkuV3hgf6yp',
-      environment: 'production',
-      createdAt: '2025-08-20T09:15:00Z',
-      lastUsed: '2025-10-27T16:45:00Z',
-      requestsToday: 892,
-      requestsThisMonth: 32145,
-      transactionsCount: 156,
-      status: 'active',
-      permissions: ['create_escrow', 'view_transactions'],
-      rateLimit: 500
+      category: 'Escrow',
+      endpoints: [
+        { method: 'POST', path: '/api/escrow/create', description: 'Create new escrow' },
+        { method: 'GET', path: '/api/escrow/:escrowId', description: 'Get escrow details' },
+        { method: 'GET', path: '/api/escrow/user/:userId', description: 'Get user escrows' },
+        { method: 'POST', path: '/api/escrow/:escrowId/release', description: 'Release payment' }
+      ]
     },
     {
-      id: 'api_003',
-      businessName: 'AutoParts Direct',
-      businessEmail: 'tech@autoparts.com',
-      apiKey: 'sk test 9xK45NpCvUdXyJmwQ8fhg2la',
-      environment: 'test',
-      createdAt: '2025-10-20T12:00:00Z',
-      lastUsed: '2025-10-26T18:30:00Z',
-      requestsToday: 234,
-      requestsThisMonth: 5678,
-      transactionsCount: 45,
-      status: 'active',
-      permissions: ['create_escrow', 'view_transactions', 'webhooks'],
-      rateLimit: 100
+      category: 'Payments',
+      endpoints: [
+        { method: 'POST', path: '/api/payments/initialize', description: 'Initialize payment' },
+        { method: 'POST', path: '/api/payments/verify', description: 'Verify payment' },
+        { method: 'POST', path: '/api/payments/webhook', description: 'Payment webhook (no auth)' }
+      ]
+    },
+    {
+      category: 'Chat',
+      endpoints: [
+        { method: 'POST', path: '/api/chat/send', description: 'Send chat message' },
+        { method: 'GET', path: '/api/chat/:escrowId', description: 'Get chat messages' }
+      ]
+    },
+    {
+      category: 'Delivery',
+      endpoints: [
+        { method: 'POST', path: '/api/delivery/upload-proof', description: 'Upload delivery proof' },
+        { method: 'GET', path: '/api/delivery/:escrowId', description: 'Get delivery details' }
+      ]
+    },
+    {
+      category: 'Disputes',
+      endpoints: [
+        { method: 'POST', path: '/api/disputes/create', description: 'Create dispute' },
+        { method: 'GET', path: '/api/disputes/:escrowId', description: 'Get dispute details' },
+        { method: 'POST', path: '/api/disputes/:disputeId/respond', description: 'Respond to dispute' }
+      ]
     }
-  ]);
+  ];
 
-  const toggleKeyVisibility = (keyId) => {
-    setVisibleKeys(prev => ({
-      ...prev,
-      [keyId]: !prev[keyId]
-    }));
+  const handleCopyEndpoint = (endpoint) => {
+    navigator.clipboard.writeText(`${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${endpoint}`);
+    setCopiedEndpoint(endpoint);
+    setTimeout(() => setCopiedEndpoint(''), 2000);
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    alert('API Key copied to clipboard!');
+  const getMethodColor = (method) => {
+    const colors = {
+      GET: 'bg-blue-500/20 text-blue-400',
+      POST: 'bg-green-500/20 text-green-400',
+      PUT: 'bg-yellow-500/20 text-yellow-400',
+      DELETE: 'bg-red-500/20 text-red-400'
+    };
+    return colors[method] || 'bg-gray-500/20 text-gray-400';
   };
-
-  const revokeAPIKey = (keyId) => {
-    if (window.confirm('Are you sure you want to revoke this API key? This action cannot be undone.')) {
-      setApiKeys(apiKeys.map(key => 
-        key.id === keyId ? { ...key, status: 'revoked' } : key
-      ));
-    }
-  };
-
-  const regenerateAPIKey = (keyId) => {
-    if (window.confirm('This will generate a new API key. The old key will stop working immediately. Continue?')) {
-      // API call to regenerate key
-      alert('New API key generated!');
-    }
-  };
-
-  const maskAPIKey = (key) => {
-    return key.substring(0, 12) + '••••••••••••••••••••';
-  };
-
-  const totalRequests = apiKeys.reduce((sum, key) => sum + key.requestsToday, 0);
-  const totalTransactions = apiKeys.reduce((sum, key) => sum + key.transactionsCount, 0);
-  const activeKeys = apiKeys.filter(key => key.status === 'active').length;
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      <AdminSidebar admin={admin} activePage="api" />
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader admin={admin} title="API Management" />
-        
-        <main className="flex-1 overflow-y-auto p-6">
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <Key className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-              <p className="text-sm text-gray-600 mb-1">Active API Keys</p>
-              <p className="text-2xl font-bold text-gray-900">{activeKeys}</p>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <TrendingUp className="w-6 h-6 text-green-600" />
-                </div>
-                <span className="text-sm text-green-600 font-semibold">+12.5%</span>
-              </div>
-              <p className="text-sm text-gray-600 mb-1">Requests Today</p>
-              <p className="text-2xl font-bold text-gray-900">{totalRequests.toLocaleString()}</p>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-purple-100 rounded-lg">
-                  <RefreshCw className="w-6 h-6 text-purple-600" />
-                </div>
-              </div>
-              <p className="text-sm text-gray-600 mb-1">API Transactions</p>
-              <p className="text-2xl font-bold text-gray-900">{totalTransactions}</p>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-yellow-100 rounded-lg">
-                  <TrendingUp className="w-6 h-6 text-yellow-600" />
-                </div>
-              </div>
-              <p className="text-sm text-gray-600 mb-1">Avg Response Time</p>
-              <p className="text-2xl font-bold text-gray-900">245ms</p>
-            </div>
-          </div>
-
-          {/* Create API Key Button */}
-          <div className="mb-6">
+    <div className="min-h-screen bg-gray-900">
+      {/* Header */}
+      <header className="bg-gray-800 border-b border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center gap-4">
             <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition"
+              onClick={() => navigate('/admin/dashboard')}
+              className="p-2 hover:bg-gray-700 rounded-lg transition"
             >
-              <Plus className="w-5 h-5" />
-              Generate New API Key
+              <ArrowLeft className="w-5 h-5 text-gray-400" />
             </button>
+            <div>
+              <h1 className="text-2xl font-bold text-white">API Management</h1>
+              <p className="text-sm text-gray-400">API documentation and key management</p>
+            </div>
           </div>
+        </div>
+      </header>
 
-          {/* API Keys List */}
-          <div className="space-y-6">
-            {apiKeys.map((apiKey) => (
-              <div key={apiKey.id} className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="p-6">
-                  {/* Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">{apiKey.businessName}</h3>
-                      <p className="text-sm text-gray-600 mt-1">{apiKey.businessEmail}</p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {apiKey.status === 'active' ? (
-                        <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                          Active
-                        </span>
-                      ) : (
-                        <span className="px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
-                          Revoked
-                        </span>
-                      )}
-                      
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        apiKey.environment === 'production' 
-                          ? 'bg-blue-100 text-blue-800' 
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {apiKey.environment}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* API Key */}
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <p className="text-xs text-gray-600 mb-1">API Key</p>
-                        <p className="text-sm font-mono text-gray-900">
-                          {visibleKeys[apiKey.id] ? apiKey.apiKey : maskAPIKey(apiKey.apiKey)}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => toggleKeyVisibility(apiKey.id)}
-                          className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition"
-                          title={visibleKeys[apiKey.id] ? 'Hide' : 'Show'}
-                        >
-                          {visibleKeys[apiKey.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                        <button
-                          onClick={() => copyToClipboard(apiKey.apiKey)}
-                          className="p-2 text-gray-600 hover:bg-gray-200 rounded-lg transition"
-                          title="Copy to clipboard"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-xs text-gray-600 mb-1">Requests Today</p>
-                      <p className="text-lg font-bold text-gray-900">{apiKey.requestsToday.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-xs text-gray-600 mb-1">Requests This Month</p>
-                      <p className="text-lg font-bold text-gray-900">{apiKey.requestsThisMonth.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-xs text-gray-600 mb-1">Transactions</p>
-                      <p className="text-lg font-bold text-gray-900">{apiKey.transactionsCount}</p>
-                    </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-xs text-gray-600 mb-1">Rate Limit</p>
-                      <p className="text-lg font-bold text-gray-900">{apiKey.rateLimit}/hr</p>
-                    </div>
-                  </div>
-
-                  {/* Details */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <p className="text-xs text-gray-600 mb-2">Permissions</p>
-                      <div className="flex flex-wrap gap-2">
-                        {apiKey.permissions.map((perm, index) => (
-                          <span key={index} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
-                            {perm.replace('_', ' ')}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Created:</span>
-                        <span className="text-gray-900">{new Date(apiKey.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Last Used:</span>
-                        <span className="text-gray-900">{new Date(apiKey.lastUsed).toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  {apiKey.status === 'active' && (
-                    <div className="flex flex-wrap gap-3">
-                      <button
-                        onClick={() => regenerateAPIKey(apiKey.id)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition flex items-center gap-2"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                        Regenerate Key
-                      </button>
-
-                      <button className="px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-semibold hover:bg-gray-700 transition">
-                        Edit Permissions
-                      </button>
-
-                      <button className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 transition">
-                        View Logs
-                      </button>
-
-                      <button className="px-4 py-2 bg-yellow-600 text-white rounded-lg text-sm font-semibold hover:bg-yellow-700 transition">
-                        Update Rate Limit
-                      </button>
-
-                      <button
-                        onClick={() => revokeAPIKey(apiKey.id)}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition flex items-center gap-2"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        Revoke Key
-                      </button>
-                    </div>
-                  )}
-                </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* API Info */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <Code className="w-6 h-6 text-blue-400" />
               </div>
-            ))}
+              <div>
+                <p className="text-sm text-gray-400">API Version</p>
+                <p className="text-lg font-semibold text-white">v1.0.0</p>
+              </div>
+            </div>
           </div>
 
-          {/* API Documentation Link */}
-          <div className="mt-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg shadow p-6 text-white">
-            <h3 className="text-xl font-bold mb-2">API Documentation</h3>
-            <p className="mb-4">Complete guide for integrating SecureEscrow into your platform</p>
-            <button className="bg-white text-blue-600 px-6 py-2 rounded-lg font-semibold hover:bg-blue-50 transition">
-              View Documentation
-            </button>
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                <Key className="w-6 h-6 text-green-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Base URL</p>
+                <p className="text-sm font-mono text-white break-all">
+                  {process.env.REACT_APP_API_URL || 'http://localhost:5000'}
+                </p>
+              </div>
+            </div>
           </div>
-        </main>
-      </div>
 
-      {/* Create API Key Modal */}
-      {showCreateModal && (
-        <CreateAPIKeyModal
-          onClose={() => setShowCreateModal(false)}
-          onCreate={(newKey) => {
-            setApiKeys([newKey, ...apiKeys]);
-            setShowCreateModal(false);
-          }}
-        />
-      )}
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                <Book className="w-6 h-6 text-purple-400" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-400">Documentation</p>
+                <a
+                  href="https://docs.dealcross.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-purple-400 hover:text-purple-300 flex items-center gap-1"
+                >
+                  View Docs <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Authentication Info */}
+        <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4 mb-8 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-yellow-200 font-semibold mb-1">Authentication Required</p>
+            <p className="text-xs text-yellow-300 mb-2">
+              Most API endpoints require JWT authentication. Include the token in the Authorization header:
+            </p>
+            <code className="block bg-gray-900 text-green-400 text-xs p-2 rounded font-mono">
+              Authorization: Bearer YOUR_JWT_TOKEN
+            </code>
+          </div>
+        </div>
+
+        {/* API Endpoints */}
+        <div className="space-y-6">
+          {apiEndpoints.map((category, index) => (
+            <div key={index} className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+              <div className="p-6 border-b border-gray-700">
+                <h2 className="text-lg font-semibold text-white">{category.category}</h2>
+              </div>
+              <div className="divide-y divide-gray-700">
+                {category.endpoints.map((endpoint, idx) => (
+                  <div key={idx} className="p-4 hover:bg-gray-700/50 transition">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className={`px-2 py-1 rounded text-xs font-semibold ${getMethodColor(endpoint.method)}`}>
+                            {endpoint.method}
+                          </span>
+                          <code className="text-sm text-gray-300 font-mono">{endpoint.path}</code>
+                        </div>
+                        <p className="text-sm text-gray-400">{endpoint.description}</p>
+                      </div>
+                      <button
+                        onClick={() => handleCopyEndpoint(endpoint.path)}
+                        className="p-2 hover:bg-gray-600 rounded-lg transition flex-shrink-0"
+                        title="Copy endpoint"
+                      >
+                        {copiedEndpoint === endpoint.path ? (
+                          <span className="text-green-400 text-xs">Copied!</span>
+                        ) : (
+                          <Copy className="w-4 h-4 text-gray-400" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Rate Limiting Info */}
+        <div className="mt-8 bg-gray-800 rounded-lg border border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Rate Limiting</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
+              <p className="text-sm text-gray-400 mb-2">General Endpoints</p>
+              <p className="text-2xl font-bold text-white">100 requests</p>
+              <p className="text-xs text-gray-500">per 15 minutes</p>
+            </div>
+            <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
+              <p className="text-sm text-gray-400 mb-2">Authentication Endpoints</p>
+              <p className="text-2xl font-bold text-white">10 requests</p>
+              <p className="text-xs text-gray-500">per 15 minutes</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Example Request */}
+        <div className="mt-8 bg-gray-800 rounded-lg border border-gray-700 p-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Example Request</h2>
+          <pre className="bg-gray-900 rounded-lg p-4 overflow-x-auto text-sm text-green-400 font-mono border border-gray-700">
+{`// Create Escrow Example
+const response = await fetch('${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/escrow/create', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_JWT_TOKEN',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    sellerEmail: 'seller@example.com',
+    itemName: 'MacBook Pro',
+    amount: 2500,
+    currency: 'USD',
+    paymentMethod: 'paystack'
+  })
+});
+
+const data = await response.json();
+console.log(data);`}
+          </pre>
+        </div>
+      </main>
     </div>
   );
 };
