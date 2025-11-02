@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
 // Public Pages
@@ -21,26 +21,83 @@ import PaymentGatewaysPage from './pages/admin/PaymentGatewaysPage';
 import APIManagementPage from './pages/admin/APIManagementPage';
 import AdminManagementPage from './pages/admin/AdminManagementPage';
 
+import { authService } from './services/authService';
+
 function App() {
-  const [user, setUser] = useState(null); // { id, name, role: 'dual', tier: 'free' | 'basic' | 'pro' }
-  const [admin, setAdmin] = useState(null); // { id, name, role: 'master' | 'sub_admin', permissions: {} }
+  const [user, setUser] = useState(null);
+  const [admin, setAdmin] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Check for existing session on mount
+  useEffect(() => {
+    const currentUser = authService.getCurrentUser();
+    if (currentUser) {
+      setUser(currentUser);
+    }
+    setLoading(false);
+  }, []);
+
+  // Protected Route Component
+  const ProtectedRoute = ({ children }) => {
+    if (loading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      );
+    }
+    return user ? children : <Navigate to="/login" />;
+  };
+
+  // Admin Protected Route Component
+  const AdminProtectedRoute = ({ children, requiredPermission }) => {
+    if (!admin) {
+      return <Navigate to="/admin/login" />;
+    }
+    if (requiredPermission && !admin.permissions[requiredPermission]) {
+      return <Navigate to="/admin/dashboard" />;
+    }
+    return children;
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <Router>
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<Login setUser={setUser} />} />
-        <Route path="/signup" element={<SignUpPage setUser={setUser} />} />
+        <Route 
+          path="/login" 
+          element={user ? <Navigate to="/dashboard" /> : <Login setUser={setUser} />} 
+        />
+        <Route 
+          path="/signup" 
+          element={user ? <Navigate to="/dashboard" /> : <SignUpPage setUser={setUser} />} 
+        />
 
-        {/* User Routes - Unified Dashboard */}
+        {/* User Routes - Protected */}
         <Route 
           path="/dashboard" 
-          element={user ? <UnifiedDashboard user={user} /> : <Navigate to="/login" />} 
+          element={
+            <ProtectedRoute>
+              <UnifiedDashboard />
+            </ProtectedRoute>
+          } 
         />
         <Route 
           path="/escrow/:id" 
-          element={user ? <EscrowDetails user={user} /> : <Navigate to="/login" />} 
+          element={
+            <ProtectedRoute>
+              <EscrowDetails />
+            </ProtectedRoute>
+          } 
         />
 
         {/* Legacy routes redirect to unified dashboard */}
@@ -51,62 +108,66 @@ function App() {
         <Route path="/admin/login" element={<AdminLogin setAdmin={setAdmin} />} />
         <Route 
           path="/admin/dashboard" 
-          element={admin ? <AdminDashboard admin={admin} /> : <Navigate to="/admin/login" />} 
+          element={
+            <AdminProtectedRoute>
+              <AdminDashboard admin={admin} />
+            </AdminProtectedRoute>
+          } 
         />
         <Route 
           path="/admin/transactions" 
           element={
-            admin && admin.permissions.viewTransactions ? 
-            <TransactionsPage admin={admin} /> : 
-            <Navigate to="/admin/login" />
+            <AdminProtectedRoute requiredPermission="viewTransactions">
+              <TransactionsPage admin={admin} />
+            </AdminProtectedRoute>
           } 
         />
         <Route 
           path="/admin/disputes" 
           element={
-            admin && admin.permissions.manageDisputes ? 
-            <DisputesPage admin={admin} /> : 
-            <Navigate to="/admin/login" />
+            <AdminProtectedRoute requiredPermission="manageDisputes">
+              <DisputesPage admin={admin} />
+            </AdminProtectedRoute>
           } 
         />
         <Route 
           path="/admin/users" 
           element={
-            admin && admin.permissions.verifyUsers ? 
-            <UsersPage admin={admin} /> : 
-            <Navigate to="/admin/login" />
+            <AdminProtectedRoute requiredPermission="verifyUsers">
+              <UsersPage admin={admin} />
+            </AdminProtectedRoute>
           } 
         />
         <Route 
           path="/admin/analytics" 
           element={
-            admin && admin.permissions.viewAnalytics ? 
-            <AnalyticsPage admin={admin} /> : 
-            <Navigate to="/admin/login" />
+            <AdminProtectedRoute requiredPermission="viewAnalytics">
+              <AnalyticsPage admin={admin} />
+            </AdminProtectedRoute>
           } 
         />
         <Route 
           path="/admin/payments" 
           element={
-            admin && admin.permissions.managePayments ? 
-            <PaymentGatewaysPage admin={admin} /> : 
-            <Navigate to="/admin/login" />
+            <AdminProtectedRoute requiredPermission="managePayments">
+              <PaymentGatewaysPage admin={admin} />
+            </AdminProtectedRoute>
           } 
         />
         <Route 
           path="/admin/api" 
           element={
-            admin && admin.permissions.manageAPI ? 
-            <APIManagementPage admin={admin} /> : 
-            <Navigate to="/admin/login" />
+            <AdminProtectedRoute requiredPermission="manageAPI">
+              <APIManagementPage admin={admin} />
+            </AdminProtectedRoute>
           } 
         />
         <Route 
           path="/admin/admins" 
           element={
-            admin && admin.permissions.manageAdmins ? 
-            <AdminManagementPage admin={admin} /> : 
-            <Navigate to="/admin/login" />
+            <AdminProtectedRoute requiredPermission="manageAdmins">
+              <AdminManagementPage admin={admin} />
+            </AdminProtectedRoute>
           } 
         />
 
