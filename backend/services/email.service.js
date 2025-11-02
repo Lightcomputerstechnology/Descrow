@@ -22,28 +22,114 @@ class EmailService {
         subject,
         html
       });
-      console.log(`Email sent to ${to}: ${subject}`);
+      console.log(`✅ Email sent to ${to}: ${subject}`);
     } catch (error) {
-      console.error('Email send error:', error);
+      console.error('❌ Email send error:', error);
       throw error;
     }
   }
 
-  // Welcome Email
-  async sendWelcomeEmail(email, name) {
-    const subject = 'Welcome to Dealcross!';
+  // 🔐 NEW: Email Verification (REGISTRATION)
+  async sendVerificationEmail(email, name, verificationToken) {
+    const subject = 'Verify Your Email - Dealcross';
     const html = `
-      <h2>Welcome to Dealcross, ${name}!</h2>
-      <p>Your account has been created successfully.</p>
-      <p>You can now:</p>
-      <ul>
-        <li>Create secure escrow transactions</li>
-        <li>Buy and sell with confidence</li>
-        <li>Track your deliveries</li>
-        <li>Resolve disputes fairly</li>
-      </ul>
-      <p><a href="${process.env.FRONTEND_URL}/login">Login to your dashboard</a></p>
-      <p>Thank you for choosing Dealcross!</p>
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #3B82F6; margin: 0;">🛡️ Dealcross</h1>
+        </div>
+        
+        <h2 style="color: #1F2937;">Welcome to Dealcross, ${name}!</h2>
+        
+        <p style="color: #4B5563; font-size: 16px; line-height: 1.6;">
+          Thank you for registering with Dealcross - your secure escrow platform. 
+          To complete your registration and start trading securely, please verify your email address.
+        </p>
+        
+        <div style="text-align: center; margin: 40px 0;">
+          <a href="${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}" 
+             style="background: #3B82F6; color: white; padding: 16px 32px; text-decoration: none; 
+                    border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
+            ✓ Verify Email Address
+          </a>
+        </div>
+        
+        <p style="color: #6B7280; font-size: 14px;">
+          Or copy and paste this link into your browser:
+        </p>
+        <p style="background: #F3F4F6; padding: 12px; border-radius: 6px; word-break: break-all; 
+                  font-size: 13px; color: #374151;">
+          ${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}
+        </p>
+        
+        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #E5E7EB;">
+          <p style="color: #EF4444; font-size: 14px; font-weight: 600;">
+            ⏰ Important: This verification link expires in 24 hours.
+          </p>
+          
+          <p style="color: #9CA3AF; font-size: 13px; margin-top: 20px;">
+            If you didn't create an account with Dealcross, please ignore this email.
+          </p>
+        </div>
+        
+        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #E5E7EB;">
+          <p style="color: #9CA3AF; font-size: 12px;">
+            © ${new Date().getFullYear()} Dealcross. All rights reserved.
+          </p>
+        </div>
+      </div>
+    `;
+    await this.sendEmail(email, subject, html);
+  }
+
+  // Welcome Email (AFTER EMAIL VERIFICATION)
+  async sendWelcomeEmail(email, name) {
+    const subject = 'Welcome to Dealcross - Let\'s Get Started!';
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #3B82F6; margin: 0;">🛡️ Dealcross</h1>
+        </div>
+        
+        <h2 style="color: #10B981;">🎉 Welcome to Dealcross, ${name}!</h2>
+        
+        <p style="color: #4B5563; font-size: 16px; line-height: 1.6;">
+          Your email has been verified and your account is now active! You're all set to start trading securely.
+        </p>
+        
+        <div style="background: #F0F9FF; border-left: 4px solid #3B82F6; padding: 20px; margin: 30px 0; border-radius: 4px;">
+          <h3 style="color: #1F2937; margin-top: 0;">What You Can Do Now:</h3>
+          <ul style="color: #4B5563; line-height: 1.8;">
+            <li>✅ Create secure escrow transactions</li>
+            <li>💰 Buy and sell with confidence</li>
+            <li>📦 Track your deliveries with GPS</li>
+            <li>⚖️ Resolve disputes fairly with our team</li>
+            <li>💬 Chat with buyers and sellers in real-time</li>
+          </ul>
+        </div>
+        
+        <div style="text-align: center; margin: 40px 0;">
+          <a href="${process.env.FRONTEND_URL}/login" 
+             style="background: #3B82F6; color: white; padding: 16px 32px; text-decoration: none; 
+                    border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px;">
+            🚀 Login to Your Dashboard
+          </a>
+        </div>
+        
+        <div style="background: #FFFBEB; border-left: 4px solid #F59E0B; padding: 16px; margin: 30px 0; border-radius: 4px;">
+          <p style="color: #92400E; margin: 0; font-size: 14px;">
+            <strong>💡 Pro Tip:</strong> Complete your KYC verification to unlock higher transaction limits!
+          </p>
+        </div>
+        
+        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #E5E7EB;">
+          <p style="color: #6B7280; font-size: 14px;">
+            Need help? Contact our support team anytime.
+          </p>
+          <p style="color: #9CA3AF; font-size: 12px; margin-top: 20px;">
+            © ${new Date().getFullYear()} Dealcross. All rights reserved.
+          </p>
+        </div>
+      </div>
     `;
     await this.sendEmail(email, subject, html);
   }
@@ -219,20 +305,6 @@ class EmailService {
       <p><a href="${process.env.FRONTEND_URL}/dashboard">View Dashboard</a></p>
     `;
     await this.sendEmail(email, subject, html);
-  }
-
-  // Verification Email
-  async sendVerificationEmail(user, verificationType, status, notes) {
-    const subject = `${verificationType === 'email' ? 'Email' : 'KYC'} ${status === 'approved' ? 'Approved' : 'Verified'}`;
-    const html = `
-      <h2>${verificationType === 'email' ? 'Email Verified' : 'KYC Status Update'}</h2>
-      <p>Hi ${user.name},</p>
-      <p>Your ${verificationType} has been ${status || 'verified'}.</p>
-      ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
-      ${status === 'rejected' ? '<p>Please resubmit your documents or contact support.</p>' : ''}
-      <p><a href="${process.env.FRONTEND_URL}/dashboard">View Dashboard</a></p>
-    `;
-    await this.sendEmail(user.email, subject, html);
   }
 }
 
