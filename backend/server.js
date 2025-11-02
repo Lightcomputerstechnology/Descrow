@@ -32,10 +32,10 @@ app.use(helmet({
 // Compression
 app.use(compression());
 
-// CORS Configuration - Allow all origins temporarily
+// CORS Configuration
 app.use(cors({
-  origin: '*',
-  credentials: false,
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
 }));
@@ -81,7 +81,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ==================== DATABASE CONNECTION ====================
 
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
 })
 .then(() => {
   console.log('✅ Connected to MongoDB');
