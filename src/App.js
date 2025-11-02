@@ -12,7 +12,6 @@ import UnifiedDashboard from './pages/UnifiedDashboard';
 import EscrowDetails from './pages/EscrowDetails';
 
 // Admin Pages
-import VerifyEmail from './pages/VerifyEmail';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import TransactionsPage from './pages/admin/TransactionsPage';
@@ -33,13 +32,9 @@ function App() {
   // Check for existing session on mount
   useEffect(() => {
     const initAuth = () => {
-      // Check user session
       const currentUser = authService.getCurrentUser();
-      if (currentUser) {
-        setUser(currentUser);
-      }
+      if (currentUser) setUser(currentUser);
 
-      // Check admin session
       const adminToken = localStorage.getItem('adminToken');
       const adminData = localStorage.getItem('admin');
       if (adminToken && adminData) {
@@ -67,11 +62,8 @@ function App() {
         </div>
       );
     }
-    
-    if (!user) {
-      return <Navigate to="/login" replace />;
-    }
-    
+
+    if (!user) return <Navigate to="/login" replace />;
     return children;
   };
 
@@ -85,11 +77,8 @@ function App() {
       );
     }
 
-    if (!admin) {
-      return <Navigate to="/admin/login" replace />;
-    }
+    if (!admin) return <Navigate to="/admin/login" replace />;
 
-    // Check permission if required
     if (requiredPermission && admin.role !== 'master' && !admin.permissions[requiredPermission]) {
       return <Navigate to="/admin/dashboard" replace />;
     }
@@ -110,130 +99,106 @@ function App() {
       <Routes>
         {/* ==================== PUBLIC ROUTES ==================== */}
         <Route path="/" element={<LandingPage />} />
-        
-        <Route 
-          path="/login" 
-          element={user ? <Navigate to="/dashboard" replace /> : <Login setUser={setUser} />} 
+        <Route
+          path="/login"
+          element={user ? <Navigate to="/dashboard" replace /> : <Login setUser={setUser} />}
         />
-        
-        <Route 
-          path="/signup" 
-          element={user ? <Navigate to="/dashboard" replace /> : <SignUpPage setUser={setUser} />} 
+        <Route
+          path="/signup"
+          element={user ? <Navigate to="/dashboard" replace /> : <SignUpPage setUser={setUser} />}
         />
+        <Route path="/verify-email" element={<VerifyEmail />} />
 
-        <Route 
-            path="/verify-email" element={<VerifyEmail />} 
-            />
-            
-          {/* ==================== USER ROUTES (Protected) ==================== */}
-        <Route 
-          path="/dashboard" 
+        {/* ==================== USER ROUTES (Protected) ==================== */}
+        <Route
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <UnifiedDashboard />
             </ProtectedRoute>
-          } 
+          }
         />
-        
-        <Route 
-          path="/escrow/:id" 
+        <Route
+          path="/escrow/:id"
           element={
             <ProtectedRoute>
               <EscrowDetails />
             </ProtectedRoute>
-          } 
+          }
         />
 
-        {/* Legacy routes - redirect to unified dashboard */}
+        {/* Legacy routes */}
         <Route path="/buyer-dashboard" element={<Navigate to="/dashboard" replace />} />
         <Route path="/seller-dashboard" element={<Navigate to="/dashboard" replace />} />
 
         {/* ==================== ADMIN ROUTES ==================== */}
-        
-        {/* Admin Login */}
-        <Route 
-          path="/admin/login" 
-          element={admin ? <Navigate to="/admin/dashboard" replace /> : <AdminLogin setAdmin={setAdmin} />} 
+        <Route
+          path="/admin/login"
+          element={admin ? <Navigate to="/admin/dashboard" replace /> : <AdminLogin setAdmin={setAdmin} />}
         />
-
-        {/* Admin Dashboard - All admins can access */}
-        <Route 
-          path="/admin/dashboard" 
+        <Route
+          path="/admin/dashboard"
           element={
             <AdminProtectedRoute>
               <AdminDashboard admin={admin} />
             </AdminProtectedRoute>
-          } 
+          }
         />
-
-        {/* Transactions - Requires viewTransactions permission */}
-        <Route 
-          path="/admin/transactions" 
+        <Route
+          path="/admin/transactions"
           element={
             <AdminProtectedRoute requiredPermission="viewTransactions">
               <TransactionsPage admin={admin} />
             </AdminProtectedRoute>
-          } 
+          }
         />
-
-        {/* Disputes - Requires manageDisputes permission */}
-        <Route 
-          path="/admin/disputes" 
+        <Route
+          path="/admin/disputes"
           element={
             <AdminProtectedRoute requiredPermission="manageDisputes">
               <DisputesPage admin={admin} />
             </AdminProtectedRoute>
-          } 
+          }
         />
-
-        {/* Users - Requires verifyUsers permission */}
-        <Route 
-          path="/admin/users" 
+        <Route
+          path="/admin/users"
           element={
             <AdminProtectedRoute requiredPermission="verifyUsers">
               <UsersPage admin={admin} />
             </AdminProtectedRoute>
-          } 
+          }
         />
-
-        {/* Analytics - Requires viewAnalytics permission */}
-        <Route 
-          path="/admin/analytics" 
+        <Route
+          path="/admin/analytics"
           element={
             <AdminProtectedRoute requiredPermission="viewAnalytics">
               <AnalyticsPage admin={admin} />
             </AdminProtectedRoute>
-          } 
+          }
         />
-
-        {/* Payment Gateways - Requires managePayments permission */}
-        <Route 
-          path="/admin/payments" 
+        <Route
+          path="/admin/payments"
           element={
             <AdminProtectedRoute requiredPermission="managePayments">
               <PaymentGatewaysPage admin={admin} />
             </AdminProtectedRoute>
-          } 
+          }
         />
-
-        {/* API Management - Requires manageAPI permission */}
-        <Route 
-          path="/admin/api" 
+        <Route
+          path="/admin/api"
           element={
             <AdminProtectedRoute requiredPermission="manageAPI">
               <APIManagementPage admin={admin} />
             </AdminProtectedRoute>
-          } 
+          }
         />
-
-        {/* Admin Management - Master admin only */}
-        <Route 
-          path="/admin/admins" 
+        <Route
+          path="/admin/admins"
           element={
             <AdminProtectedRoute requiredPermission="manageAdmins">
               <AdminManagementPage admin={admin} />
             </AdminProtectedRoute>
-          } 
+          }
         />
 
         {/* ==================== CATCH ALL ==================== */}
