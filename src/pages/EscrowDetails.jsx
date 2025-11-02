@@ -16,7 +16,7 @@ import {
   DollarSign,
   User,
   Calendar,
-  Truck
+  Truck,
   X
 } from 'lucide-react';
 import { escrowService } from '../services/escrowService';
