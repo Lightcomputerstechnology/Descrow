@@ -1,62 +1,73 @@
-import api from '../config/api'; // <-- this imports your working Axios setup
+import api from '../config/api';
 
 export const authService = {
-  // 🟢 Register new user
+  // Register
   register: async (userData) => {
     try {
+      console.log('Registering user:', userData.email);
       const response = await api.post('/auth/register', userData);
-      if (response.data.token) {
+      
+      if (response.data.success && response.data.token) {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
       }
+      
       return response.data;
     } catch (error) {
-      console.error('Registration error:', error);
-      throw error.response?.data || { message: 'Registration failed' };
+      console.error('Registration error:', error.response?.data || error.message);
+      throw error;
     }
   },
 
-  // 🟢 Login user
+  // Login
   login: async (credentials) => {
     try {
+      console.log('Logging in user:', credentials.email);
       const response = await api.post('/auth/login', credentials);
-      if (response.data.token) {
+      
+      if (response.data.success && response.data.token) {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
       }
+      
       return response.data;
     } catch (error) {
-      console.error('Login error:', error);
-      throw error.response?.data || { message: 'Login failed' };
+      console.error('Login error:', error.response?.data || error.message);
+      throw error;
     }
   },
 
-  // 🟡 Logout
+  // Logout
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/login';
   },
 
-  // 🟢 Get current user (from localStorage)
+  // Get current user
   getCurrentUser: () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+    try {
+      const user = localStorage.getItem('user');
+      return user ? JSON.parse(user) : null;
+    } catch (error) {
+      console.error('Error getting current user:', error);
+      return null;
+    }
   },
 
-  // 🟢 Verify email
+  // Verify email
   verifyEmail: async (token) => {
     const response = await api.post('/auth/verify-email', { token });
     return response.data;
   },
 
-  // 🟢 Forgot password
+  // Forgot password
   forgotPassword: async (email) => {
     const response = await api.post('/auth/forgot-password', { email });
     return response.data;
   },
 
-  // 🟢 Reset password
+  // Reset password
   resetPassword: async (token, password) => {
     const response = await api.post('/auth/reset-password', { token, password });
     return response.data;
