@@ -11,6 +11,7 @@ import UnifiedDashboard from './pages/UnifiedDashboard';
 import EscrowDetails from './pages/EscrowDetails';
 
 // Admin Pages
+import VerifyEmail from './pages/VerifyEmail';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import TransactionsPage from './pages/admin/TransactionsPage';
