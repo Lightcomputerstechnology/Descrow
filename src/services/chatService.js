@@ -12,9 +12,11 @@ export const chatService = {
         formData.append('attachments', file);
       });
     }
+
     const response = await api.post('/chat/send', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
+
     return response.data;
   },
 
