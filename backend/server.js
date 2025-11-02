@@ -32,18 +32,33 @@ app.use(helmet({
 // Compression
 app.use(compression());
 
-// CORS Configuration
-// Replace the existing CORS section with this:
+// CORS Configuration - Allow multiple origins
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://descrow-5l46.onrender.com', // Your frontend URL
+  process.env.FRONTEND_URL
+].filter(Boolean); // Remove undefined values
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001', process.env.FRONTEND_URL],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, curl, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('❌ Blocked by CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
 }));
 
-// Add OPTIONS handling for preflight requests
+// Handle preflight requests
 app.options('*', cors());
-
 
 // Body Parsers
 app.use(express.json({ limit: '10mb' }));
@@ -74,7 +89,7 @@ app.use('/api/', limiter);
 // Stricter rate limit for auth routes
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 20, // Increased from 10 to 20 for testing
   message: {
     success: false,
     message: 'Too many authentication attempts, please try again later.'
@@ -86,18 +101,15 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ==================== DATABASE CONNECTION ====================
 
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => {
-  console.log('✅ Connected to MongoDB');
-  console.log(`📦 Database: ${mongoose.connection.name}`);
-})
-.catch((error) => {
-  console.error('❌ MongoDB connection error:', error);
-  process.exit(1);
-});
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => {
+    console.log('✅ Connected to MongoDB');
+    console.log(`📦 Database: ${mongoose.connection.name}`);
+  })
+  .catch((error) => {
+    console.error('❌ MongoDB connection error:', error);
+    process.exit(1);
+  });
 
 // ==================== HEALTH CHECK ====================
 
@@ -226,6 +238,7 @@ const server = app.listen(PORT, () => {
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 API URL: http://localhost:${PORT}/api`);
   console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
+  console.log(`✅ Allowed Origins:`, allowedOrigins);
   console.log('🚀 ================================');
 });
 
