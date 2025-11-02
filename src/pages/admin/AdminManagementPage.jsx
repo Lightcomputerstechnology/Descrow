@@ -74,7 +74,7 @@ const AdminManagementPage = ({ admin }) => {
       setSaving(true);
       await adminService.updateAdminPermissions(selectedAdmin._id, formData.permissions);
       alert('Permissions updated successfully');
-      setShow​​​​​​​​​​​​​​​​EditModal(false);
+      setShowEditModal(false);
       setSelectedAdmin(null);
       resetForm();
       fetchAdmins();
