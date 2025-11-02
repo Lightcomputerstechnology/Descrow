@@ -1,212 +1,315 @@
-import React, { useState } from 'react';
-import { 
-  DollarSign, 
-  Users, 
-  AlertTriangle, 
-  TrendingUp, 
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Users,
+  DollarSign,
+  Package,
+  AlertCircle,
+  TrendingUp,
   Activity,
-  CheckCircle,
-  XCircle,
-  Clock
+  Shield,
+  LogOut,
+  Loader
 } from 'lucide-react';
-import AdminSidebar from '../../components/admin/AdminSidebar';
-import AdminHeader from '../../components/admin/AdminHeader';
+import { adminService } from '../../services/adminService';
 
 const AdminDashboard = ({ admin }) => {
-  // Mock data - Replace with API calls
-  const [stats] = useState({
-    totalTransactions: 1247,
-    totalValue: 3456789,
-    activeEscrows: 156,
-    completedToday: 23,
-    pendingDisputes: 8,
-    totalUsers: 5432,
-    revenueThisMonth: 45678,
-    transactionFees: 12345
-  });
+  const navigate = useNavigate();
+  const [stats, setStats] = useState(null);
+  const [recentEscrows, setRecentEscrows] = useState([]);
+  const [recentDisputes, setRecentDisputes] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [recentTransactions] = useState([
-    {
-      id: 'ESC12345',
-      buyer: 'John Doe',
-      seller: 'TechStore Ltd',
-      amount: 2500,
-      status: 'completed',
-      date: '2025-10-27T10:30:00Z'
-    },
-    {
-      id: 'ESC12346',
-      buyer: 'Jane Smith',
-      seller: 'Fashion Hub',
-      amount: 890,
-      status: 'in_escrow',
-      date: '2025-10-27T09:15:00Z'
-    },
-    {
-      id: 'ESC12347',
-      buyer: 'Mike Johnson',
-      seller: 'AutoParts Direct',
-      amount: 450,
-      status: 'disputed',
-      date: '2025-10-27T08:45:00Z'
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const response = await adminService.getDashboardStats();
+      setStats(response.stats);
+      setRecentEscrows(response.recentEscrows || []);
+      setRecentDisputes(response.recentDisputes || []);
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+    } finally {
+      setLoading(false);
     }
-  ]);
-
-  const getStatusBadge = (status) => {
-    const badges = {
-      completed: { color: 'bg-green-100 text-green-800', icon: CheckCircle, text: 'Completed' },
-      in_escrow: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, text: 'In Escrow' },
-      disputed: { color: 'bg-red-100 text-red-800', icon: XCircle, text: 'Disputed' },
-      awaiting_delivery: { color: 'bg-blue-100 text-blue-800', icon: Activity, text: 'In Transit' }
-    };
-    const badge = badges[status];
-    const Icon = badge.icon;
-    return (
-      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}>
-        <Icon className="w-3 h-3 mr-1" />
-        {badge.text}
-      </span>
-    );
   };
 
-  return (
-    <div className="flex h-screen bg-gray-100">
-      <AdminSidebar admin={admin} activePage="dashboard" />
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader admin={admin} title="Dashboard Overview" />
-        
-        <main className="flex-1 overflow-y-auto p-6">
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-blue-100 rounded-lg">
-                  <DollarSign className="w-6 h-6 text-blue-600" />
-                </div>
-                <span className="text-sm text-green-600 font-semibold">+12.5%</span>
-              </div>
-              <p className="text-sm text-gray-600 mb-1">Total Transaction Value</p>
-              <p className="text-2xl font-bold text-gray-900">
-                ${stats.totalValue.toLocaleString()}
-              </p>
-            </div>
+  const handleLogout = () => {
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('admin');
+    navigate('/admin/login');
+  };
 
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <Activity className="w-6 h-6 text-green-600" />
-                </div>
-                <span className="text-sm text-green-600 font-semibold">+8.2%</span>
-              </div>
-              <p className="text-sm text-gray-600 mb-1">Active Escrows</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.activeEscrows}</p>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-red-100 rounded-lg">
-                  <AlertTriangle className="w-6 h-6 text-red-600" />
-                </div>
-                <span className="text-sm text-red-600 font-semibold">Urgent</span>
-              </div>
-              <p className="text-sm text-gray-600 mb-1">Pending Disputes</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.pendingDisputes}</p>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-3 bg-purple-100 rounded-lg">
-                  <Users className="w-6 h-6 text-purple-600" />
-                </div>
-                <span className="text-sm text-green-600 font-semibold">+15.3%</span>
-              </div>
-              <p className="text-sm text-gray-600 mb-1">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalUsers.toLocaleString()}</p>
-            </div>
-          </div>
-
-          {/* Revenue Stats */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow p-6 text-white">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Monthly Revenue</h3>
-                <TrendingUp className="w-6 h-6" />
-              </div>
-              <p className="text-4xl font-bold mb-2">${stats.revenueThisMonth.toLocaleString()}</p>
-              <p className="text-green-100">October 2025</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow p-6 text-white">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Transaction Fees</h3>
-                <DollarSign className="w-6 h-6" />
-              </div>
-              <p className="text-4xl font-bold mb-2">${stats.transactionFees.toLocaleString()}</p>
-              <p className="text-blue-100">This Month</p>
-            </div>
-          </div>
-
-          {/* Recent Transactions */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Recent Transactions</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Transaction ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Buyer
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Seller
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {recentTransactions.map((transaction) => (
-                    <tr key={transaction.id} className="hover:bg-gray-50 cursor-pointer">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-medium text-blue-600">{transaction.id}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-900">{transaction.buyer}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-900">{transaction.seller}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-semibold text-gray-900">
-                          ${transaction.amount.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(transaction.status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(transaction.date).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </main>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <Loader className="w-12 h-12 text-red-600 animate-spin" />
       </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-900">
+      {/* Header */}
+      <header className="bg-gray-800 border-b border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <Shield className="w-8 h-8 text-red-500" />
+              <div>
+                <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+                <p className="text-sm text-gray-400">Welcome back, {admin.name}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-xs text-gray-400">Role</p>
+                <p className="text-sm font-semibold text-red-400 uppercase">{admin.role}</p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-4 py-2 text-gray-300 hover:bg-gray-700 rounded-lg transition"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <Users className="w-8 h-8 text-blue-400" />
+              <span className="text-xs text-gray-400">Today: +{stats?.todayUsers || 0}</span>
+            </div>
+            <p className="text-3xl font-bold text-white mb-1">{stats?.totalUsers || 0}</p>
+            <p className="text-sm text-gray-400">Total Users</p>
+          </div>
+
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <Package className="w-8 h-8 text-green-400" />
+              <span className="text-xs text-gray-400">Today: +{stats?.todayEscrows || 0}</span>
+            </div>
+            <p className="text-3xl font-bold text-white mb-1">{stats?.totalEscrows || 0}</p>
+            <p className="text-sm text-gray-400">Total Escrows</p>
+          </div>
+
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <Activity className="w-8 h-8 text-yellow-400" />
+            </div>
+            <p className="text-3xl font-bold text-white mb-1">{stats?.activeEscrows || 0}</p>
+            <p className="text-sm text-gray-400">Active Escrows</p>
+          </div>
+
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <DollarSign className="w-8 h-8 text-green-400" />
+            </div>
+            <p className="text-3xl font-bold text-white mb-1">
+              ${(stats?.totalRevenue || 0).toLocaleString()}
+            </p>
+            <p className="text-sm text-gray-400">Total Revenue</p>
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                <AlertCircle className="w-6 h-6 text-yellow-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">{stats?.pendingDisputes || 0}</p>
+                <p className="text-sm text-gray-400">Pending Disputes</p>
+              </div>
+            </div>
+            {admin.permissions.manageDisputes && (
+              <button
+                onClick={() => navigate('/admin/disputes')}
+                className="text-sm text-yellow-400 hover:text-yellow-300 transition"
+              >
+                View All Disputes →
+              </button>
+            )}
+          </div>
+
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-green-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">{stats?.completedEscrows || 0}</p>
+                <p className="text-sm text-gray-400">Completed Escrows</p>
+              </div>
+            </div>
+            {admin.permissions.viewTransactions && (
+              <button
+                onClick={() => navigate('/admin/transactions')}
+                className="text-sm text-green-400 hover:text-green-300 transition"
+              >
+                View All Transactions →
+              </button>
+            )}
+          </div>
+
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <Users className="w-6 h-6 text-blue-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">{stats?.totalUsers || 0}</p>
+                <p className="text-sm text-gray-400">Total Users</p>
+              </div>
+            </div>
+            {admin.permissions.verifyUsers && (
+              <button
+                onClick={() => navigate('/admin/users')}
+                className="text-sm text-blue-400 hover:text-blue-300 transition"
+              >
+                Manage Users →
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Recent Escrows */}
+          <div className="bg-gray-800 rounded-lg border border-gray-700">
+            <div className="p-6 border-b border-gray-700">
+              <h2 className="text-lg font-semibold text-white">Recent Escrows</h2>
+            </div>
+            <div className="divide-y divide-gray-700">
+              {recentEscrows.length > 0 ? (
+                recentEscrows.slice(0, 5).map((escrow) => (
+                  <div key={escrow._id} className="p-4 hover:bg-gray-700/50 transition">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="font-semibold text-white">{escrow.itemName}</p>
+                        <p className="text-sm text-gray-400">
+                          {escrow.buyer?.name} → {escrow.seller?.name}
+                        </p>
+                      </div>
+                      <span className="text-sm font-semibold text-green-400">
+                        ${escrow.amount.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        escrow.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                        escrow.status === 'disputed' ? 'bg-red-500/20 text-red-400' :
+                        'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {escrow.status.replace('_', ' ')}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(escrow.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-gray-500">No recent escrows</div>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Disputes */}
+          <div className="bg-gray-800 rounded-lg border border-gray-700">
+            <div className="p-6 border-b border-gray-700">
+              <h2 className="text-lg font-semibold text-white">Recent Disputes</h2>
+            </div>
+            <div className="divide-y divide-gray-700">
+              {recentDisputes.length > 0 ? (
+                recentDisputes.slice(0, 5).map((dispute) => (
+                  <div key={dispute._id} className="p-4 hover:bg-gray-700/50 transition">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="font-semibold text-white">{dispute.reason}</p>
+                        <p className="text-sm text-gray-400">
+                          Escrow: {dispute.escrow?.escrowId}
+                        </p>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        dispute.status === 'resolved' ? 'bg-green-500/20 text-green-400' :
+                        dispute.status === 'under_review' ? 'bg-yellow-500/20 text-yellow-400' :
+                        'bg-red-500/20 text-red-400'
+                      }`}>
+                        {dispute.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {new Date(dispute.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-gray-500">No recent disputes</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+          {admin.permissions.viewTransactions && (
+            <button
+              onClick={() => navigate('/admin/transactions')}
+              className="p-4 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 transition text-left"
+            >
+              <Package className="w-8 h-8 text-blue-400 mb-2" />
+              <p className="font-semibold text-white">Transactions</p>
+              <p className="text-xs text-gray-400">View all escrows</p>
+            </button>
+          )}
+
+          {admin.permissions.manageDisputes && (
+            <button
+              onClick={() => navigate('/admin/disputes')}
+              className="p-4 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 transition text-left"
+            >
+              <AlertCircle className="w-8 h-8 text-yellow-400 mb-2" />
+              <p className="font-semibold text-white">Disputes</p>
+              <p className="text-xs text-gray-400">Manage disputes</p>
+            </button>
+          )}
+
+          {admin.permissions.verifyUsers && (
+            <button
+              onClick={() => navigate('/admin/users')}
+              className="p-4 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 transition text-left"
+            >
+              <Users className="w-8 h-8 text-green-400 mb-2" />
+              <p className="font-semibold text-white">Users</p>
+              <p className="text-xs text-gray-400">Manage users</p>
+            </button>
+          )}
+
+          {admin.permissions.viewAnalytics && (
+            <button
+              onClick={() => navigate('/admin/analytics')}
+              className="p-4 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 transition text-left"
+            >
+              <TrendingUp className="w-8 h-8 text-purple-400 mb-2" />
+              <p className="font-semibold text-white">Analytics</p>
+              <p className="text-xs text-gray-400">View reports</p>
+            </button>
+          )}
+        </div>
+      </main>
     </div>
   );
 };
