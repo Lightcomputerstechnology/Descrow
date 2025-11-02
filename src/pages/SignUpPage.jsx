@@ -25,7 +25,6 @@ const SignUpPage = ({ setUser }) => {
     });
     setError('');
 
-    // Check password strength
     if (name === 'password') {
       checkPasswordStrength(value);
     }
@@ -53,69 +52,59 @@ const SignUpPage = ({ setUser }) => {
     return 'Strong';
   };
 
-  // Replace the handleSubmit function with this:
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError('');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
 
-  // Validation
-  if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
-    setError('Please fill in all fields');
-    return;
-  }
-
-  if (formData.password.length < 8) {
-    setError('Password must be at least 8 characters long');
-    return;
-  }
-
-  if (formData.password !== formData.confirmPassword) {
-    setError('Passwords do not match');
-    return;
-  }
-
-  try {
-    setLoading(true);
-    const response = await authService.register({
-      name: formData.name,
-      email: formData.email,
-      password: formData.password
-    });
-
-    if (response.success) {
-      // Show success message
-      alert(`Registration successful!\n\nA verification email has been sent to ${response.email}.\n\nPlease check your inbox and click the verification link to activate your account before logging in.`);
-      
-      // Redirect to login page
-      navigate('/login');
+    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
+      setError('Please fill in all fields');
+      return;
     }
-  } catch (err) {
-    setError(err.message || 'Registration failed. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-};
-    // Extract error message
-    let errorMessage = 'Registration failed. Please try again.';
-    
-    if (err.response?.data?.message) {
-      errorMessage = err.response.data.message;
-    } else if (err.response?.data?.errors) {
-      errorMessage = err.response.data.errors.map(e => e.msg || e.message).join(', ');
-    } else if (err.message) {
-      errorMessage = err.message;
+
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return;
     }
-    
-    setError(errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await authService.register({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password
+      });
+
+      if (response.success) {
+        alert(
+          `Registration successful!\n\nA verification email has been sent to ${response.email}.\n\nPlease check your inbox and click the verification link to activate your account before logging in.`
+        );
+        navigate('/login');
+      }
+    } catch (err) {
+      let errorMessage = 'Registration failed. Please try again.';
+
+      if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.response?.data?.errors) {
+        errorMessage = err.response.data.errors.map(e => e.msg || e.message).join(', ');
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-gray-900 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-4">
             <Shield className="w-12 h-12 text-blue-400" />
@@ -125,7 +114,6 @@ const handleSubmit = async (e) => {
           <p className="text-blue-200">Start trading securely with escrow protection</p>
         </div>
 
-        {/* Sign Up Form */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8">
           {error && (
             <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
@@ -135,7 +123,6 @@ const handleSubmit = async (e) => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Name */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Full Name
@@ -155,7 +142,6 @@ const handleSubmit = async (e) => {
               </div>
             </div>
 
-            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Email Address
@@ -175,7 +161,6 @@ const handleSubmit = async (e) => {
               </div>
             </div>
 
-            {/* Password */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Password
@@ -201,7 +186,6 @@ const handleSubmit = async (e) => {
                 </button>
               </div>
 
-              {/* Password Strength Indicator */}
               {formData.password && (
                 <div className="mt-2">
                   <div className="flex items-center gap-2 mb-1">
@@ -219,7 +203,6 @@ const handleSubmit = async (e) => {
               )}
             </div>
 
-            {/* Confirm Password */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Confirm Password
@@ -252,7 +235,6 @@ const handleSubmit = async (e) => {
               )}
             </div>
 
-            {/* Terms & Conditions */}
             <div className="flex items-start">
               <input
                 id="terms"
@@ -273,7 +255,6 @@ const handleSubmit = async (e) => {
               </label>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
@@ -290,14 +271,12 @@ const handleSubmit = async (e) => {
             </button>
           </form>
 
-          {/* Divider */}
           <div className="mt-6 mb-6 flex items-center">
             <div className="flex-1 border-t border-gray-300 dark:border-gray-700"></div>
             <span className="px-4 text-sm text-gray-500 dark:text-gray-400">OR</span>
             <div className="flex-1 border-t border-gray-300 dark:border-gray-700"></div>
           </div>
 
-          {/* Login Link */}
           <p className="text-center text-sm text-gray-600 dark:text-gray-400">
             Already have an account?{' '}
             <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
@@ -306,7 +285,6 @@ const handleSubmit = async (e) => {
           </p>
         </div>
 
-        {/* Benefits */}
         <div className="mt-8 bg-white/10 backdrop-blur-sm rounded-xl p-6 text-white">
           <h3 className="font-semibold mb-3">Why choose Dealcross?</h3>
           <ul className="space-y-2 text-sm text-blue-100">
@@ -329,7 +307,6 @@ const handleSubmit = async (e) => {
           </ul>
         </div>
 
-        {/* Back to Home */}
         <div className="text-center mt-6">
           <Link to="/" className="text-sm text-blue-200 hover:text-white transition">
             ← Back to Home
