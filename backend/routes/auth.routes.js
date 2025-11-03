@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const authController = require('../controllers/auth.controller');
-const User = require('../models/User.model'); // 👈 Add this import
+const User = require('../models/User.model');
+const sendEmail = require('../utils/sendEmail'); // 👈 Make sure you have this utility file
 
 // ============================================
 // AUTH ROUTES
@@ -98,6 +99,37 @@ router.get('/dev/force-verify/:email', async (req, res) => {
   } catch (error) {
     console.error('❌ Force verify error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// ============================================
+// DEV TOOL: Test Email Sending
+// ============================================
+
+router.get('/dev/test-email/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    const subject = '✅ Email Test Successful';
+    const message = `
+      <h2>Hello from your backend!</h2>
+      <p>This is a test email sent from your Render app.</p>
+      <p>If you're seeing this, your email configuration is working fine 🎉</p>
+    `;
+
+    await sendEmail(email, subject, message);
+
+    res.status(200).json({
+      success: true,
+      message: `Test email sent successfully to ${email}`,
+    });
+  } catch (error) {
+    console.error('❌ Email test failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send test email',
+      error: error.message,
+    });
   }
 });
 
