@@ -1,74 +1,34 @@
 // routes/auth.routes.js
 const express = require('express');
-const { body } = require('express-validator');
 const router = express.Router();
 const authController = require('../controllers/auth.controller');
+const emailService = require('../services/email.service');
+const jwt = require('jsonwebtoken');
 
-// ------------------------- REGISTER -------------------------
-router.post(
-  '/register',
-  [
-    body('name').notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  ],
-  authController.register
-);
+// ------------------------- TEST EMAIL (DEV ONLY) -------------------------
+router.get('/dev/test-email/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
 
-// ------------------------- LOGIN -------------------------
-router.post(
-  '/login',
-  [
-    body('email').isEmail().withMessage('Valid email is required'),
-    body('password').notEmpty().withMessage('Password is required'),
-  ],
-  authController.login
-);
+    // Generate a dummy verification token for testing
+    const testToken = jwt.sign(
+      { id: 'test-user-id' }, // Replace with a real user ID if needed
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
 
-// ------------------------- VERIFY EMAIL -------------------------
-router.post(
-  '/verify-email',
-  [
-    body('token').notEmpty().withMessage('Verification token is required'),
-  ],
-  authController.verifyEmail
-);
+    // Send test verification email
+    await emailService.sendVerificationEmail(email, 'Test User', testToken);
 
-// ------------------------- RESEND VERIFICATION -------------------------
-router.post(
-  '/resend-verification',
-  [
-    body('email').isEmail().withMessage('Valid email is required'),
-  ],
-  authController.resendVerification
-);
-
-// ------------------------- FORGOT PASSWORD -------------------------
-router.post(
-  '/forgot-password',
-  [
-    body('email').isEmail().withMessage('Valid email is required'),
-  ],
-  authController.forgotPassword
-);
-
-// ------------------------- RESET PASSWORD -------------------------
-router.post(
-  '/reset-password',
-  [
-    body('token').notEmpty().withMessage('Reset token is required'),
-    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  ],
-  authController.resetPassword
-);
-
-// ------------------------- REFRESH TOKEN -------------------------
-router.post(
-  '/refresh-token',
-  [
-    body('token').notEmpty().withMessage('Token is required'),
-  ],
-  authController.refreshToken
-);
+    res.status(200).json({ success: true, message: `Test email sent to ${email}` });
+  } catch (error) {
+    console.error('❌ Test email failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send test email',
+      error: error.message
+    });
+  }
+});
 
 module.exports = router;
