@@ -1,6 +1,5 @@
 // services/email.service.js
-const Resend = require('resend');
-
+const { Resend } = require('resend'); // ✅ destructure Resend
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM_EMAIL = process.env.EMAIL_FROM || 'Dealcross <noreply@dealcross.net>';
 
@@ -66,8 +65,6 @@ class EmailService {
     const html = `<h2>Hello ${name},</h2><p>Your password has been changed successfully.</p>`;
     await this.sendEmail(email, subject, html);
   }
-
-  // You can copy your existing escrow/payment/dispute methods here and replace `this.transporter` with `this.sendEmail`
 }
 
 module.exports = new EmailService();
