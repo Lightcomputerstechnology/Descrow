@@ -24,6 +24,7 @@ const app = express();
 // ✅ FIX: Tell Express to trust Render's proxy
 // This prevents express-rate-limit and IP detection errors behind Render's proxy
 app.set('trust proxy', 1);
+app.use(express.json());
 
 // ==================== MIDDLEWARE ====================
 
