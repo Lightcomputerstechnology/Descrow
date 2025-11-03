@@ -25,7 +25,8 @@
     "compression": "^1.7.4",
     "morgan": "^1.10.0",
     "axios": "^1.7.7",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "resend": "^1.1.0"        // ✅ Add this line
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
