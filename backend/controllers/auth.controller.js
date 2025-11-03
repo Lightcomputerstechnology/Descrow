@@ -1,7 +1,3 @@
-exports.register = async (req, res) => {
-  console.log('🧩 Incoming registration:', req.body); // 👈 Add this
-  ...
-}
 const User = require('../models/User.model');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
