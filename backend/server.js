@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -21,102 +22,82 @@ const apiKeyRoutes = require('./routes/apiKey.routes');
 
 // Initialize Express App
 const app = express();
-// ✅ FIX: Tell Express to trust Render's proxy
-// This prevents express-rate-limit and IP detection errors behind Render's proxy
-app.set('trust proxy', 1);
+app.set('trust proxy', 1); // Trust Render's proxy
 app.use(express.json());
 
 // ==================== MIDDLEWARE ====================
 
 // Security headers
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+  })
+);
 
 // Compression
 app.use(compression());
 
-// CORS Configuration - Allow multiple origins
+// CORS Configuration
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
-  'https://descrow-5l46.onrender.com', // Your frontend URL
+  'https://descrow-5l46.onrender.com',
   process.env.FRONTEND_URL
-].filter(Boolean); // Remove undefined values
+].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, Postman, curl, etc.)
     if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log('❌ Blocked by CORS:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
+    if (allowedOrigins.includes(origin)) callback(null, true);
+    else callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key']
+  methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','x-api-key']
 }));
 
-// Handle preflight requests
 app.options('*', cors());
 
-// Body Parsers
+// Body parsers
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Logging
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-} else {
-  app.use(morgan('combined'));
-}
+if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));
+else app.use(morgan('combined'));
 
 // Rate Limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: {
-    success: false,
-    message: 'Too many requests from this IP, please try again later.'
-  },
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { success: false, message: 'Too many requests from this IP, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false
 });
-
-// Apply rate limiting to API routes
 app.use('/api/', limiter);
 
 // Stricter rate limit for auth routes
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20, // Increased from 10 to 20 for testing
-  message: {
-    success: false,
-    message: 'Too many authentication attempts, please try again later.'
-  }
+  max: 20,
+  message: { success: false, message: 'Too many authentication attempts, please try again later.' }
 });
 
 // Serve Static Files (uploads)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ==================== DATABASE CONNECTION ====================
-
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('✅ Connected to MongoDB');
     console.log(`📦 Database: ${mongoose.connection.name}`);
   })
-  .catch((error) => {
+  .catch(error => {
     console.error('❌ MongoDB connection error:', error);
     process.exit(1);
   });
 
 // ==================== HEALTH CHECK ====================
-
 app.get('/', (req, res) => {
   res.status(200).json({
     success: true,
@@ -139,103 +120,49 @@ app.get('/api/health', (req, res) => {
 
 // ==================== API ROUTES ====================
 
-// Authentication Routes (with stricter rate limiting)
+// Auth routes with stricter rate limit
 app.use('/api/auth', authLimiter, authRoutes);
 
-// User Routes
+// Other routes
 app.use('/api/users', userRoutes);
-
-// Escrow Routes
 app.use('/api/escrow', escrowRoutes);
-
-// Chat Routes
 app.use('/api/chat', chatRoutes);
-
-// Delivery Routes
 app.use('/api/delivery', deliveryRoutes);
-
-// Dispute Routes
 app.use('/api/disputes', disputeRoutes);
-
-// Payment Routes
 app.use('/api/payments', paymentRoutes);
-
-// Admin Routes
 app.use('/api/admin', adminRoutes);
-
-// API Key Routes
 app.use('/api/api-keys', apiKeyRoutes);
 
 // ==================== ERROR HANDLING ====================
 
-// 404 Handler - Route not found
+// 404 Handler
 app.use((req, res, next) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found',
-    path: req.originalUrl,
-    method: req.method
-  });
+  res.status(404).json({ success: false, message: 'Route not found', path: req.originalUrl, method: req.method });
 });
 
 // Global Error Handler
 app.use((error, req, res, next) => {
   console.error('Error:', error);
 
-  // Mongoose validation error
   if (error.name === 'ValidationError') {
     const errors = Object.values(error.errors).map(err => err.message);
-    return res.status(400).json({
-      success: false,
-      message: 'Validation Error',
-      errors
-    });
+    return res.status(400).json({ success: false, message: 'Validation Error', errors });
   }
 
-  // Mongoose duplicate key error
   if (error.code === 11000) {
     const field = Object.keys(error.keyPattern)[0];
-    return res.status(400).json({
-      success: false,
-      message: `${field} already exists`
-    });
+    return res.status(400).json({ success: false, message: `${field} already exists` });
   }
 
-  // JWT errors
-  if (error.name === 'JsonWebTokenError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid token'
-    });
-  }
+  if (error.name === 'JsonWebTokenError') return res.status(401).json({ success: false, message: 'Invalid token' });
+  if (error.name === 'TokenExpiredError') return res.status(401).json({ success: false, message: 'Token expired' });
+  if (error.name === 'MulterError') return res.status(400).json({ success: false, message: `File upload error: ${error.message}` });
 
-  if (error.name === 'TokenExpiredError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Token expired'
-    });
-  }
-
-  // Multer file upload errors
-  if (error.name === 'MulterError') {
-    return res.status(400).json({
-      success: false,
-      message: `File upload error: ${error.message}`
-    });
-  }
-
-  // Default error
-  res.status(error.status || 500).json({
-    success: false,
-    message: error.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: error.stack })
-  });
+  res.status(error.status || 500).json({ success: false, message: error.message || 'Internal server error', ...(process.env.NODE_ENV === 'development' && { stack: error.stack }) });
 });
 
 // ==================== START SERVER ====================
-
 const PORT = process.env.PORT || 5000;
-
 const server = app.listen(PORT, () => {
   console.log('🚀 ================================');
   console.log(`🚀 Server running on port ${PORT}`);
@@ -247,22 +174,16 @@ const server = app.listen(PORT, () => {
 });
 
 // ==================== GRACEFUL SHUTDOWN ====================
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (error) => {
+process.on('unhandledRejection', error => {
   console.error('❌ Unhandled Rejection:', error);
-  server.close(() => {
-    process.exit(1);
-  });
+  server.close(() => process.exit(1));
 });
 
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', error => {
   console.error('❌ Uncaught Exception:', error);
   process.exit(1);
 });
 
-// Handle SIGTERM signal
 process.on('SIGTERM', () => {
   console.log('👋 SIGTERM received. Shutting down gracefully...');
   server.close(() => {
@@ -274,7 +195,6 @@ process.on('SIGTERM', () => {
   });
 });
 
-// Handle SIGINT signal (Ctrl+C)
 process.on('SIGINT', () => {
   console.log('\n👋 SIGINT received. Shutting down gracefully...');
   server.close(() => {
