@@ -1,34 +1,40 @@
-const nodemailer = require('nodemailer');
+// utils/sendEmail.js
+const fetch = require('node-fetch');
 
 /**
- * Send an email using environment variables for SMTP configuration.
+ * Send an email using the Resend API.
  *
  * Required ENV variables:
- * SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, FROM_EMAIL
+ * RESEND_API_KEY, EMAIL_FROM
  */
 const sendEmail = async (to, subject, html) => {
   try {
-    // Create transporter
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT || 465,
-      secure: process.env.SMTP_PORT == 465, // true for 465, false for 587
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) throw new Error('RESEND_API_KEY not configured.');
+
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        from: process.env.EMAIL_FROM || 'Dealcross <noreply@dealcross.com>',
+        to,
+        subject,
+        html,
+      }),
     });
 
-    // Send email
-    const info = await transporter.sendMail({
-      from: process.env.FROM_EMAIL || `"Dealcross" <${process.env.SMTP_USER}>`,
-      to,
-      subject,
-      html,
-    });
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('❌ Resend API Error:', error);
+      throw new Error('Email could not be sent.');
+    }
 
-    console.log(`📧 Email sent to ${to}: ${info.messageId}`);
-    return info;
+    const data = await response.json();
+    console.log(`📧 Email sent to ${to}: ${data.id || 'No ID returned'}`);
+    return data;
   } catch (error) {
     console.error('❌ Email sending failed:', error);
     throw new Error('Email could not be sent.');
