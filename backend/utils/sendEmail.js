@@ -1,4 +1,6 @@
 // utils/sendEmail.js
+const fetch = require('node-fetch');
+
 /**
  * Send an email using the Resend API.
  *
