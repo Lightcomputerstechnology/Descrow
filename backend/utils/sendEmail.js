@@ -8,10 +8,6 @@ const fetch = require('node-fetch');
  * RESEND_API_KEY, EMAIL_FROM
  */
 
-// NEW (correct)
-const { Resend } = require('resend');
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const sendEmail = async (to, subject, html) => {
   try {
     const apiKey = process.env.RESEND_API_KEY;
