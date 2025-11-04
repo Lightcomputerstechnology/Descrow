@@ -1,18 +1,18 @@
 // File: src/pages/LandingPage.jsx
 import React from 'react';
-import SEOHead from '@/components/SEOHead';
-import HeroSection from '@/components/HeroSection';
-import DealsInProgress from '@/components/DealsInProgress';
-import HowItWorks from '@/components/HowItWorks';
-import TrustLevels from '@/components/TrustLevels';
-import FastPayouts from '@/components/FastPayouts';
-import PaymentMethods from '@/components/PaymentMethods';
-import TestimonialsSection from '@/components/TestimonialsSection';
-import APISection from '@/components/APISection';
-import FAQPreview from '@/components/FAQPreview';
-import StartTradingCTA from '@/components/StartTradingCTA';
-import BlogPreviewList from '@/components/BlogPreviewList';
-import ContactSection from '@/components/ContactSection';
+import SEOHead from '../components/SEOHead';
+import HeroSection from '../components/HeroSection';
+import DealsInProgress from '../components/DealsInProgress';
+import HowItWorks from '../components/HowItWorks';
+import TrustLevels from '../components/TrustLevels';
+import FastPayouts from '../components/FastPayouts';
+import PaymentMethods from '../components/PaymentMethods';
+import TestimonialsSection from '../components/TestimonialsSection';
+import APISection from '../components/APISection';
+import FAQPreview from '../components/FAQPreview';
+import StartTradingCTA from '../components/StartTradingCTA';
+import BlogPreviewList from '../components/BlogPreviewList';
+import ContactSection from '../components/ContactSection';
 
 export default function LandingPage() {
   return (
