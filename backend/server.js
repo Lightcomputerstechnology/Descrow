@@ -19,10 +19,11 @@ const disputeRoutes = require('./routes/dispute.routes');
 const paymentRoutes = require('./routes/payment.routes');
 const adminRoutes = require('./routes/admin.routes');
 const apiKeyRoutes = require('./routes/apiKey.routes');
+const verifyRoutes = require('./routes/verify.routes'); // ✅ Added
 
 // Initialize Express App
 const app = express();
-app.set('trust proxy', 1); // Trust Render's proxy
+app.set('trust proxy', 1);
 app.use(express.json());
 
 // ==================== MIDDLEWARE ====================
@@ -76,14 +77,13 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Stricter rate limit for auth routes
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   message: { success: false, message: 'Too many authentication attempts, please try again later.' }
 });
 
-// Serve Static Files (uploads)
+// Serve Static Files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ==================== DATABASE CONNECTION ====================
@@ -119,11 +119,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // ==================== API ROUTES ====================
-
-// Auth routes with stricter rate limit
 app.use('/api/auth', authLimiter, authRoutes);
-
-// Other routes
 app.use('/api/users', userRoutes);
 app.use('/api/escrow', escrowRoutes);
 app.use('/api/chat', chatRoutes);
@@ -132,6 +128,9 @@ app.use('/api/disputes', disputeRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/api-keys', apiKeyRoutes);
+
+// ✅ Verification redirect routes
+app.use('/api/verify-email', verifyRoutes);
 
 // ==================== ERROR HANDLING ====================
 
