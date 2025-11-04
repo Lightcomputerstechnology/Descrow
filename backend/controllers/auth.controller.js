@@ -9,7 +9,7 @@ const generateToken = (userId) => {
   return jwt.sign(
     { id: userId },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRE || '7d' }
+    { expiresIn: process.env.JWT_EXPIRE || '1d' } // shorter expiry for verification
   );
 };
 
@@ -37,10 +37,8 @@ exports.register = async (req, res) => {
 
     const verificationToken = generateToken(user._id);
 
-    // Send verification email
-    emailService.sendVerificationEmail(user.email, user.name, verificationToken)
-      .then(() => console.log('✅ Verification email sent'))
-      .catch(err => console.log('⚠️ Verification email failed:', err.message));
+    // ✅ Send verification email with await
+    await emailService.sendVerificationEmail(user.email, user.name, verificationToken);
 
     res.status(201).json({
       success: true,
@@ -101,31 +99,59 @@ exports.login = async (req, res) => {
   }
 };
 
-// ------------------------- VERIFY EMAIL -------------------------
+// ------------------------- VERIFY EMAIL (POST) -------------------------
 exports.verifyEmail = async (req, res) => {
   try {
     const { token } = req.body;
-    if (!token) return res.status(400).json({ success: false, message: 'Verification token is required' });
+    if (!token)
+      return res.status(400).json({ success: false, message: 'Verification token is required' });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    if (user.verified) return res.status(400).json({ success: false, message: 'Email already verified. You can login now.' });
+    if (!user)
+      return res.status(404).json({ success: false, message: 'User not found' });
+    if (user.verified)
+      return res.status(400).json({ success: false, message: 'Email already verified' });
 
     user.verified = true;
     await user.save();
 
-    emailService.sendWelcomeEmail(user.email, user.name)
-      .then(() => console.log('✅ Welcome email sent'))
-      .catch(err => console.log('⚠️ Welcome email failed:', err.message));
+    await emailService.sendWelcomeEmail(user.email, user.name);
 
     res.status(200).json({ success: true, message: 'Email verified successfully! You can now login.' });
 
   } catch (error) {
     console.error('❌ Verify email error:', error);
-    if (error.name === 'JsonWebTokenError') return res.status(400).json({ success: false, message: 'Invalid verification token' });
-    if (error.name === 'TokenExpiredError') return res.status(400).json({ success: false, message: 'Verification token expired. Request a new one.' });
-    res.status(400).json({ success: false, message: 'Email verification failed' });
+    if (error.name === 'TokenExpiredError')
+      return res.status(400).json({ success: false, message: 'Verification token expired. Please request a new one.' });
+    if (error.name === 'JsonWebTokenError')
+      return res.status(400).json({ success: false, message: 'Invalid verification token' });
+
+    res.status(500).json({ success: false, message: 'Email verification failed' });
+  }
+};
+
+// ------------------------- VERIFY EMAIL (GET) - For click link -------------------------
+exports.verifyEmailRedirect = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
+
+    if (!user)
+      return res.redirect(`${process.env.FRONTEND_URL}/verify-error?reason=user-not-found`);
+    if (user.verified)
+      return res.redirect(`${process.env.FRONTEND_URL}/verify-success?already=true`);
+
+    user.verified = true;
+    await user.save();
+
+    await emailService.sendWelcomeEmail(user.email, user.name);
+
+    return res.redirect(`${process.env.FRONTEND_URL}/verify-success`);
+  } catch (error) {
+    console.error('❌ Verify redirect error:', error);
+    return res.redirect(`${process.env.FRONTEND_URL}/verify-error?reason=invalid-token`);
   }
 };
 
@@ -133,20 +159,23 @@ exports.verifyEmail = async (req, res) => {
 exports.resendVerification = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
+    if (!email)
+      return res.status(400).json({ success: false, message: 'Email is required' });
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ success: false, message: 'No account found with that email' });
-    if (user.verified) return res.status(400).json({ success: false, message: 'Email already verified. You can login now.' });
+    if (!user)
+      return res.status(404).json({ success: false, message: 'No account found with that email' });
+    if (user.verified)
+      return res.status(400).json({ success: false, message: 'Email already verified' });
 
     const verificationToken = generateToken(user._id);
     await emailService.sendVerificationEmail(user.email, user.name, verificationToken);
 
-    res.status(200).json({ success: true, message: 'Verification email sent! Please check your inbox.' });
+    res.status(200).json({ success: true, message: 'Verification email resent successfully' });
 
   } catch (error) {
     console.error('❌ Resend verification error:', error);
-    res.status(500).json({ success: false, message: 'Failed to send verification email' });
+    res.status(500).json({ success: false, message: 'Failed to resend verification email' });
   }
 };
 
@@ -155,12 +184,11 @@ exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ success: false, message: 'No account found with that email' });
+    if (!user)
+      return res.status(404).json({ success: false, message: 'No account found with that email' });
 
     const resetToken = generateToken(user._id);
-    emailService.sendPasswordResetEmail(user.email, user.name, resetToken)
-      .then(() => console.log('✅ Password reset email sent'))
-      .catch(err => console.log('⚠️ Password reset email failed:', err.message));
+    await emailService.sendPasswordResetEmail(user.email, user.name, resetToken);
 
     res.status(200).json({ success: true, message: 'Password reset link sent to your email' });
 
@@ -176,14 +204,13 @@ exports.resetPassword = async (req, res) => {
     const { token, password } = req.body;
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id);
-    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    if (!user)
+      return res.status(404).json({ success: false, message: 'User not found' });
 
     user.password = password;
     await user.save();
 
-    emailService.sendPasswordChangedEmail(user.email, user.name)
-      .then(() => console.log('✅ Password changed email sent'))
-      .catch(err => console.log('⚠️ Password changed email failed:', err.message));
+    await emailService.sendPasswordChangedEmail(user.email, user.name);
 
     res.status(200).json({ success: true, message: 'Password reset successful' });
 
@@ -199,7 +226,8 @@ exports.refreshToken = async (req, res) => {
     const { token } = req.body;
     const decoded = jwt.verify(token, process.env.JWT_SECRET, { ignoreExpiration: true });
     const user = await User.findById(decoded.id);
-    if (!user || !user.isActive) return res.status(401).json({ success: false, message: 'Invalid token' });
+    if (!user || !user.isActive)
+      return res.status(401).json({ success: false, message: 'Invalid token' });
 
     const newToken = generateToken(user._id);
     res.status(200).json({ success: true, token: newToken });
