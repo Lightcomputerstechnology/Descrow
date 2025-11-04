@@ -7,12 +7,17 @@ const LanguageSwitcher = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('English');
 
   const languages = [
-    { code: 'en', name: 'English', flag: '🇺🇸' },
-    { code: 'es', name: 'Español', flag: '🇪🇸' },
-    { code: 'fr', name: 'Français', flag: '🇫🇷' },
-    { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
-    { code: 'zh', name: '中文', flag: '🇨🇳' }
-  ];
+  { code: 'en', name: 'English', emoji: '🇺🇸' },
+  { code: 'es', name: 'Español', emoji: '🇪🇸' },
+  { code: 'fr', name: 'Français', emoji: '🇫🇷' },
+  { code: 'de', name: 'Deutsch', emoji: '🇩🇪' },
+  { code: 'zh', name: '中文', emoji: '🇨🇳' },
+  { code: 'ru', name: 'Русский', emoji: '🇷🇺' },
+  { code: 'ar', name: 'العربية', emoji: '🇸🇦' },
+  { code: 'pt', name: 'Português', emoji: '🇧🇷' },
+  { code: 'ja', name: '日本語', emoji: '🇯🇵' },
+  { code: 'hi', name: 'हिन्दी', emoji: '🇮🇳' },
+];
 
   return (
     <div className="relative">
