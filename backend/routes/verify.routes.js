@@ -1,208 +1,74 @@
-// server.js
+// backend/routes/verify.routes.js
 const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
-const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
-const path = require('path');
-require('dotenv').config();
+const jwt = require('jsonwebtoken');
+const User = require('../models/User'); // adjust the path if your model is named differently
+const router = express.Router();
 
-// Import Routes
-const authRoutes = require('./routes/auth.routes');
-const userRoutes = require('./routes/user.routes');
-const escrowRoutes = require('./routes/escrow.routes');
-const chatRoutes = require('./routes/chat.routes');
-const deliveryRoutes = require('./routes/delivery.routes');
-const disputeRoutes = require('./routes/dispute.routes');
-const paymentRoutes = require('./routes/payment.routes');
-const adminRoutes = require('./routes/admin.routes');
-const apiKeyRoutes = require('./routes/apiKey.routes');
-const verifyRoutes = require('./routes/verify.routes'); // ✅ Added
+/**
+ * ✅ GET /api/verify-email/:token
+ * Called when a user clicks the email verification link
+ */
+router.get('/:token', async (req, res) => {
+  const { token } = req.params;
 
-// Initialize Express App
-const app = express();
-app.set('trust proxy', 1);
-app.use(express.json());
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id);
 
-// ==================== MIDDLEWARE ====================
+    if (!user) {
+      return res.status(404).send(renderTemplate('Email Verification Failed', `
+        <p>We couldn’t find your account. Please try registering again.</p>
+      `));
+    }
 
-// Security headers
-app.use(
-  helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" }
-  })
-);
+    if (user.isVerified) {
+      return res.status(200).send(renderTemplate('Already Verified', `
+        <p>Your email has already been verified. You can log in now.</p>
+      `));
+    }
 
-// Compression
-app.use(compression());
+    user.isVerified = true;
+    await user.save();
 
-// CORS Configuration
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'https://descrow-5l46.onrender.com',
-  process.env.FRONTEND_URL
-].filter(Boolean);
-
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) callback(null, true);
-    else callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','x-api-key']
-}));
-
-app.options('*', cors());
-
-// Body parsers
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Logging
-if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));
-else app.use(morgan('combined'));
-
-// Rate Limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { success: false, message: 'Too many requests from this IP, please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false
-});
-app.use('/api/', limiter);
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { success: false, message: 'Too many authentication attempts, please try again later.' }
-});
-
-// Serve Static Files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// ==================== DATABASE CONNECTION ====================
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log('✅ Connected to MongoDB');
-    console.log(`📦 Database: ${mongoose.connection.name}`);
-  })
-  .catch(error => {
-    console.error('❌ MongoDB connection error:', error);
-    process.exit(1);
-  });
-
-// ==================== HEALTH CHECK ====================
-app.get('/', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Dealcross API is running',
-    version: '1.0.0',
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'API health check passed',
-    status: 'healthy',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
-  });
-});
-
-// ==================== API ROUTES ====================
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/escrow', escrowRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/delivery', deliveryRoutes);
-app.use('/api/disputes', disputeRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/api-keys', apiKeyRoutes);
-
-// ✅ Verification redirect routes
-app.use('/api/verify-email', verifyRoutes);
-
-// ==================== ERROR HANDLING ====================
-
-// 404 Handler
-app.use((req, res, next) => {
-  res.status(404).json({ success: false, message: 'Route not found', path: req.originalUrl, method: req.method });
-});
-
-// Global Error Handler
-app.use((error, req, res, next) => {
-  console.error('Error:', error);
-
-  if (error.name === 'ValidationError') {
-    const errors = Object.values(error.errors).map(err => err.message);
-    return res.status(400).json({ success: false, message: 'Validation Error', errors });
+    res.status(200).send(renderTemplate('Email Verified ✅', `
+      <p>Your email has been successfully verified! You can now log in.</p>
+      <div style="text-align:center;margin-top:20px;">
+        <a href="${process.env.FRONTEND_URL}/login"
+           style="background:#2563EB;color:#fff;padding:12px 28px;text-decoration:none;border-radius:6px;">
+          Go to Login
+        </a>
+      </div>
+    `));
+  } catch (err) {
+    console.error('❌ Email verification failed:', err);
+    return res.status(400).send(renderTemplate('Invalid or Expired Link', `
+      <p>The verification link is invalid or has expired.</p>
+      <p>Please request a new verification email.</p>
+    `));
   }
-
-  if (error.code === 11000) {
-    const field = Object.keys(error.keyPattern)[0];
-    return res.status(400).json({ success: false, message: `${field} already exists` });
-  }
-
-  if (error.name === 'JsonWebTokenError') return res.status(401).json({ success: false, message: 'Invalid token' });
-  if (error.name === 'TokenExpiredError') return res.status(401).json({ success: false, message: 'Token expired' });
-  if (error.name === 'MulterError') return res.status(400).json({ success: false, message: `File upload error: ${error.message}` });
-
-  res.status(error.status || 500).json({ success: false, message: error.message || 'Internal server error', ...(process.env.NODE_ENV === 'development' && { stack: error.stack }) });
 });
 
-// ==================== START SERVER ====================
-const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
-  console.log('🚀 ================================');
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 API URL: http://localhost:${PORT}/api`);
-  console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
-  console.log(`✅ Allowed Origins:`, allowedOrigins);
-  console.log('🚀 ================================');
-});
 
-// ==================== GRACEFUL SHUTDOWN ====================
-process.on('unhandledRejection', error => {
-  console.error('❌ Unhandled Rejection:', error);
-  server.close(() => process.exit(1));
-});
+// ✅ Inline simple HTML template
+function renderTemplate(title, body) {
+  return `
+    <html>
+      <head>
+        <title>${title}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+      </head>
+      <body style="font-family:Arial,Helvetica,sans-serif;background:#f4f7fa;padding:40px;text-align:center;">
+        <div style="max-width:500px;margin:auto;background:#fff;padding:30px;border-radius:12px;
+                    box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+          <img src="https://dealcross.net/logo.png" alt="Dealcross" style="width:90px;margin-bottom:10px;">
+          <h2 style="color:#2563EB;">${title}</h2>
+          <div style="color:#333;font-size:15px;">${body}</div>
+          <hr style="border:none;border-top:1px solid #eee;margin:25px 0;">
+          <p style="color:#999;font-size:12px;">© ${new Date().getFullYear()} Dealcross</p>
+        </div>
+      </body>
+    </html>
+  `;
+}
 
-process.on('uncaughtException', error => {
-  console.error('❌ Uncaught Exception:', error);
-  process.exit(1);
-});
-
-process.on('SIGTERM', () => {
-  console.log('👋 SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
-    console.log('💤 Server closed');
-    mongoose.connection.close(false, () => {
-      console.log('📦 MongoDB connection closed');
-      process.exit(0);
-    });
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('\n👋 SIGINT received. Shutting down gracefully...');
-  server.close(() => {
-    console.log('💤 Server closed');
-    mongoose.connection.close(false, () => {
-      console.log('📦 MongoDB connection closed');
-      process.exit(0);
-    });
-  });
-});
-
-module.exports = app;
+module.exports = router;
