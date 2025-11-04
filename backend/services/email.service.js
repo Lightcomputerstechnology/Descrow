@@ -1,12 +1,11 @@
 // services/email.service.js
 const { Resend } = require('resend');
 
+// Initialize Resend with your API key
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// ✅ Automatically use Resend domain until your own is verified
-const FROM_EMAIL =
-  process.env.EMAIL_FROM_VERIFIED ||
-  'Dealcross <onboarding@resend.dev>'; // fallback verified domain
+// ✅ Hardcoded fallback verified domain for testing
+const FROM_EMAIL = 'Dealcross <onboarding@resend.dev>';
 
 class EmailService {
   // Generic send email
@@ -22,23 +21,13 @@ class EmailService {
       return response;
     } catch (error) {
       console.error('❌ Email send failed:', error);
-      if (error.message?.includes('domain is not verified')) {
-        console.warn('⚠️ Switching to resend.dev fallback domain...');
-        // Retry once with resend.dev domain
-        const fallbackResponse = await resend.emails.send({
-          from: 'Dealcross <onboarding@resend.dev>',
-          to,
-          subject,
-          html,
-        });
-        console.log(`✅ Fallback email sent via resend.dev to ${to}`);
-        return fallbackResponse;
-      }
       throw new Error('Email sending failed');
     }
   }
 
-  // Email Verification
+  // ------------------ EMAIL TYPES ------------------
+
+  // Verification Email
   async sendVerificationEmail(email, name, verificationToken) {
     const subject = 'Verify Your Email - Dealcross';
     const html = `
