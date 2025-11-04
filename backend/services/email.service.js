@@ -2,7 +2,11 @@
 const { Resend } = require('resend');
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM_EMAIL = process.env.EMAIL_FROM || 'Dealcross <noreply@dealcross.net>';
+
+// ✅ Automatically use Resend domain until your own is verified
+const FROM_EMAIL =
+  process.env.EMAIL_FROM_VERIFIED ||
+  'Dealcross <onboarding@resend.dev>'; // fallback verified domain
 
 class EmailService {
   // Generic send email
@@ -18,6 +22,18 @@ class EmailService {
       return response;
     } catch (error) {
       console.error('❌ Email send failed:', error);
+      if (error.message?.includes('domain is not verified')) {
+        console.warn('⚠️ Switching to resend.dev fallback domain...');
+        // Retry once with resend.dev domain
+        const fallbackResponse = await resend.emails.send({
+          from: 'Dealcross <onboarding@resend.dev>',
+          to,
+          subject,
+          html,
+        });
+        console.log(`✅ Fallback email sent via resend.dev to ${to}`);
+        return fallbackResponse;
+      }
       throw new Error('Email sending failed');
     }
   }
@@ -42,7 +58,7 @@ class EmailService {
   // Welcome Email
   async sendWelcomeEmail(email, name) {
     const subject = 'Welcome to Dealcross';
-    const html = `<h2>Hello ${name},</h2><p>Your email is verified and account is active!</p>`;
+    const html = `<h2>Hello ${name},</h2><p>Your email is verified and your account is active!</p>`;
     await this.sendEmail(email, subject, html);
   }
 
