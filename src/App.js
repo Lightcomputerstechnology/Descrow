@@ -1,5 +1,7 @@
+// File: src/App.js
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import Navbar from './components/Navbar';
 
 // Public Pages
 import VerifyEmail from './pages/VerifyEmail';
@@ -86,16 +88,25 @@ function App() {
     return children;
   };
 
+  // Check if current route is admin or public (no navbar needed)
+  const showNavbar = () => {
+    const path = window.location.pathname;
+    const noNavbarRoutes = ['/login', '/signup', '/verify-email', '/admin'];
+    return !noNavbarRoutes.some(route => path.startsWith(route));
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   return (
-    <Router>
+    <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors duration-300">
+      {showNavbar() && <Navbar />}
+      
       <Routes>
         {/* ==================== PUBLIC ROUTES ==================== */}
         <Route path="/" element={<LandingPage />} />
@@ -204,7 +215,7 @@ function App() {
         {/* ==================== CATCH ALL ==================== */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </Router>
+    </div>
   );
 }
 
