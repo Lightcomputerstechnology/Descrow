@@ -1,7 +1,7 @@
 // backend/routes/verify.routes.js
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const User = require('../models/User'); // adjust the path if your model is named differently
+const User = require('../models/User.model'); // Corrected import
 const router = express.Router();
 
 /**
@@ -21,13 +21,13 @@ router.get('/:token', async (req, res) => {
       `));
     }
 
-    if (user.isVerified) {
+    if (user.verified) { // corrected field to match your model: 'verified'
       return res.status(200).send(renderTemplate('Already Verified', `
         <p>Your email has already been verified. You can log in now.</p>
       `));
     }
 
-    user.isVerified = true;
+    user.verified = true; // corrected field
     await user.save();
 
     res.status(200).send(renderTemplate('Email Verified ✅', `
@@ -47,7 +47,6 @@ router.get('/:token', async (req, res) => {
     `));
   }
 });
-
 
 // ✅ Inline simple HTML template
 function renderTemplate(title, body) {
