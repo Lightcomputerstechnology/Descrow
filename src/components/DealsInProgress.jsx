@@ -4,14 +4,14 @@ import { Zap } from 'lucide-react';
 import API from '../utils/api';
 import { toast } from 'react-hot-toast';
 
+// Mock deals for display
 const mockDeals = [
-  const mockDeals = [
   {
     buyer: 'Sarah Johnson',
     seller: 'Kelvin Ugo',
     itemName: 'iPhone 14 Pro Purchase',
     location: 'Lagos, Nigeria',
-    condition: 'fairly used',
+    condition: 'Fairly used',
     amount: '$1,200',
     status: 'In Escrow 🔒',
   },
@@ -102,6 +102,7 @@ const DealsInProgress = () => {
   const [allDeals, setAllDeals] = useState(mockDeals);
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  // Fetch real deals from backend (optional)
   useEffect(() => {
     const fetchDeals = async () => {
       try {
@@ -120,13 +121,13 @@ const DealsInProgress = () => {
         }
       } catch (err) {
         console.error('Failed to fetch real deals:', err.message);
-        // Silent fail - just use mock deals
       }
     };
 
     fetchDeals();
   }, []);
 
+  // Cycle through deals every 7 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % allDeals.length);
@@ -139,7 +140,7 @@ const DealsInProgress = () => {
   return (
     <section className="py-12 bg-white dark:bg-gray-950 text-center transition-colors duration-300">
       <div className="max-w-6xl mx-auto px-4">
-        {/* Section Title with Live Indicator */}
+        {/* Section Title */}
         <div className="flex items-center justify-center gap-3 mb-8">
           <Zap className="w-6 h-6 text-yellow-500 animate-pulse" />
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -157,7 +158,8 @@ const DealsInProgress = () => {
             className="bg-blue-900 dark:bg-blue-800 text-white rounded-2xl shadow-xl p-8 transition-all duration-500 hover:shadow-2xl hover:scale-105"
           >
             <h3 className="text-xl font-semibold mb-4">
-              {currentDeal?.buyer} purchasing {currentDeal?.itemName} from {currentDeal?.seller}
+              {currentDeal?.buyer} purchasing {currentDeal?.itemName} from{' '}
+              {currentDeal?.seller}
             </h3>
             <div className="space-y-2 text-left">
               <p>
@@ -179,7 +181,7 @@ const DealsInProgress = () => {
           </div>
         </div>
 
-        {/* Progress Indicator */}
+        {/* Progress Dots */}
         <div className="flex justify-center gap-2 mt-6">
           {allDeals.map((_, index) => (
             <div
