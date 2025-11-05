@@ -1,33 +1,30 @@
-// File: src/services/authService.js
+// src/services/authService.js
 import api from '../config/api';
 import { toast } from 'react-hot-toast';
 
 export const authService = {
   /**
    * 📝 Register a new user
-   * Backend automatically sends verification email
    */
-  register: async (userData) => {
+  async register(userData) {
     try {
       const res = await api.post('/auth/register', userData);
-
       toast.success(
         res.data.message ||
           'Registration successful! Please check your email to verify your account.'
       );
-
       return res.data;
     } catch (err) {
       console.error('Registration error:', err);
-      toast.error(err.response?.data?.message || 'Registration failed. Please try again.');
+      toast.error(err.response?.data?.message || 'Registration failed.');
       throw err.response?.data || { message: 'Registration failed.' };
     }
   },
 
   /**
-   * 🔑 Login user (only if email is verified)
+   * 🔑 Login user
    */
-  login: async (credentials) => {
+  async login(credentials) {
     try {
       const res = await api.post('/auth/login', credentials);
 
@@ -36,29 +33,29 @@ export const authService = {
         localStorage.setItem('user', JSON.stringify(res.data.user));
         toast.success(`Welcome back, ${res.data.user?.firstName || 'User'}!`);
       } else {
-        toast.error('Your email is not verified yet. Please check your inbox.');
+        toast.error('Your email is not verified yet.');
       }
 
       return res.data;
     } catch (err) {
       console.error('Login error:', err);
-      toast.error(err.response?.data?.message || 'Invalid credentials. Please try again.');
+      toast.error(err.response?.data?.message || 'Invalid credentials.');
       throw err.response?.data || { message: 'Login failed.' };
     }
   },
 
   /**
-   * 📧 Verify user email via token
+   * 📧 Verify email
    */
-  verifyEmail: async (token) => {
+  async verifyEmail(token) {
     try {
-      const res = await api.post('/auth/verify', { token }); // match backend route
+      const res = await api.post('/auth/verify-email', { token });
       toast.success('✅ Email verified successfully! You can now log in.');
       setTimeout(() => (window.location.href = '/login'), 2000);
       return res.data;
     } catch (err) {
-      console.error('Email verification error:', err);
-      toast.error(err.response?.data?.message || 'Invalid or expired verification link.');
+      console.error('Verify email error:', err);
+      toast.error(err.response?.data?.message || 'Invalid or expired link.');
       throw err.response?.data || { message: 'Verification failed.' };
     }
   },
@@ -66,7 +63,7 @@ export const authService = {
   /**
    * 🔁 Resend verification email
    */
-  resendVerification: async (email) => {
+  async resendVerification(email) {
     try {
       const res = await api.post('/auth/resend-verification', { email });
       toast.success('📩 A new verification email has been sent.');
@@ -79,9 +76,9 @@ export const authService = {
   },
 
   /**
-   * 🔐 Forgot password - send reset link
+   * 🔐 Forgot password
    */
-  forgotPassword: async (email) => {
+  async forgotPassword(email) {
     try {
       const res = await api.post('/auth/forgot-password', { email });
       toast.success('📨 Password reset link sent to your email.');
@@ -94,9 +91,9 @@ export const authService = {
   },
 
   /**
-   * 🔁 Reset password using token
+   * 🔁 Reset password
    */
-  resetPassword: async (token, password) => {
+  async resetPassword(token, password) {
     try {
       const res = await api.post('/auth/reset-password', { token, password });
       toast.success('✅ Password reset successful! You can now log in.');
@@ -110,9 +107,9 @@ export const authService = {
   },
 
   /**
-   * 🚪 Logout user
+   * 🚪 Logout
    */
-  logout: () => {
+  logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     toast.success('You’ve been logged out.');
@@ -122,7 +119,7 @@ export const authService = {
   /**
    * 👤 Get current logged-in user
    */
-  getCurrentUser: () => {
+  getCurrentUser() {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
   },
