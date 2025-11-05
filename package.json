@@ -15,7 +15,8 @@
     "react-helmet-async": "^2.0.4",
     "react-i18next": "^13.5.0",
     "i18next": "^23.7.6",
-    "react-hot-toast": "^2.4.1"
+    "react-hot-toast": "^2.4.1",
+    "react-scripts": "5.0.1"
   },
   "scripts": {
     "start": "react-scripts start",
