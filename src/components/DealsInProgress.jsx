@@ -5,16 +5,97 @@ import API from '../utils/api';
 import { toast } from 'react-hot-toast';
 
 const mockDeals = [
-  { title: 'iPhone 14 Pro Purchase - Sarah', amount: '$1,200', status: 'In Escrow' },
-  { title: 'Helena paying for Web Dev', amount: '$4,200', status: 'Locked' },
-  { title: 'Amazon Order Deal - Tom', amount: '$300', status: 'Pending' },
-  { title: 'Design Contract - Bryan', amount: '$1,000', status: 'Secured' },
-  { title: 'Crypto Exchange - Kelvin', amount: '$5,000', status: 'Locked' },
-  { title: 'Used Car Purchase - Mike', amount: '$6,800', status: 'In Progress' },
-  { title: 'Furniture Delivery - Tina', amount: '$2,100', status: 'Completed' },
-  { title: 'Freelance Video Edit - Joe', amount: '$400', status: 'In Escrow' },
-  { title: 'School Payment - Amanda', amount: '$3,500', status: 'Active' },
-  { title: 'Consulting Payment - Chloe', amount: '$1,800', status: 'Escrowed' },
+  const mockDeals = [
+  {
+    buyer: 'Sarah Johnson',
+    seller: 'Kelvin Ugo',
+    itemName: 'iPhone 14 Pro Purchase',
+    location: 'Lagos, Nigeria',
+    condition: 'fairly used',
+    amount: '$1,200',
+    status: 'In Escrow 🔒',
+  },
+  {
+    buyer: 'Helena',
+    seller: 'Web Dev Agency',
+    itemName: 'Web Development Services',
+    location: 'Abuja, Nigeria',
+    condition: 'New',
+    amount: '$4,200',
+    status: 'Locked 🔒',
+  },
+  {
+    buyer: 'Tom',
+    seller: 'Amazon',
+    itemName: 'Amazon Order',
+    location: 'Online',
+    condition: 'New',
+    amount: '$300',
+    status: 'Pending ⏳',
+  },
+  {
+    buyer: 'Bryan',
+    seller: 'Design Co.',
+    itemName: 'Design Contract',
+    location: 'Port Harcourt, Nigeria',
+    condition: 'N/A',
+    amount: '$1,000',
+    status: 'Secured 🔒',
+  },
+  {
+    buyer: 'Kelvin',
+    seller: 'Crypto Exchange',
+    itemName: 'Crypto Exchange',
+    location: 'Online',
+    condition: 'N/A',
+    amount: '$5,000',
+    status: 'Locked 🔒',
+  },
+  {
+    buyer: 'Mike',
+    seller: 'Used Cars Ltd',
+    itemName: 'Used Car Purchase',
+    location: 'Ibadan, Nigeria',
+    condition: 'Good',
+    amount: '$6,800',
+    status: 'In Progress ⏳',
+  },
+  {
+    buyer: 'Tina',
+    seller: 'Furniture Co.',
+    itemName: 'Furniture Delivery',
+    location: 'Enugu, Nigeria',
+    condition: 'New',
+    amount: '$2,100',
+    status: 'Completed ✅',
+  },
+  {
+    buyer: 'Joe',
+    seller: 'Freelance Video Editor',
+    itemName: 'Freelance Video Edit',
+    location: 'Online',
+    condition: 'N/A',
+    amount: '$400',
+    status: 'In Escrow 🔒',
+  },
+  {
+    buyer: 'Amanda',
+    seller: 'School ABC',
+    itemName: 'School Payment',
+    location: 'Lagos, Nigeria',
+    condition: 'N/A',
+    amount: '$3,500',
+    status: 'Active 🔵',
+  },
+  {
+    buyer: 'Chloe',
+    seller: 'Consulting Firm',
+    itemName: 'Consulting Payment',
+    location: 'Abuja, Nigeria',
+    condition: 'N/A',
+    amount: '$1,800',
+    status: 'Escrowed 🔒',
+  },
 ];
 
 const DealsInProgress = () => {
@@ -25,9 +106,13 @@ const DealsInProgress = () => {
     const fetchDeals = async () => {
       try {
         const res = await API.get('/deals/public');
-        if (Array.isArray(res) && res.length > 0) {
-          const realDeals = res.map((deal) => ({
-            title: `${deal.title} - ${deal.dealer_name || 'User'}`,
+        if (Array.isArray(res?.data) && res.data.length > 0) {
+          const realDeals = res.data.map((deal) => ({
+            buyer: deal.buyer_name || 'User',
+            seller: deal.seller_name || 'Seller',
+            itemName: deal.title,
+            location: deal.location || 'Unknown',
+            condition: deal.condition || 'N/A',
             amount: `$${deal.amount}`,
             status: deal.status || 'Pending',
           }));
@@ -71,12 +156,20 @@ const DealsInProgress = () => {
             key={currentIndex}
             className="bg-blue-900 dark:bg-blue-800 text-white rounded-2xl shadow-xl p-8 transition-all duration-500 hover:shadow-2xl hover:scale-105"
           >
-            <h3 className="text-xl font-semibold mb-4">{currentDeal?.title}</h3>
-            <div className="space-y-2">
-              <p className="text-lg">
+            <h3 className="text-xl font-semibold mb-4">
+              {currentDeal?.buyer} purchasing {currentDeal?.itemName} from {currentDeal?.seller}
+            </h3>
+            <div className="space-y-2 text-left">
+              <p>
+                <strong>Location:</strong> {currentDeal?.location}
+              </p>
+              <p>
+                <strong>Condition:</strong> {currentDeal?.condition}
+              </p>
+              <p>
                 <strong>Amount:</strong> {currentDeal?.amount}
               </p>
-              <p className="text-sm">
+              <p>
                 <strong>Status:</strong>{' '}
                 <span className="px-2 py-1 bg-white/20 rounded-md">
                   {currentDeal?.status}
