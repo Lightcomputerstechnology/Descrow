@@ -14,7 +14,8 @@
     "react-countup": "^6.5.0",
     "react-helmet-async": "^2.0.4",
     "react-i18next": "^13.5.0",
-    "i18next": "^23.7.6"
+    "i18next": "^23.7.6",
+    "react-hot-toast": "^2.4.1"
   },
   "scripts": {
     "start": "react-scripts start",
