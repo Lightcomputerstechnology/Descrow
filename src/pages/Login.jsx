@@ -5,13 +5,19 @@ import { authService } from '../services/authService';
 
 const Login = ({ setUser }) => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
     setError('');
   };
 
@@ -19,6 +25,7 @@ const Login = ({ setUser }) => {
     e.preventDefault();
     setError('');
 
+    // Validation
     if (!formData.email || !formData.password) {
       setError('Please fill in all fields');
       return;
@@ -27,21 +34,33 @@ const Login = ({ setUser }) => {
     try {
       setLoading(true);
       const response = await authService.login({
-        email: formData.email,
-        password: formData.password,
+        email: formData.email.trim(),
+        password: formData.password
       });
 
-      if (response.user) {
+      // ✅ Handle success
+      if (response.success && response.user) {
         setUser(response.user);
 
-        if (response.user.verified) {
-          navigate('/dashboard');
-        } else {
-          navigate('/verify-email', { state: { email: response.user.email } });
-        }
+        // ✅ Ensure proper redirection — absolute path to dashboard
+        navigate('/dashboard', { replace: true });
+      } 
+      // ✅ Handle verification pending
+      else if (response.message?.toLowerCase().includes('verify')) {
+        setError('Your email is not verified. Please check your inbox or spam folder.');
+      } 
+      // ✅ Handle unknown login errors
+      else {
+        setError(response.message || 'Login failed. Please try again.');
       }
+
     } catch (err) {
-      setError(err.message || 'Login failed. Please check your credentials.');
+      console.error('Login error:', err);
+      const message =
+        err.response?.data?.message ||
+        err.message ||
+        'Login failed. Please check your credentials.';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -117,7 +136,7 @@ const Login = ({ setUser }) => {
               </div>
             </div>
 
-            {/* Remember & Forgot Password */}
+            {/* Forgot Password */}
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <input
