@@ -16,6 +16,9 @@ exports.loginValidation = [
 exports.createEscrowValidation = [
   body('sellerEmail').isEmail().normalizeEmail().withMessage('Valid seller email required'),
   body('itemName').trim().notEmpty().withMessage('Item name required'),
+  body('itemDescription').optional().trim(),
+  body('location').optional().trim().notEmpty().withMessage('Location cannot be empty'),
+  body('condition').optional().trim().notEmpty().withMessage('Condition cannot be empty'),
   body('amount').isFloat({ min: 1 }).withMessage('Amount must be greater than 0'),
   body('currency').optional().isIn(['USD', 'EUR', 'GBP', 'NGN']).withMessage('Invalid currency'),
   body('paymentMethod').isIn(['paystack', 'flutterwave', 'crypto']).withMessage('Invalid payment method')
