@@ -1,10 +1,23 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Shield, Mail, Lock, User, Eye, EyeOff, Loader, AlertCircle, CheckCircle } from 'lucide-react';
-import { authService } from '../services/authService';
+// src/pages/SignUpPage.jsx
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  Shield,
+  Mail,
+  Lock,
+  User,
+  Eye,
+  EyeOff,
+  Loader,
+  AlertCircle,
+  CheckCircle
+} from 'lucide-react';
+import toast, { Toaster } from 'react-hot-toast';
+import authService from '../services/authService'; // expects default export
 
 const SignUpPage = ({ setUser }) => {
   const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -14,30 +27,28 @@ const SignUpPage = ({ setUser }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [serverError, setServerError] = useState('');
   const [passwordStrength, setPasswordStrength] = useState(0);
+
+  useEffect(() => {
+    if (serverError) setServerError('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.name, formData.email, formData.password, formData.confirmPassword]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value
-    });
-    setError('');
-
-    if (name === 'password') {
-      checkPasswordStrength(value);
-    }
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === 'password') checkPasswordStrength(value);
   };
 
   const checkPasswordStrength = (password) => {
-    let strength = 0;
-    if (password.length >= 8) strength++;
-    if (password.length >= 12) strength++;
-    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
-    if (/\d/.test(password)) strength++;
-    if (/[^a-zA-Z0-9]/.test(password)) strength++;
-    setPasswordStrength(strength);
+    let score = 0;
+    if (password.length >= 8) score++;
+    if (password.length >= 12) score++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+    if (/\d/.test(password)) score++;
+    if (/[^a-zA-Z0-9]/.test(password)) score++;
+    setPasswordStrength(score);
   };
 
   const getPasswordStrengthColor = () => {
@@ -54,49 +65,59 @@ const SignUpPage = ({ setUser }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setServerError('');
 
+    // Frontend validations
     if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
-      setError('Please fill in all fields');
+      setServerError('Please fill in all fields.');
       return;
     }
-
     if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
+      setServerError('Password must be at least 8 characters long.');
       return;
     }
-
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
+      setServerError('Passwords do not match.');
       return;
     }
 
     try {
       setLoading(true);
-      const response = await authService.register({
-        name: formData.name,
-        email: formData.email,
+
+      // Call backend
+      const res = await authService.register({
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
         password: formData.password
       });
 
-      if (response.success) {
-        alert(
-          `Registration successful!\n\nA verification email has been sent to ${response.email}.\n\nPlease check your inbox and click the verification link to activate your account before logging in.`
-        );
-        navigate('/login');
+      // Accept common shapes: res.data.success or res.success
+      const success = res?.data?.success ?? res?.success;
+      const email = res?.data?.email ?? res?.email;
+
+      if (success) {
+        toast.success('Registration successful! Verification email sent.');
+        // Optionally navigate to login with a notice
+        navigate('/login', { state: { notice: `Verification email sent to ${email || formData.email}` } });
+        return;
       }
+
+      // If backend responded but marked failure
+      const message =
+        res?.data?.message ||
+        res?.message ||
+        'Registration submitted but the server returned an unexpected response.';
+      setServerError(message);
+      toast.error(message);
     } catch (err) {
-      let errorMessage = 'Registration failed. Please try again.';
-
-      if (err.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err.response?.data?.errors) {
-        errorMessage = err.response.data.errors.map(e => e.msg || e.message).join(', ');
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-
-      setError(errorMessage);
+      // Normalize error message
+      const message =
+        err?.response?.data?.message ||
+        (Array.isArray(err?.response?.data?.errors) ? err.response.data.errors.map(x => x.msg || x.message).join(', ') : null) ||
+        err?.message ||
+        'Registration failed. Please try again.';
+      setServerError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -104,6 +125,7 @@ const SignUpPage = ({ setUser }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-gray-900 flex items-center justify-center p-4">
+      <Toaster position="top-right" />
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-2 mb-4">
@@ -115,18 +137,16 @@ const SignUpPage = ({ setUser }) => {
         </div>
 
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8">
-          {error && (
+          {serverError && (
             <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+              <p className="text-sm text-red-800 dark:text-red-200">{serverError}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Full Name
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -143,9 +163,7 @@ const SignUpPage = ({ setUser }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Email Address
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -162,9 +180,7 @@ const SignUpPage = ({ setUser }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -181,6 +197,7 @@ const SignUpPage = ({ setUser }) => {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label="Toggle password visibility"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -193,20 +210,16 @@ const SignUpPage = ({ setUser }) => {
                       <div
                         className={`h-full ${getPasswordStrengthColor()} transition-all duration-300`}
                         style={{ width: `${(passwordStrength / 5) * 100}%` }}
-                      ></div>
+                      />
                     </div>
-                    <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">
-                      {getPasswordStrengthText()}
-                    </span>
+                    <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">{getPasswordStrengthText()}</span>
                   </div>
                 </div>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Confirm Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Confirm Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -223,10 +236,12 @@ const SignUpPage = ({ setUser }) => {
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  aria-label="Toggle confirm password visibility"
                 >
                   {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+
               {formData.confirmPassword && formData.password === formData.confirmPassword && (
                 <div className="mt-2 flex items-center gap-2 text-green-600 dark:text-green-400">
                   <CheckCircle className="w-4 h-4" />
@@ -236,22 +251,12 @@ const SignUpPage = ({ setUser }) => {
             </div>
 
             <div className="flex items-start">
-              <input
-                id="terms"
-                name="terms"
-                type="checkbox"
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1"
-                required
-              />
+              <input id="terms" name="terms" type="checkbox" className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1" required />
               <label htmlFor="terms" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                 I agree to the{' '}
-                <Link to="/terms" className="text-blue-600 hover:text-blue-500 font-medium">
-                  Terms of Service
-                </Link>{' '}
+                <Link to="/terms" className="text-blue-600 hover:text-blue-500 font-medium">Terms of Service</Link>{' '}
                 and{' '}
-                <Link to="/privacy" className="text-blue-600 hover:text-blue-500 font-medium">
-                  Privacy Policy
-                </Link>
+                <Link to="/privacy" className="text-blue-600 hover:text-blue-500 font-medium">Privacy Policy</Link>
               </label>
             </div>
 
@@ -272,45 +277,29 @@ const SignUpPage = ({ setUser }) => {
           </form>
 
           <div className="mt-6 mb-6 flex items-center">
-            <div className="flex-1 border-t border-gray-300 dark:border-gray-700"></div>
+            <div className="flex-1 border-t border-gray-300 dark:border-gray-700" />
             <span className="px-4 text-sm text-gray-500 dark:text-gray-400">OR</span>
-            <div className="flex-1 border-t border-gray-300 dark:border-gray-700"></div>
+            <div className="flex-1 border-t border-gray-300 dark:border-gray-700" />
           </div>
 
           <p className="text-center text-sm text-gray-600 dark:text-gray-400">
             Already have an account?{' '}
-            <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
-              Login here
-            </Link>
+            <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">Login here</Link>
           </p>
         </div>
 
         <div className="mt-8 bg-white/10 backdrop-blur-sm rounded-xl p-6 text-white">
           <h3 className="font-semibold mb-3">Why choose Dealcross?</h3>
           <ul className="space-y-2 text-sm text-blue-100">
-            <li className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
-              Secure escrow protection for all transactions
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
-              Real-time chat with buyers and sellers
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
-              GPS tracking and delivery proof
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-400 flex-shrink-0" />
-              24/7 dispute resolution support
-            </li>
+            <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-400" /> Secure escrow protection for all transactions</li>
+            <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-400" /> Real-time chat with buyers and sellers</li>
+            <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-400" /> GPS tracking and delivery proof</li>
+            <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-400" /> 24/7 dispute resolution support</li>
           </ul>
         </div>
 
         <div className="text-center mt-6">
-          <Link to="/" className="text-sm text-blue-200 hover:text-white transition">
-            ← Back to Home
-          </Link>
+          <Link to="/" className="text-sm text-blue-200 hover:text-white transition">← Back to Home</Link>
         </div>
       </div>
     </div>
