@@ -10,8 +10,10 @@ router.post('/create',
     body('sellerEmail').isEmail().withMessage('Valid seller email is required'),
     body('itemName').trim().notEmpty().withMessage('Item name is required'),
     body('amount').isFloat({ min: 0 }).withMessage('Valid amount is required'),
-    body('currency').optional().isIn(['USD', 'EUR', 'GBP', 'NGN', 'CNY', 'JPY', 'AUD', 'CAD', 'INR', 'ZAR']),
-    body('paymentMethod').isIn(['flutterwave', 'paystack', 'nowpayments', 'bank_transfer']).withMessage('Valid payment method is required')
+    body('currency').optional().isIn(['USD', 'EUR', 'GBP', 'NGN', 'CNY', 'JPY', 'AUD', 'CAD', 'INR', 'ZAR']).withMessage('Invalid currency'),
+    body('paymentMethod').isIn(['flutterwave', 'paystack', 'nowpayments', 'bank_transfer']).withMessage('Valid payment method is required'),
+    body('location').trim().notEmpty().withMessage('Location is required'),
+    body('itemCondition').trim().notEmpty().withMessage('Item condition is required')
   ],
   (req, res, next) => {
     // Check if request has API key or user token
