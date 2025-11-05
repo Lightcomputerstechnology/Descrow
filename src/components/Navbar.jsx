@@ -1,9 +1,8 @@
 // File: src/components/Navbar.jsx
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import Logo from '../assets/dealcross-logo.png';
 import LanguageSwitcher from './LanguageSwitcher';
 import ThemeToggle from './ThemeToggle';
 import { useUser } from '../context/UserContext';
@@ -31,7 +30,7 @@ export default function Navbar() {
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center">
-          <img src={Logo} alt="Dealcross" className="h-8 w-auto mr-2" />
+          <Shield className="w-8 h-8 text-blue-600 mr-2" />
           <span className="text-xl font-bold text-gray-900 dark:text-white">Dealcross</span>
         </Link>
 
@@ -133,7 +132,7 @@ export default function Navbar() {
               {/* Sidebar Header */}
               <div className="flex items-center justify-between mb-8">
                 <Link to="/" className="flex items-center" onClick={() => setOpen(false)}>
-                  <img src={Logo} alt="Dealcross" className="h-8 w-auto mr-2" />
+                  <Shield className="w-8 h-8 text-blue-600 mr-2" />
                   <span className="text-xl font-bold text-gray-900 dark:text-white">Dealcross</span>
                 </Link>
                 <button onClick={() => setOpen(false)}>
