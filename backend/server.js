@@ -1,4 +1,4 @@
-// server.js
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -7,7 +7,6 @@ const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-require('dotenv').config();
 
 // Import Routes
 const authRoutes = require('./routes/auth.routes');
@@ -19,26 +18,20 @@ const disputeRoutes = require('./routes/dispute.routes');
 const paymentRoutes = require('./routes/payment.routes');
 const adminRoutes = require('./routes/admin.routes');
 const apiKeyRoutes = require('./routes/apiKey.routes');
-const verifyRoutes = require('./routes/verify.routes'); // ✅ Added
+const verifyRoutes = require('./routes/verify.routes');
 
-// Initialize Express App
 const app = express();
 app.set('trust proxy', 1);
-app.use(express.json());
 
 // ==================== MIDDLEWARE ====================
 
 // Security headers
-app.use(
-  helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" }
-  })
-);
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 
 // Compression
 app.use(compression());
 
-// CORS Configuration
+// CORS
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
@@ -47,10 +40,9 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) callback(null, true);
-    else callback(new Error('Not allowed by CORS'));
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
@@ -64,59 +56,45 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Logging
-if (process.env.NODE_ENV === 'development') app.use(morgan('dev'));
-else app.use(morgan('combined'));
+app.use(process.env.NODE_ENV === 'development' ? morgan('dev') : morgan('combined'));
 
 // Rate Limiting
-const limiter = rateLimit({
+const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  message: { success: false, message: 'Too many requests from this IP, please try again later.' },
+  message: { success: false, message: 'Too many requests, try again later.' },
   standardHeaders: true,
   legacyHeaders: false
 });
-app.use('/api/', limiter);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
-  message: { success: false, message: 'Too many authentication attempts, please try again later.' }
+  message: { success: false, message: 'Too many auth attempts, try again later.' }
 });
 
-// Serve Static Files
+app.use('/api/', generalLimiter);
+
+// Static Files
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ==================== DATABASE CONNECTION ====================
+// ==================== DATABASE ====================
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log('✅ Connected to MongoDB');
-    console.log(`📦 Database: ${mongoose.connection.name}`);
-  })
-  .catch(error => {
-    console.error('❌ MongoDB connection error:', error);
+  .then(() => console.log(`✅ MongoDB Connected: ${mongoose.connection.name}`))
+  .catch(err => {
+    console.error('❌ MongoDB Connection Error:', err);
     process.exit(1);
   });
 
 // ==================== HEALTH CHECK ====================
-app.get('/', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Dealcross API is running',
-    version: '1.0.0',
-    timestamp: new Date().toISOString()
-  });
-});
-
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'API health check passed',
-    status: 'healthy',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
-  });
-});
+app.get('/', (req, res) => res.json({ success: true, message: 'Dealcross API running', version: '1.0.0', timestamp: new Date() }));
+app.get('/api/health', (req, res) => res.json({
+  success: true,
+  status: 'healthy',
+  uptime: process.uptime(),
+  database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+  timestamp: new Date()
+}));
 
 // ==================== API ROUTES ====================
 app.use('/api/auth', authLimiter, authRoutes);
@@ -128,51 +106,58 @@ app.use('/api/disputes', disputeRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/api-keys', apiKeyRoutes);
-
-// ✅ Verification redirect routes
 app.use('/api/verify-email', verifyRoutes);
 
 // ==================== ERROR HANDLING ====================
+app.use((req, res, next) => res.status(404).json({ success: false, message: 'Route not found', path: req.originalUrl, method: req.method }));
 
-// 404 Handler
-app.use((req, res, next) => {
-  res.status(404).json({ success: false, message: 'Route not found', path: req.originalUrl, method: req.method });
-});
+app.use((err, req, res, next) => {
+  console.error('❌ Error:', err);
 
-// Global Error Handler
-app.use((error, req, res, next) => {
-  console.error('Error:', error);
-
-  if (error.name === 'ValidationError') {
-    const errors = Object.values(error.errors).map(err => err.message);
+  if (err.name === 'ValidationError') {
+    const errors = Object.values(err.errors).map(e => e.message);
     return res.status(400).json({ success: false, message: 'Validation Error', errors });
   }
 
-  if (error.code === 11000) {
-    const field = Object.keys(error.keyPattern)[0];
+  if (err.code === 11000) {
+    const field = Object.keys(err.keyPattern)[0];
     return res.status(400).json({ success: false, message: `${field} already exists` });
   }
 
-  if (error.name === 'JsonWebTokenError') return res.status(401).json({ success: false, message: 'Invalid token' });
-  if (error.name === 'TokenExpiredError') return res.status(401).json({ success: false, message: 'Token expired' });
-  if (error.name === 'MulterError') return res.status(400).json({ success: false, message: `File upload error: ${error.message}` });
+  if (['JsonWebTokenError', 'TokenExpiredError', 'MulterError'].includes(err.name)) {
+    return res.status(401).json({ success: false, message: err.message });
+  }
 
-  res.status(error.status || 500).json({ success: false, message: error.message || 'Internal server error', ...(process.env.NODE_ENV === 'development' && { stack: error.stack }) });
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Internal server error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
 });
 
 // ==================== START SERVER ====================
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, () => {
-  console.log('🚀 ================================');
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
   console.log(`🔗 API URL: http://localhost:${PORT}/api`);
   console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
   console.log(`✅ Allowed Origins:`, allowedOrigins);
-  console.log('🚀 ================================');
 });
 
 // ==================== GRACEFUL SHUTDOWN ====================
+['SIGINT','SIGTERM'].forEach(signal => {
+  process.on(signal, () => {
+    console.log(`👋 ${signal} received. Shutting down...`);
+    server.close(() => {
+      console.log('💤 Server closed');
+      mongoose.connection.close(false, () => {
+        console.log('📦 MongoDB connection closed');
+        process.exit(0);
+      });
+    });
+  });
+});
+
 process.on('unhandledRejection', error => {
   console.error('❌ Unhandled Rejection:', error);
   server.close(() => process.exit(1));
@@ -181,28 +166,6 @@ process.on('unhandledRejection', error => {
 process.on('uncaughtException', error => {
   console.error('❌ Uncaught Exception:', error);
   process.exit(1);
-});
-
-process.on('SIGTERM', () => {
-  console.log('👋 SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
-    console.log('💤 Server closed');
-    mongoose.connection.close(false, () => {
-      console.log('📦 MongoDB connection closed');
-      process.exit(0);
-    });
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('\n👋 SIGINT received. Shutting down gracefully...');
-  server.close(() => {
-    console.log('💤 Server closed');
-    mongoose.connection.close(false, () => {
-      console.log('📦 MongoDB connection closed');
-      process.exit(0);
-    });
-  });
 });
 
 module.exports = app;
