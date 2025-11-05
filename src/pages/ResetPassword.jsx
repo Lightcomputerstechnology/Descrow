@@ -1,88 +1,106 @@
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
-import { Lock, Eye, EyeOff, Loader } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
 const ResetPassword = () => {
   const { token } = useParams();
+  const navigate = useNavigate();
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleReset = async (e) => {
     e.preventDefault();
-    if (!password || !confirmPassword) return;
-    if (password !== confirmPassword) return;
+
+    if (!password || !confirmPassword) {
+      return toast.error('Please fill in both password fields.');
+    }
+    if (password.length < 8) {
+      return toast.error('Password must be at least 8 characters long.');
+    }
+    if (password !== confirmPassword) {
+      return toast.error('Passwords do not match.');
+    }
 
     try {
       setLoading(true);
       await authService.resetPassword(token, password);
-      setPassword('');
-      setConfirmPassword('');
+      toast.success('✅ Password reset successful! Redirecting to login...');
+      setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
-      console.error(err);
+      toast.error(err.message || 'Failed to reset password. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 p-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-8">
-        <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Reset Password</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-          Enter a new password to reset your account.
-        </p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
+      <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-lg shadow-xl p-8">
+        <h2 className="text-2xl font-semibold text-center text-gray-800 dark:text-gray-100 mb-6">
+          Reset Your Password
+        </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <form onSubmit={handleReset} className="space-y-5">
+          <div>
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
+              New Password
+            </label>
             <input
-              type={showPassword ? 'text' : 'password'}
-              placeholder="New Password"
+              id="password"
+              type="password"
+              placeholder="Enter new password"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-            </button>
           </div>
 
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <div>
+            <label
+              htmlFor="confirmPassword"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
+              Confirm Password
+            </label>
             <input
-              type={showConfirm ? 'text' : 'password'}
-              placeholder="Confirm Password"
+              id="confirmPassword"
+              type="password"
+              placeholder="Confirm new password"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
             />
-            <button
-              type="button"
-              onClick={() => setShowConfirm(!showConfirm)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              {showConfirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-            </button>
           </div>
 
           <button
             type="submit"
-            disabled={loading || password !== confirmPassword}
-            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition disabled:opacity-50"
+            disabled={loading}
+            className={`w-full py-2 mt-3 font-semibold rounded-lg transition ${
+              loading
+                ? 'bg-blue-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
           >
-            {loading ? <Loader className="w-5 h-5 animate-spin" /> : 'Reset Password'}
+            {loading ? 'Resetting...' : 'Reset Password'}
           </button>
         </form>
+
+        <div className="text-center mt-6">
+          <button
+            onClick={() => navigate('/login')}
+            className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+          >
+            Back to Login
+          </button>
+        </div>
       </div>
     </div>
   );
