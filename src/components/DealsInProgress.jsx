@@ -1,8 +1,6 @@
 // File: src/components/DealsInProgress.jsx
 import React, { useState, useEffect } from 'react';
 import { Zap } from 'lucide-react';
-import API from '../api';
-import { toast } from 'react-hot-toast';
 
 const mockDeals = [
   { title: 'iPhone 14 Pro Purchase - Sarah', amount: '$1,200', status: 'In Escrow' },
@@ -18,29 +16,8 @@ const mockDeals = [
 ];
 
 const DealsInProgress = () => {
-  const [allDeals, setAllDeals] = useState(mockDeals);
+  const [allDeals] = useState(mockDeals);
   const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(() => {
-    const fetchDeals = async () => {
-      try {
-        const res = await API.get('/deals/public');
-        if (Array.isArray(res) && res.length > 0) {
-          const realDeals = res.map((deal) => ({
-            title: `${deal.title} - ${deal.dealer_name || 'User'}`,
-            amount: `$${deal.amount}`,
-            status: deal.status || 'Pending',
-          }));
-          setAllDeals([...realDeals, ...mockDeals]);
-        }
-      } catch (err) {
-        console.error('Failed to fetch real deals:', err.message);
-        // Silent fail - just use mock deals
-      }
-    };
-
-    fetchDeals();
-  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
