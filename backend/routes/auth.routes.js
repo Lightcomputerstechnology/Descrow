@@ -1,38 +1,55 @@
-// routes/auth.routes.js
 const express = require('express');
 const router = express.Router();
+const authController = require('../controllers/auth.controller');
+const { body } = require('express-validator');
 const emailService = require('../services/email.service');
 const jwt = require('jsonwebtoken');
+
+// ---------------- REGISTER ----------------
+router.post(
+  '/register',
+  [
+    body('name').notEmpty().withMessage('Name is required'),
+    body('email').isEmail().withMessage('Valid email required'),
+    body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+  ],
+  authController.register
+);
+
+// ---------------- LOGIN ----------------
+router.post(
+  '/login',
+  [
+    body('email').isEmail().withMessage('Valid email required'),
+    body('password').notEmpty().withMessage('Password required')
+  ],
+  authController.login
+);
+
+// ---------------- VERIFY EMAIL ----------------
+router.post('/verify', authController.verifyEmail);
+router.get('/verify/:token', authController.verifyEmailRedirect);
+
+// ---------------- RESEND VERIFICATION ----------------
+router.post('/resend-verification', authController.resendVerification);
+
+// ---------------- FORGOT + RESET PASSWORD ----------------
+router.post('/forgot-password', authController.forgotPassword);
+router.post('/reset-password', authController.resetPassword);
 
 // ---------------- DEV: Test Email ----------------
 router.get('/dev/test-email', async (req, res) => {
   try {
-    const email = req.query.email; // Pass email as query: ?email=someone@example.com
+    const email = req.query.email;
     if (!email) {
       return res.status(400).json({ success: false, message: 'Email is required' });
     }
 
-    // Generate a dummy verification token for testing
-    const testToken = jwt.sign(
-      { id: 'test-user-id' },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-
+    const testToken = jwt.sign({ id: 'test-user-id' }, process.env.JWT_SECRET, { expiresIn: '1h' });
     await emailService.sendVerificationEmail(email, 'Test User', testToken);
-
-    res.status(200).json({
-      success: true,
-      message: `Test verification email sent to ${email}`
-    });
-
+    res.status(200).json({ success: true, message: `Test email sent to ${email}` });
   } catch (error) {
-    console.error('❌ Test email failed:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to send test email',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to send test email', error: error.message });
   }
 });
 
