@@ -26,7 +26,7 @@ import PaymentGatewaysPage from './pages/admin/PaymentGatewaysPage';
 import APIManagementPage from './pages/admin/APIManagementPage';
 import AdminManagementPage from './pages/admin/AdminManagementPage';
 
-import authService from './services/authService';
+import { authService } from '../services/authService';
 
 function App() {
   const [user, setUser] = useState(null);
