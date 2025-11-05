@@ -7,8 +7,6 @@ const jwt = require('jsonwebtoken');
 
 /**
  * ---------------- REGISTER ----------------
- * POST /api/auth/register
- * Validates name, email, password
  */
 router.post(
   '/register',
@@ -24,7 +22,6 @@ router.post(
 
 /**
  * ---------------- LOGIN ----------------
- * POST /api/auth/login
  */
 router.post(
   '/login',
@@ -37,29 +34,25 @@ router.post(
 
 /**
  * ---------------- VERIFY EMAIL ----------------
- * POST /api/auth/verify    -> frontend verification page
- * GET  /api/auth/verify/:token -> click link in email
+ * POST /api/auth/verify-email  -> Used by frontend React component
+ * GET  /api/auth/verify/:token -> Used for email link clicks
  */
-router.post('/verify', authController.verifyEmail);
+router.post('/verify-email', authController.verifyEmail);  // ✅ Match frontend
 router.get('/verify/:token', authController.verifyEmailRedirect);
 
 /**
  * ---------------- RESEND VERIFICATION ----------------
- * POST /api/auth/resend-verification
  */
 router.post('/resend-verification', authController.resendVerification);
 
 /**
  * ---------------- FORGOT & RESET PASSWORD ----------------
- * POST /api/auth/forgot-password
- * POST /api/auth/reset-password
  */
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
 
 /**
  * ---------------- DEV: TEST EMAIL ----------------
- * GET /api/auth/dev/test-email?email=someone@example.com
  */
 router.get('/dev/test-email', async (req, res) => {
   try {
