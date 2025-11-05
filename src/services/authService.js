@@ -5,13 +5,17 @@ import { toast } from 'react-hot-toast';
 const authService = {
   /**
    * 📝 Register a new user
+   * Backend automatically sends verification email
    */
   register: async (userData) => {
     try {
       const res = await api.post('/auth/register', userData);
+
       toast.success(
-        res.data.message || 'Registration successful! Please check your email to verify your account.'
+        res.data.message ||
+          'Registration successful! Please check your email to verify your account.'
       );
+
       return res.data;
     } catch (err) {
       console.error('Registration error:', err);
