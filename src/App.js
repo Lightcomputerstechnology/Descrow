@@ -8,6 +8,8 @@ import VerifyEmail from './pages/VerifyEmail';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import SignUpPage from './pages/SignUpPage';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 
 // User Pages
 import UnifiedDashboard from './pages/UnifiedDashboard';
@@ -91,7 +93,14 @@ function App() {
   // Check if current route is admin or public (no navbar needed)
   const showNavbar = () => {
     const path = window.location.pathname;
-    const noNavbarRoutes = ['/login', '/signup', '/verify-email', '/admin'];
+    const noNavbarRoutes = [
+      '/login',
+      '/signup',
+      '/verify-email',
+      '/forgot-password',
+      '/reset-password',
+      '/admin'
+    ];
     return !noNavbarRoutes.some(route => path.startsWith(route));
   };
 
@@ -119,6 +128,8 @@ function App() {
           element={user ? <Navigate to="/dashboard" replace /> : <SignUpPage setUser={setUser} />}
         />
         <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
 
         {/* ==================== USER ROUTES (Protected) ==================== */}
         <Route
