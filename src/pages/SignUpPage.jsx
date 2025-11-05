@@ -13,7 +13,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
-import authService from '../services/authService'; // expects default export
+import { authService } from '../services/authService';
 
 const SignUpPage = ({ setUser }) => {
   const navigate = useNavigate();
