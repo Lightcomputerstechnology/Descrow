@@ -202,7 +202,7 @@ const VerifyEmail = () => {
                       </>
                     ) : (
                       <>
-                    <Mail className="w-5 h-5" />
+                      <Mail className="w-5 h-5" />
                         Resend Verification Email
                       </>
                     )}
