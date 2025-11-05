@@ -28,12 +28,16 @@ export const authService = {
     try {
       const res = await api.post('/auth/login', credentials);
 
-      if (res.data.token) {
-        localStorage.setItem('token', res.data.token);
+      if (res.data.user) {
+        // Always store the user object, even if not verified
         localStorage.setItem('user', JSON.stringify(res.data.user));
-        toast.success(`Welcome back, ${res.data.user?.firstName || 'User'}!`);
-      } else {
-        toast.error('Your email is not verified yet.');
+
+        if (res.data.user.verified) {
+          localStorage.setItem('token', res.data.token);
+          toast.success(`Welcome back, ${res.data.user?.firstName || 'User'}!`);
+        } else {
+          toast.error('Your email is not verified yet.');
+        }
       }
 
       return res.data;
@@ -51,6 +55,13 @@ export const authService = {
     try {
       const res = await api.post('/auth/verify-email', { token });
       toast.success('✅ Email verified successfully! You can now log in.');
+
+      // Optionally update localStorage user if currently stored
+      const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      if (storedUser.email === res.data.user.email) {
+        localStorage.setItem('user', JSON.stringify({ ...storedUser, verified: true }));
+      }
+
       setTimeout(() => (window.location.href = '/login'), 2000);
       return res.data;
     } catch (err) {
