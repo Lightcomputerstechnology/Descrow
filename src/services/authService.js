@@ -1,67 +1,64 @@
 import api from '../config/api';
+import { toast } from 'react-hot-toast';
 
 export const authService = {
   /**
-   * 📝 Register new user
-   * - Sends registration details to backend
-   * - Backend sends verification email automatically
-   * - Does NOT store token until user verifies email
+   * 📝 Register a new user
+   * Backend automatically sends verification email
    */
   register: async (userData) => {
     try {
-      const response = await api.post('/auth/register', userData);
+      const res = await api.post('/auth/register', userData);
 
-      // Inform user that verification is required
-      alert(
-        response.data.message ||
-          'Registration successful! Please check your email to verify your account before logging in.'
+      toast.success(
+        res.data.message ||
+          'Registration successful! Please check your email to verify your account.'
       );
 
-      return response.data;
-    } catch (error) {
-      console.error('Registration error:', error);
-      throw error.response?.data || { message: 'Registration failed. Please try again.' };
+      return res.data;
+    } catch (err) {
+      console.error('Registration error:', err);
+      toast.error(err.response?.data?.message || 'Registration failed. Please try again.');
+      throw err.response?.data || { message: 'Registration failed.' };
     }
   },
 
   /**
-   * 🔑 Login user
-   * - Requires verified email
-   * - Stores token and user info in localStorage
+   * 🔑 Login user (only if email is verified)
    */
   login: async (credentials) => {
     try {
-      const response = await api.post('/auth/login', credentials);
+      const res = await api.post('/auth/login', credentials);
 
-      // Only store token if provided (means user is verified)
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+      if (res.data.token) {
+        localStorage.setItem('token', res.data.token);
+        localStorage.setItem('user', JSON.stringify(res.data.user));
+        toast.success(`Welcome back, ${res.data.user?.firstName || 'User'}!`);
+      } else {
+        toast.error('Your email is not verified yet. Please check your inbox.');
       }
 
-      return response.data;
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error.response?.data || { message: 'Login failed. Check your credentials.' };
+      return res.data;
+    } catch (err) {
+      console.error('Login error:', err);
+      toast.error(err.response?.data?.message || 'Invalid credentials. Please try again.');
+      throw err.response?.data || { message: 'Login failed.' };
     }
   },
 
   /**
-   * 📧 Verify user email
-   * - Called from frontend verification page
-   * - Triggers welcome email from backend
+   * 📧 Verify user email via token
    */
   verifyEmail: async (token) => {
     try {
-      const response = await api.post('/auth/verify-email', { token });
-
-      alert('✅ Email verified successfully! You can now log in.');
-      window.location.href = '/login'; // Redirect after success
-
-      return response.data;
-    } catch (error) {
-      console.error('Email verification error:', error);
-      throw error.response?.data || { message: 'Invalid or expired verification link.' };
+      const res = await api.post('/auth/verify-email', { token });
+      toast.success('✅ Email verified successfully! You can now log in.');
+      setTimeout(() => (window.location.href = '/login'), 2000);
+      return res.data;
+    } catch (err) {
+      console.error('Email verification error:', err);
+      toast.error(err.response?.data?.message || 'Invalid or expired verification link.');
+      throw err.response?.data || { message: 'Verification failed.' };
     }
   },
 
@@ -70,23 +67,54 @@ export const authService = {
    */
   resendVerification: async (email) => {
     try {
-      const response = await api.post('/auth/resend-verification', { email });
-
-      alert('📩 A new verification email has been sent. Please check your inbox.');
-      return response.data;
-    } catch (error) {
-      console.error('Resend verification error:', error);
-      throw error.response?.data || { message: 'Failed to resend verification email.' };
+      const res = await api.post('/auth/resend-verification', { email });
+      toast.success('📩 A new verification email has been sent.');
+      return res.data;
+    } catch (err) {
+      console.error('Resend verification error:', err);
+      toast.error(err.response?.data?.message || 'Failed to resend verification email.');
+      throw err.response?.data || { message: 'Resend verification failed.' };
     }
   },
 
   /**
-   * 🚪 Logout
-   * - Clears stored data and redirects to login
+   * 🔐 Forgot password - send reset link
+   */
+  forgotPassword: async (email) => {
+    try {
+      const res = await api.post('/auth/forgot-password', { email });
+      toast.success('📨 Password reset link sent to your email.');
+      return res.data;
+    } catch (err) {
+      console.error('Forgot password error:', err);
+      toast.error(err.response?.data?.message || 'Failed to send reset link.');
+      throw err.response?.data || { message: 'Forgot password failed.' };
+    }
+  },
+
+  /**
+   * 🔁 Reset password using token
+   */
+  resetPassword: async (token, password) => {
+    try {
+      const res = await api.post('/auth/reset-password', { token, password });
+      toast.success('✅ Password reset successful! You can now log in.');
+      setTimeout(() => (window.location.href = '/login'), 2000);
+      return res.data;
+    } catch (err) {
+      console.error('Reset password error:', err);
+      toast.error(err.response?.data?.message || 'Failed to reset password.');
+      throw err.response?.data || { message: 'Password reset failed.' };
+    }
+  },
+
+  /**
+   * 🚪 Logout user
    */
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    toast.success('You’ve been logged out.');
     window.location.href = '/login';
   },
 
@@ -96,39 +124,5 @@ export const authService = {
   getCurrentUser: () => {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
-  },
-
-  /**
-   * 🔐 Forgot password
-   * - Sends password reset link to email
-   */
-  forgotPassword: async (email) => {
-    try {
-      const response = await api.post('/auth/forgot-password', { email });
-
-      alert('📨 Password reset link has been sent to your email.');
-      return response.data;
-    } catch (error) {
-      console.error('Forgot password error:', error);
-      throw error.response?.data || { message: 'Failed to send password reset link.' };
-    }
-  },
-
-  /**
-   * 🔁 Reset password
-   * - Validates token and updates password
-   */
-  resetPassword: async (token, password) => {
-    try {
-      const response = await api.post('/auth/reset-password', { token, password });
-
-      alert('✅ Password reset successful! You can now log in with your new password.');
-      window.location.href = '/login';
-
-      return response.data;
-    } catch (error) {
-      console.error('Reset password error:', error);
-      throw error.response?.data || { message: 'Failed to reset password. Please try again.' };
-    }
   },
 };
