@@ -25,6 +25,13 @@ const authService = {
   },
 
   /**
+   * 📝 Signup alias for register (for compatibility)
+   */
+  signup: async (userData) => {
+    return authService.register(userData);
+  },
+
+  /**
    * 🔑 Login user (only if email is verified)
    */
   login: async (credentials) => {
@@ -115,7 +122,7 @@ const authService = {
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    toast.success('You’ve been logged out.');
+    toast.success('You've been logged out.');
     window.location.href = '/login';
   },
 
@@ -125,6 +132,20 @@ const authService = {
   getCurrentUser: () => {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
+  },
+
+  /**
+   * 🔑 Get token
+   */
+  getToken: () => {
+    return localStorage.getItem('token');
+  },
+
+  /**
+   * ✅ Check if authenticated
+   */
+  isAuthenticated: () => {
+    return !!localStorage.getItem('token');
   },
 };
 
