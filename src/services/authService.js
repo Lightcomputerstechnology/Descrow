@@ -1,13 +1,21 @@
-// src/services/authService.js
+// File: src/services/authService.js
 import api from '../config/api';
 import { toast } from 'react-hot-toast';
 
-const authService = {
-  // 📝 Register a new user
+export const authService = {
+  /**
+   * 📝 Register a new user
+   * Backend automatically sends verification email
+   */
   register: async (userData) => {
     try {
       const res = await api.post('/auth/register', userData);
-      toast.success(res.data.message || 'Registration successful! Please check your email to verify your account.');
+
+      toast.success(
+        res.data.message ||
+          'Registration successful! Please check your email to verify your account.'
+      );
+
       return res.data;
     } catch (err) {
       console.error('Registration error:', err);
@@ -16,7 +24,9 @@ const authService = {
     }
   },
 
-  // 🔑 Login user
+  /**
+   * 🔑 Login user (only if email is verified)
+   */
   login: async (credentials) => {
     try {
       const res = await api.post('/auth/login', credentials);
@@ -37,10 +47,12 @@ const authService = {
     }
   },
 
-  // 📧 Verify email
+  /**
+   * 📧 Verify user email via token
+   */
   verifyEmail: async (token) => {
     try {
-      const res = await api.post('/auth/verify-email', { token });
+      const res = await api.post('/auth/verify', { token }); // match backend route
       toast.success('✅ Email verified successfully! You can now log in.');
       setTimeout(() => (window.location.href = '/login'), 2000);
       return res.data;
@@ -51,7 +63,9 @@ const authService = {
     }
   },
 
-  // 🔁 Resend verification email
+  /**
+   * 🔁 Resend verification email
+   */
   resendVerification: async (email) => {
     try {
       const res = await api.post('/auth/resend-verification', { email });
@@ -64,7 +78,9 @@ const authService = {
     }
   },
 
-  // 🔐 Forgot password
+  /**
+   * 🔐 Forgot password - send reset link
+   */
   forgotPassword: async (email) => {
     try {
       const res = await api.post('/auth/forgot-password', { email });
@@ -77,7 +93,9 @@ const authService = {
     }
   },
 
-  // 🔁 Reset password
+  /**
+   * 🔁 Reset password using token
+   */
   resetPassword: async (token, password) => {
     try {
       const res = await api.post('/auth/reset-password', { token, password });
@@ -91,7 +109,9 @@ const authService = {
     }
   },
 
-  // 🚪 Logout
+  /**
+   * 🚪 Logout user
+   */
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -99,12 +119,11 @@ const authService = {
     window.location.href = '/login';
   },
 
-  // 👤 Get current logged-in user
+  /**
+   * 👤 Get current logged-in user
+   */
   getCurrentUser: () => {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
-  }
+  },
 };
-
-// ✅ Default export
-export default authService;
