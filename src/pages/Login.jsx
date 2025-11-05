@@ -5,19 +5,13 @@ import { authService } from '../services/authService';
 
 const Login = ({ setUser }) => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
     setError('');
   };
 
@@ -25,7 +19,6 @@ const Login = ({ setUser }) => {
     e.preventDefault();
     setError('');
 
-    // Validation
     if (!formData.email || !formData.password) {
       setError('Please fill in all fields');
       return;
@@ -35,15 +28,20 @@ const Login = ({ setUser }) => {
       setLoading(true);
       const response = await authService.login({
         email: formData.email,
-        password: formData.password
+        password: formData.password,
       });
 
-      if (response.success) {
+      if (response.user) {
         setUser(response.user);
-        navigate('/dashboard');
+
+        if (response.user.verified) {
+          navigate('/dashboard');
+        } else {
+          navigate('/verify-email', { state: { email: response.user.email } });
+        }
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+      setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -119,7 +117,7 @@ const Login = ({ setUser }) => {
               </div>
             </div>
 
-            {/* Forgot Password */}
+            {/* Remember & Forgot Password */}
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <input
