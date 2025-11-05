@@ -1,7 +1,7 @@
 // File: src/components/DealsInProgress.jsx
 import React, { useState, useEffect } from 'react';
 import { Zap } from 'lucide-react';
-import api from '../config/api';
+import API from '../utils/api';
 import { toast } from 'react-hot-toast';
 
 const mockDeals = [
