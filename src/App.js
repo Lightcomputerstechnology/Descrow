@@ -1,6 +1,7 @@
 // File: src/App.js
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import Navbar from './components/Navbar';
 
 // Public Pages
@@ -37,7 +38,9 @@ function App() {
   useEffect(() => {
     const initAuth = () => {
       const currentUser = authService.getCurrentUser();
-      if (currentUser) setUser(currentUser);
+      if (currentUser && currentUser.verified) {
+        setUser(currentUser);
+      }
 
       const adminToken = localStorage.getItem('adminToken');
       const adminData = localStorage.getItem('admin');
@@ -67,7 +70,14 @@ function App() {
       );
     }
 
-    if (!user) return <Navigate to="/login" replace />;
+    if (!user) {
+      return <Navigate to="/login" replace />;
+    }
+
+    if (!user.verified) {
+      return <Navigate to="/login" replace />;
+    }
+
     return children;
   };
 
@@ -81,9 +91,11 @@ function App() {
       );
     }
 
-    if (!admin) return <Navigate to="/admin/login" replace />;
+    if (!admin) {
+      return <Navigate to="/admin/login" replace />;
+    }
 
-    if (requiredPermission && admin.role !== 'master' && !admin.permissions[requiredPermission]) {
+    if (requiredPermission && admin.role !== 'master' && !admin.permissions?.[requiredPermission]) {
       return <Navigate to="/admin/dashboard" replace />;
     }
 
@@ -114,7 +126,32 @@ function App() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors duration-300">
-      {showNavbar() && <Navbar />}
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: '#4ade80',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            duration: 4000,
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
+      
+      {showNavbar() && <Navbar user={user} />}
       
       <Routes>
         {/* ==================== PUBLIC ROUTES ==================== */}
@@ -129,7 +166,7 @@ function App() {
         />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password/:token" element={<ResetPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* ==================== USER ROUTES (Protected) ==================== */}
         <Route
@@ -149,7 +186,7 @@ function App() {
           }
         />
 
-        {/* Legacy routes */}
+        {/* Legacy routes - redirect to new unified dashboard */}
         <Route path="/buyer-dashboard" element={<Navigate to="/dashboard" replace />} />
         <Route path="/seller-dashboard" element={<Navigate to="/dashboard" replace />} />
 
