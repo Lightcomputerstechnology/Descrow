@@ -28,7 +28,6 @@ const CreateEscrowModal = ({ user, onClose, onSuccess }) => {
     e.preventDefault();
     setError('');
 
-    // Validation
     if (!formData.sellerEmail || !formData.itemName || !formData.amount) {
       setError('Please fill in all required fields');
       return;
@@ -39,7 +38,6 @@ const CreateEscrowModal = ({ user, onClose, onSuccess }) => {
       return;
     }
 
-    // Tier limits check
     const tierLimits = user.getTierLimits ? user.getTierLimits() : { maxTransactionAmount: 500 };
     if (tierLimits.maxTransactionAmount !== -1 && parseFloat(formData.amount) > tierLimits.maxTransactionAmount) {
       setError(`Amount exceeds your tier limit of $${tierLimits.maxTransactionAmount}`);
