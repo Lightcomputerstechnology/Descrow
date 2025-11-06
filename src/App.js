@@ -103,7 +103,7 @@ function App() {
     return children;
   };
 
-  // Check if current route is admin or public (no navbar needed)
+  // Show Navbar only for non-admin, non-auth routes
   const showNavbar = () => {
     const path = window.location.pathname;
     const noNavbarRoutes = [
@@ -112,7 +112,7 @@ function App() {
       '/verify-email',
       '/forgot-password',
       '/reset-password',
-      '/admin'
+      '/admin',
     ];
     return !noNavbarRoutes.some(route => path.startsWith(route));
   };
@@ -127,7 +127,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors duration-300">
-      <Toaster 
+      <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,
@@ -151,9 +151,9 @@ function App() {
           },
         }}
       />
-      
+
       {showNavbar() && <Navbar user={user} />}
-      
+
       <Routes>
         {/* ==================== PUBLIC ROUTES ==================== */}
         <Route path="/" element={<LandingPage />} />
@@ -168,6 +168,7 @@ function App() {
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/resend-verification" element={<ResendVerification />} />
 
         {/* ==================== USER ROUTES (Protected) ==================== */}
         <Route
@@ -185,10 +186,9 @@ function App() {
               <EscrowDetails />
             </ProtectedRoute>
           }
-            <Route path="/resend-verification" element={<ResendVerification />} />
         />
 
-        {/* Legacy routes - redirect to new unified dashboard */}
+        {/* Legacy redirects */}
         <Route path="/buyer-dashboard" element={<Navigate to="/dashboard" replace />} />
         <Route path="/seller-dashboard" element={<Navigate to="/dashboard" replace />} />
 
