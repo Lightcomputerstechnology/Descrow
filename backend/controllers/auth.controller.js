@@ -220,30 +220,45 @@ exports.verifyEmail = async (req, res) => {
   }
 };
 
-// ------------------------- VERIFY EMAIL (GET) - For click link -------------------------
+// ------------------------- VERIFY EMAIL (GET) - For email link clicks -------------------------
 exports.verifyEmailRedirect = async (req, res) => {
   try {
     const { token } = req.params;
     
+    console.log('🔍 Verification redirect called with token:', token);
+
+    if (!token) {
+      console.log('❌ No token provided');
+      return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=error&reason=no-token`);
+    }
+
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
+      console.log('✅ Token decoded successfully:', decoded);
     } catch (jwtError) {
+      console.error('❌ Token verification failed:', jwtError.message);
+      if (jwtError.name === 'TokenExpiredError') {
+        return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=error&reason=expired-token`);
+      }
       return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=error&reason=invalid-token`);
     }
 
     const user = await User.findById(decoded.id);
 
     if (!user) {
+      console.log('❌ User not found for ID:', decoded.id);
       return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=error&reason=user-not-found`);
     }
 
     if (user.verified) {
+      console.log('ℹ️ User already verified:', user.email);
       return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=already-verified`);
     }
 
     user.verified = true;
     await user.save();
+    console.log('✅ User verified successfully:', user.email);
 
     // Send welcome email
     emailService.sendWelcomeEmail(user.email, user.name).catch(err => {
