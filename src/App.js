@@ -35,14 +35,23 @@ function App() {
   const [admin, setAdmin] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Check for existing session on mount
+  // ✅ FIXED: Check for existing session on mount
   useEffect(() => {
     const initAuth = () => {
+      // Check for user token AND user data
+      const token = localStorage.getItem('token');
       const currentUser = authService.getCurrentUser();
-      if (currentUser && currentUser.verified) {
+      
+      // Only set user if BOTH token exists AND user is verified
+      if (token && currentUser && currentUser.verified) {
         setUser(currentUser);
+      } else {
+        // Clear invalid session
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
       }
 
+      // Admin check
       const adminToken = localStorage.getItem('adminToken');
       const adminData = localStorage.getItem('admin');
       if (adminToken && adminData) {
@@ -112,6 +121,7 @@ function App() {
       '/verify-email',
       '/forgot-password',
       '/reset-password',
+      '/resend-verification',
       '/admin',
     ];
     return !noNavbarRoutes.some(route => path.startsWith(route));
