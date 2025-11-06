@@ -53,16 +53,23 @@ const Login = ({ setUser }) => {
         password: formData.password
       });
 
-      // ✅ Handle success
-      if (response.success && response.user) {
+      // ✅ FIXED: Check if user is verified AND token exists
+      if (response.success && response.user && response.user.verified && response.token) {
+        // Update React state
         setUser(response.user);
+        
+        // Navigate to dashboard
         navigate('/dashboard', { replace: true });
       } 
-      // ✅ Handle verification pending
-      else if (response.message?.toLowerCase().includes('verify')) {
+      // ✅ Handle unverified users
+      else if (response.user && !response.user.verified) {
         setError('Your email is not verified. Please check your inbox or spam folder.');
       } 
-      // ✅ Handle unknown login errors
+      // ✅ Handle missing token
+      else if (!response.token) {
+        setError('Login failed. Please try again.');
+      }
+      // ✅ Handle other errors
       else {
         setError(response.message || 'Login failed. Please try again.');
       }
@@ -115,7 +122,7 @@ const Login = ({ setUser }) => {
                 <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-                  {/* ✅ RESEND VERIFICATION LINK - THIS IS WHERE IT GOES */}
+                  {/* ✅ RESEND VERIFICATION LINK */}
                   {error.toLowerCase().includes('verify') && (
                     <div className="mt-3">
                       <Link
