@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Shield, Mail, Lock, Eye, EyeOff, Loader, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { Shield, Mail, Lock, Eye, EyeOff, Loader, AlertCircle, CheckCircle } from 'lucide-react';
 import { authService } from '../services/authService';
 
 const Login = ({ setUser }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -12,6 +13,19 @@ const Login = ({ setUser }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  // ✅ Check for registration success message
+  useEffect(() => {
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message);
+      if (location.state.email) {
+        setFormData(prev => ({ ...prev, email: location.state.email }));
+      }
+      // Clear the state to avoid showing message on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   const handleChange = (e) => {
     setFormData({
@@ -24,6 +38,7 @@ const Login = ({ setUser }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
 
     // Validation
     if (!formData.email || !formData.password) {
@@ -41,8 +56,6 @@ const Login = ({ setUser }) => {
       // ✅ Handle success
       if (response.success && response.user) {
         setUser(response.user);
-
-        // ✅ Ensure proper redirection — absolute path to dashboard
         navigate('/dashboard', { replace: true });
       } 
       // ✅ Handle verification pending
@@ -66,6 +79,19 @@ const Login = ({ setUser }) => {
     }
   };
 
+  const handleResendVerification = async () => {
+    if (!formData.email) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    try {
+      await authService.resendVerification(formData.email.trim());
+    } catch (err) {
+      console.error('Resend verification error:', err);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-gray-900 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
@@ -81,10 +107,37 @@ const Login = ({ setUser }) => {
 
         {/* Login Form */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8">
+          
+          {/* ✅ Success Message (from registration) */}
+          {successMessage && (
+            <div className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-green-800 dark:text-green-200">{successMessage}</p>
+                <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                  📧 Check your email inbox (and spam folder) for the verification link.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Error Message */}
           {error && (
-            <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+                  {error.toLowerCase().includes('verify') && (
+                    <button
+                      onClick={handleResendVerification}
+                      className="mt-2 text-xs text-red-700 dark:text-red-300 underline hover:text-red-900 dark:hover:text-red-100"
+                    >
+                      Resend verification email
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
