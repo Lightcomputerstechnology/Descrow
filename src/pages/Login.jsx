@@ -79,19 +79,6 @@ const Login = ({ setUser }) => {
     }
   };
 
-  const handleResendVerification = async () => {
-    if (!formData.email) {
-      setError('Please enter your email address');
-      return;
-    }
-
-    try {
-      await authService.resendVerification(formData.email.trim());
-    } catch (err) {
-      console.error('Resend verification error:', err);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-gray-900 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
@@ -128,13 +115,18 @@ const Login = ({ setUser }) => {
                 <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+                  {/* ✅ RESEND VERIFICATION LINK - THIS IS WHERE IT GOES */}
                   {error.toLowerCase().includes('verify') && (
-                    <button
-                      onClick={handleResendVerification}
-                      className="mt-2 text-xs text-red-700 dark:text-red-300 underline hover:text-red-900 dark:hover:text-red-100"
-                    >
-                      Resend verification email
-                    </button>
+                    <div className="mt-3">
+                      <Link
+                        to="/resend-verification"
+                        state={{ email: formData.email }}
+                        className="inline-flex items-center gap-1 text-sm text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100 underline font-medium"
+                      >
+                        <Mail className="w-4 h-4" />
+                        Resend verification email
+                      </Link>
+                    </div>
                   )}
                 </div>
               </div>
