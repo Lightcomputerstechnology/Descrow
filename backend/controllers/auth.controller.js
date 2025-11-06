@@ -13,6 +13,12 @@ const generateToken = (userId) => {
   );
 };
 
+// -------------------- Helper: Get Clean Frontend URL --------------------
+const getFrontendUrl = () => {
+  const url = process.env.FRONTEND_URL || 'http://localhost:3000';
+  return url.replace(/\/$/, ''); // Remove trailing slash if present
+};
+
 // ------------------------- REGISTER -------------------------
 exports.register = async (req, res) => {
   try {
@@ -224,12 +230,13 @@ exports.verifyEmail = async (req, res) => {
 exports.verifyEmailRedirect = async (req, res) => {
   try {
     const { token } = req.params;
+    const frontendUrl = getFrontendUrl(); // ✅ FIXED: Use helper function
     
     console.log('🔍 Verification redirect called with token:', token);
 
     if (!token) {
       console.log('❌ No token provided');
-      return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=error&reason=no-token`);
+      return res.redirect(`${frontendUrl}/verify-email?status=error&reason=no-token`);
     }
 
     let decoded;
@@ -239,21 +246,21 @@ exports.verifyEmailRedirect = async (req, res) => {
     } catch (jwtError) {
       console.error('❌ Token verification failed:', jwtError.message);
       if (jwtError.name === 'TokenExpiredError') {
-        return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=error&reason=expired-token`);
+        return res.redirect(`${frontendUrl}/verify-email?status=error&reason=expired-token`);
       }
-      return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=error&reason=invalid-token`);
+      return res.redirect(`${frontendUrl}/verify-email?status=error&reason=invalid-token`);
     }
 
     const user = await User.findById(decoded.id);
 
     if (!user) {
       console.log('❌ User not found for ID:', decoded.id);
-      return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=error&reason=user-not-found`);
+      return res.redirect(`${frontendUrl}/verify-email?status=error&reason=user-not-found`);
     }
 
     if (user.verified) {
       console.log('ℹ️ User already verified:', user.email);
-      return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=already-verified`);
+      return res.redirect(`${frontendUrl}/verify-email?status=already-verified`);
     }
 
     user.verified = true;
@@ -265,11 +272,12 @@ exports.verifyEmailRedirect = async (req, res) => {
       console.error('Failed to send welcome email:', err);
     });
 
-    return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=success`);
+    return res.redirect(`${frontendUrl}/verify-email?status=success`);
     
   } catch (error) {
     console.error('❌ Verify redirect error:', error);
-    return res.redirect(`${process.env.FRONTEND_URL}/verify-email?status=error&reason=server-error`);
+    const frontendUrl = getFrontendUrl();
+    return res.redirect(`${frontendUrl}/verify-email?status=error&reason=server-error`);
   }
 };
 
