@@ -34,10 +34,10 @@ router.post(
 
 /**
  * ---------------- VERIFY EMAIL ----------------
- * POST /api/auth/verify-email  -> Used by frontend React component
- * GET  /api/auth/verify/:token -> Used for email link clicks
+ * POST /api/auth/verify-email  -> Used by frontend when token is in URL
+ * GET  /api/auth/verify/:token -> Used when user clicks link in email (redirects)
  */
-router.post('/verify-email', authController.verifyEmail);  // ✅ Match frontend
+router.post('/verify-email', authController.verifyEmail);
 router.get('/verify/:token', authController.verifyEmailRedirect);
 
 /**
@@ -50,6 +50,11 @@ router.post('/resend-verification', authController.resendVerification);
  */
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
+
+/**
+ * ---------------- REFRESH TOKEN ----------------
+ */
+router.post('/refresh-token', authController.refreshToken);
 
 /**
  * ---------------- DEV: TEST EMAIL ----------------
