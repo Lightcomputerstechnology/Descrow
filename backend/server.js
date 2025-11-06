@@ -31,18 +31,27 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 // Compression
 app.use(compression());
 
-// CORS
+// CORS - UPDATED TO INCLUDE dealcross.net
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'https://descrow-5l46.onrender.com',
+  'https://dealcross.net',              // ← NEW
+  'https://www.dealcross.net',          // ← NEW
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('❌ Blocked origin:', origin);  // For debugging
+      callback(new Error('Not allowed by CORS'));
+    }
   },
   credentials: true,
   methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
