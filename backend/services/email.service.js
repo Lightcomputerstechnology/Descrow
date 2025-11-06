@@ -4,11 +4,18 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 
+// ✅ ADDED: Helper function to get clean frontend URL
+const getFrontendUrl = () => {
+  const url = process.env.FRONTEND_URL || 'http://localhost:3000';
+  return url.replace(/\/$/, ''); // Remove trailing slash if present
+};
+
 /**
  * Send verification email to new users
  */
 exports.sendVerificationEmail = async (email, name, token) => {
-  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+  const frontendUrl = getFrontendUrl(); // ✅ FIXED
+  const verificationUrl = `${frontendUrl}/verify-email?token=${token}`;
   
   try {
     const emailData = {
@@ -199,7 +206,8 @@ exports.sendVerificationEmail = async (email, name, token) => {
  * Send password reset email
  */
 exports.sendPasswordResetEmail = async (email, name, token) => {
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+  const frontendUrl = getFrontendUrl(); // ✅ FIXED
+  const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
   
   try {
     const emailData = {
@@ -397,6 +405,8 @@ exports.sendPasswordResetEmail = async (email, name, token) => {
  * Send welcome email after successful verification
  */
 exports.sendWelcomeEmail = async (email, name) => {
+  const frontendUrl = getFrontendUrl(); // ✅ FIXED
+  
   try {
     const emailData = {
       from: process.env.EMAIL_FROM,
@@ -527,7 +537,7 @@ exports.sendWelcomeEmail = async (email, name) => {
               </div>
               
               <div class="button-container">
-                <a href="${process.env.FRONTEND_URL}/dashboard" class="button">Go to Dashboard</a>
+                <a href="${frontendUrl}/dashboard" class="button">Go to Dashboard</a>
               </div>
               
               <p>
