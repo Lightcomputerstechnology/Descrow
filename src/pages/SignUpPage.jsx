@@ -1,4 +1,4 @@
-React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Shield, Mail, Lock, User, Eye, EyeOff, Loader, AlertCircle, CheckCircle } from 'lucide-react';
 import { authService } from '../services/authService';
@@ -16,6 +16,7 @@ const SignUpPage = ({ setUser }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [passwordStrength, setPasswordStrength] = useState(0);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -24,6 +25,7 @@ const SignUpPage = ({ setUser }) => {
       [name]: value
     });
     setError('');
+    setSuccessMessage('');
 
     // Password strength check
     if (name === 'password') {
@@ -56,6 +58,7 @@ const SignUpPage = ({ setUser }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
 
     // Validation
     if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword) {
@@ -81,20 +84,18 @@ const SignUpPage = ({ setUser }) => {
         password: formData.password
       });
 
-      // ✅ Check if registration was successful
+      // ✅ Handle success
       if (response.success) {
-        // Store the email for the verification notice page
-        localStorage.setItem('pendingVerificationEmail', formData.email.trim());
-        
-        // ✅ Redirect to login with verification notice
-        navigate('/login', { 
-          state: { 
-            message: 'Registration successful! Please check your email to verify your account.',
-            email: formData.email.trim(),
-            requiresVerification: true
-          } 
-        });
+        if (response.message?.toLowerCase().includes('verify')) {
+          // Show verification notice if email verification required
+          setSuccessMessage('Account created! Please verify your email before logging in.');
+        } else {
+          // If user is auto-verified
+          setUser(response.user);
+          navigate('/dashboard', { replace: true });
+        }
       } else {
+        // API returned success = false
         setError(response.message || 'Registration failed. Please try again.');
       }
 
@@ -129,6 +130,13 @@ const SignUpPage = ({ setUser }) => {
             <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-green-800 dark:text-green-200">{successMessage}</p>
             </div>
           )}
 
