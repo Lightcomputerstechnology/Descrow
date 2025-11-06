@@ -1,6 +1,6 @@
 // File: src/App.js
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Navbar from './components/Navbar';
 
@@ -30,28 +30,46 @@ import AdminManagementPage from './pages/admin/AdminManagementPage';
 
 import { authService } from './services/authService';
 
+// ✅ NEW: Simple 404 Component
+const NotFound = () => {
+  const location = useLocation();
+  
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+      <div className="text-center">
+        <h1 className="text-6xl font-bold text-gray-900 dark:text-white mb-4">404</h1>
+        <p className="text-xl text-gray-600 dark:text-gray-400 mb-8">
+          Page not found: {location.pathname}
+        </p>
+        <a
+          href="/"
+          className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+        >
+          Go Home
+        </a>
+      </div>
+    </div>
+  );
+};
+
 function App() {
   const [user, setUser] = useState(null);
   const [admin, setAdmin] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ FIXED: Check for existing session on mount
+  // ✅ Check for existing session on mount
   useEffect(() => {
     const initAuth = () => {
-      // Check for user token AND user data
       const token = localStorage.getItem('token');
       const currentUser = authService.getCurrentUser();
       
-      // Only set user if BOTH token exists AND user is verified
       if (token && currentUser && currentUser.verified) {
         setUser(currentUser);
       } else {
-        // Clear invalid session
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       }
 
-      // Admin check
       const adminToken = localStorage.getItem('adminToken');
       const adminData = localStorage.getItem('admin');
       if (adminToken && adminData) {
@@ -272,8 +290,8 @@ function App() {
           }
         />
 
-        {/* ==================== CATCH ALL ==================== */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* ==================== 404 - MUST BE LAST ==================== */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
   );
