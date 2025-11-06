@@ -30,7 +30,14 @@ const VerifyEmail = () => {
 
     // No token or status - show error
     setVerificationStatus('error');
-    setMessage('No verification token provided. Please check your email for the verification link.');
+    const errorMessages = {
+      'invalid-token': 'Invalid or expired verification link. Please request a new one.',
+      'expired-token': 'Verification link has expired. Please request a new one.',
+      'no-token': 'No verification token provided.',
+      'user-not-found': 'User not found. Please register again.',
+      'server-error': 'Server error occurred. Please try again later.'
+    };
+    setMessage(errorMessages[reason] || 'No verification token provided. Please check your email for the verification link.');
   }, [token, status, reason]);
 
   const handleBackendRedirect = (status, reason) => {
@@ -88,8 +95,10 @@ const VerifyEmail = () => {
       setResending(true);
       await authService.resendVerification(resendEmail.trim());
       setResendEmail('');
+      setMessage('Verification email resent successfully!');
     } catch (error) {
       console.error('Resend verification error:', error);
+      setMessage('Failed to resend verification email. Please try again.');
     } finally {
       setResending(false);
     }
