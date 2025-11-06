@@ -10,6 +10,7 @@ import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import SignUpPage from './pages/SignUpPage';
 import ForgotPassword from './pages/ForgotPassword';
+import ResendVerification from './pages/ResendVerification';
 import ResetPassword from './pages/ResetPassword';
 
 // User Pages
@@ -184,6 +185,7 @@ function App() {
               <EscrowDetails />
             </ProtectedRoute>
           }
+            <Route path="/resend-verification" element={<ResendVerification />} />
         />
 
         {/* Legacy routes - redirect to new unified dashboard */}
