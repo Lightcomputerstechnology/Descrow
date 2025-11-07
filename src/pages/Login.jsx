@@ -48,34 +48,43 @@ const Login = ({ setUser }) => {
 
     try {
       setLoading(true);
+      console.log('🔐 Attempting login...'); // Debug log
+      
       const response = await authService.login({
         email: formData.email.trim(),
         password: formData.password
       });
 
-      // ✅ FIXED: Check if user is verified AND token exists
-      if (response.success && response.user && response.user.verified && response.token) {
-        // Update React state
+      console.log('📦 Login response:', response); // Debug log
+
+      // ✅ Check if login was successful
+      if (response.success && response.user && response.token) {
+        console.log('✅ Login successful, user:', response.user); // Debug log
+        
+        // Check if user is verified
+        if (!response.user.verified) {
+          setError('Your email is not verified. Please check your inbox or spam folder.');
+          return;
+        }
+
+        // Update parent component state
         setUser(response.user);
         
+        console.log('🚀 Navigating to dashboard...'); // Debug log
+        
         // Navigate to dashboard
-        navigate('/dashboard', { replace: true });
-      } 
-      // ✅ Handle unverified users
-      else if (response.user && !response.user.verified) {
+        setTimeout(() => {
+          navigate('/dashboard', { replace: true });
+        }, 100);
+        
+      } else if (response.user && !response.user.verified) {
         setError('Your email is not verified. Please check your inbox or spam folder.');
-      } 
-      // ✅ Handle missing token
-      else if (!response.token) {
-        setError('Login failed. Please try again.');
-      }
-      // ✅ Handle other errors
-      else {
+      } else {
         setError(response.message || 'Login failed. Please try again.');
       }
 
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('❌ Login error:', err); // Debug log
       const message =
         err.response?.data?.message ||
         err.message ||
