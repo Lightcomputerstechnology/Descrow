@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Shield, Mail, Lock, Eye, EyeOff, Loader, AlertCircle, CheckCircle } from 'lucide-react';
 import { authService } from '../services/authService';
+import { toast } from 'react-hot-toast';
 
 const Login = ({ setUser }) => {
   const navigate = useNavigate();
@@ -15,14 +16,12 @@ const Login = ({ setUser }) => {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // ✅ Check for registration success message
   useEffect(() => {
     if (location.state?.message) {
       setSuccessMessage(location.state.message);
       if (location.state.email) {
         setFormData(prev => ({ ...prev, email: location.state.email }));
       }
-      // Clear the state to avoid showing message on refresh
       window.history.replaceState({}, document.title);
     }
   }, [location]);
@@ -37,10 +36,11 @@ const Login = ({ setUser }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    e.stopPropagation(); // ✅ Stop event bubbling
+    
     setError('');
     setSuccessMessage('');
 
-    // Validation
     if (!formData.email || !formData.password) {
       setError('Please fill in all fields');
       return;
@@ -48,48 +48,92 @@ const Login = ({ setUser }) => {
 
     try {
       setLoading(true);
-      console.log('🔐 Attempting login...'); // Debug log
+      console.log('🔐 Starting login process...');
+      console.log('📧 Email:', formData.email);
       
       const response = await authService.login({
         email: formData.email.trim(),
         password: formData.password
       });
 
-      console.log('📦 Login response:', response); // Debug log
+      console.log('📦 Full response:', JSON.stringify(response, null, 2));
 
-      // ✅ Check if login was successful
-      if (response.success && response.user && response.token) {
-        console.log('✅ Login successful, user:', response.user); // Debug log
-        
-        // Check if user is verified
-        if (!response.user.verified) {
-          setError('Your email is not verified. Please check your inbox or spam folder.');
-          return;
-        }
-
-        // Update parent component state
-        setUser(response.user);
-        
-        console.log('🚀 Navigating to dashboard...'); // Debug log
-        
-        // Navigate to dashboard
-        setTimeout(() => {
-          navigate('/dashboard', { replace: true });
-        }, 100);
-        
-      } else if (response.user && !response.user.verified) {
-        setError('Your email is not verified. Please check your inbox or spam folder.');
-      } else {
-        setError(response.message || 'Login failed. Please try again.');
+      // ✅ Extensive checks
+      if (!response) {
+        console.error('❌ No response from authService');
+        setError('Login failed - no response from server');
+        return;
       }
 
+      if (!response.success) {
+        console.error('❌ Response not successful:', response.message);
+        setError(response.message || 'Login failed');
+        return;
+      }
+
+      if (!response.user) {
+        console.error('❌ No user in response');
+        setError('Login failed - invalid response');
+        return;
+      }
+
+      if (!response.token) {
+        console.error('❌ No token in response');
+        setError('Login failed - no authentication token');
+        return;
+      }
+
+      if (!response.user.verified) {
+        console.warn('⚠️ User not verified');
+        setError('Your email is not verified. Please check your inbox or spam folder.');
+        return;
+      }
+
+      console.log('✅ All checks passed!');
+      console.log('👤 User object:', response.user);
+      console.log('🎫 Token exists:', !!response.token);
+
+      // Double-check localStorage
+      const storedToken = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
+      console.log('💾 Token in localStorage:', !!storedToken);
+      console.log('💾 User in localStorage:', !!storedUser);
+
+      if (!storedToken || !storedUser) {
+        console.error('❌ Token/user not saved to localStorage!');
+        setError('Session not created properly. Please try again.');
+        return;
+      }
+
+      // Update parent state
+      console.log('🔄 Updating parent component state...');
+      setUser(response.user);
+
+      // Show success toast
+      toast.success(`Welcome back, ${response.user.name}!`);
+
+      console.log('🚀 Attempting navigation to /dashboard...');
+      
+      // Navigate after a short delay
+      setTimeout(() => {
+        console.log('📍 Navigating now...');
+        navigate('/dashboard', { replace: true });
+      }, 500);
+
     } catch (err) {
-      console.error('❌ Login error:', err); // Debug log
+      console.error('❌ Login error caught:', err);
+      console.error('Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
+      
       const message =
         err.response?.data?.message ||
         err.message ||
         'Login failed. Please check your credentials.';
       setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -111,7 +155,6 @@ const Login = ({ setUser }) => {
         {/* Login Form */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8">
           
-          {/* ✅ Success Message (from registration) */}
           {successMessage && (
             <div className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 flex items-start gap-3">
               <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
@@ -124,14 +167,12 @@ const Login = ({ setUser }) => {
             </div>
           )}
 
-          {/* Error Message */}
           {error && (
             <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-                  {/* ✅ RESEND VERIFICATION LINK */}
                   {error.toLowerCase().includes('verify') && (
                     <div className="mt-3">
                       <Link
