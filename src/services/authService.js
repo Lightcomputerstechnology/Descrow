@@ -78,9 +78,6 @@ export const authService = {
       console.log('💾 Token saved:', !!savedToken);
       console.log('💾 User saved:', !!savedUser);
 
-      // Don't show toast here - let Login.js handle it
-      // toast.success(`Welcome back, ${res.data.user?.name || 'User'}!`);
-
       console.log('✅ authService.login returning success response');
       return res.data;
 
@@ -106,7 +103,9 @@ export const authService = {
         localStorage.setItem('user', JSON.stringify({ ...storedUser, verified: true }));
       }
 
-      setTimeout(() => (window.location.href = '/login'), 2000);
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 2000);
       return res.data;
     } catch (err) {
       console.error('Verify email error:', err);
@@ -152,7 +151,9 @@ export const authService = {
     try {
       const res = await api.post('/auth/reset-password', { token, password });
       toast.success('✅ Password reset successful! You can now log in.');
-      setTimeout(() => (window.location.href = '/login'), 2000);
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 2000);
       return res.data;
     } catch (err) {
       console.error('Reset password error:', err);
@@ -167,7 +168,7 @@ export const authService = {
   logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    toast.success('You've been logged out.');
+    toast.success('You have been logged out.');
     window.location.href = '/login';
   },
 
@@ -177,5 +178,5 @@ export const authService = {
   getCurrentUser() {
     const user = localStorage.getItem('user');
     return user ? JSON.parse(user) : null;
-  },
+  }
 };
