@@ -1,6 +1,7 @@
 // controllers/auth.controller.js
 const User = require('../models/User.model');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { validationResult } = require('express-validator');
 const emailService = require('../services/email.service');
 
@@ -33,8 +34,11 @@ exports.register = async (req, res) => {
 
     const { name, email, password } = req.body;
 
-    const existingUser = await User.findOne({ email });
+    console.log('📝 Registration attempt for:', email);
+
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
+      console.log('❌ Email already exists:', email);
       return res.status(400).json({ 
         success: false, 
         message: 'Email already registered' 
@@ -43,11 +47,20 @@ exports.register = async (req, res) => {
 
     const user = await User.create({
       name,
-      email,
+      email: email.toLowerCase(),
       password,
       role: 'dual',
       tier: 'free',
       verified: false
+    });
+
+    console.log('✅ User created:', user.email);
+
+    // Verify password was hashed
+    const checkUser = await User.findById(user._id).select('+password');
+    console.log('✅ Password hashed successfully:', {
+      hasPassword: !!checkUser.password,
+      hashLength: checkUser.password?.length
     });
 
     const verificationToken = generateToken(user._id);
@@ -83,6 +96,7 @@ exports.login = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Validation errors:', errors.array());
       return res.status(400).json({ 
         success: false, 
         message: 'Validation failed', 
@@ -92,15 +106,30 @@ exports.login = async (req, res) => {
 
     const { email, password } = req.body;
     
-    const user = await User.findOne({ email }).select('+password');
+    console.log('🔐 Login attempt for:', email);
+    console.log('📦 Password provided:', !!password, 'Length:', password?.length);
+    
+    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+    
     if (!user) {
+      console.log('❌ User not found:', email);
       return res.status(401).json({ 
         success: false, 
         message: 'Invalid credentials' 
       });
     }
 
+    console.log('✅ User found:', {
+      id: user._id,
+      email: user.email,
+      verified: user.verified,
+      isActive: user.isActive,
+      hasPassword: !!user.password,
+      passwordHashLength: user.password?.length
+    });
+
     if (!user.verified) {
+      console.log('⚠️ User not verified:', email);
       return res.status(403).json({ 
         success: false, 
         message: 'Please verify your email first', 
@@ -110,24 +139,41 @@ exports.login = async (req, res) => {
     }
 
     if (!user.isActive) {
+      console.log('⚠️ User not active:', email);
       return res.status(403).json({ 
         success: false, 
         message: 'Account is suspended. Contact support.' 
       });
     }
 
+    console.log('🔑 Attempting password comparison...');
+    
     const isPasswordValid = await user.comparePassword(password);
+    
+    console.log('🔑 Password comparison result:', isPasswordValid);
+
     if (!isPasswordValid) {
+      console.log('❌ Password mismatch for:', email);
+      
+      // Manual bcrypt test for debugging
+      const manualTest = await bcrypt.compare(password, user.password);
+      console.log('🔧 Manual bcrypt.compare result:', manualTest);
+      
       return res.status(401).json({ 
         success: false, 
         message: 'Invalid credentials' 
       });
     }
 
+    console.log('✅ Password valid, updating last login...');
+    
     user.lastLogin = new Date();
     await user.save();
 
     const token = generateToken(user._id);
+    
+    console.log('✅ Login successful for:', email);
+    console.log('🎫 Token generated');
 
     res.status(200).json({
       success: true,
@@ -201,6 +247,8 @@ exports.verifyEmail = async (req, res) => {
     user.verified = true;
     await user.save();
 
+    console.log('✅ Email verified for:', user.email);
+
     // Send welcome email (don't await - non-critical)
     emailService.sendWelcomeEmail(user.email, user.name).catch(err => {
       console.error('Failed to send welcome email:', err);
@@ -230,7 +278,7 @@ exports.verifyEmail = async (req, res) => {
 exports.verifyEmailRedirect = async (req, res) => {
   try {
     const { token } = req.params;
-    const frontendUrl = getFrontendUrl(); // ✅ FIXED: Use helper function
+    const frontendUrl = getFrontendUrl();
     
     console.log('🔍 Verification redirect called with token:', token);
 
@@ -293,7 +341,7 @@ exports.resendVerification = async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase() });
     
     if (!user) {
       return res.status(404).json({ 
@@ -341,7 +389,7 @@ exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
     
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase() });
     
     if (!user) {
       return res.status(404).json({ 
@@ -416,6 +464,8 @@ exports.resetPassword = async (req, res) => {
 
     user.password = password;
     await user.save();
+
+    console.log('✅ Password reset successful for:', user.email);
 
     // Send password changed email
     emailService.sendPasswordChangedEmail(user.email, user.name).catch(err => {
