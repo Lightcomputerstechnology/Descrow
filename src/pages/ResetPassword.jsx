@@ -1,11 +1,12 @@
 // File: src/pages/ResetPassword.jsx
-import React, { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Lock, Loader, CheckCircle, XCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { Lock, Loader, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { authService } from '../services/authService';
 
 const ResetPassword = () => {
-  const { token } = useParams();
+  const [searchParams] = useSearchParams(); // ✅ CHANGED: Use searchParams instead of useParams
+  const token = searchParams.get('token'); // ✅ CHANGED: Get token from query string
   const navigate = useNavigate();
 
   const [password, setPassword] = useState('');
@@ -14,10 +15,32 @@ const ResetPassword = () => {
   const [status, setStatus] = useState('idle'); // idle, success, error
   const [message, setMessage] = useState('');
 
+  // ✅ NEW: Check if token exists on mount
+  useEffect(() => {
+    if (!token) {
+      setStatus('error');
+      setMessage('Invalid or missing reset token. Please request a new password reset link.');
+    }
+  }, [token]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // ✅ NEW: Check token before submitting
+    if (!token) {
+      setMessage('Invalid reset link. Please request a new password reset.');
+      setStatus('error');
+      return;
+    }
+
     if (!password || !confirmPassword) {
       setMessage('Please fill in all fields');
+      setStatus('error');
+      return;
+    }
+
+    if (password.length < 8) {
+      setMessage('Password must be at least 8 characters long');
       setStatus('error');
       return;
     }
@@ -30,13 +53,16 @@ const ResetPassword = () => {
 
     setLoading(true);
     setStatus('idle');
+    setMessage('');
 
     try {
+      console.log('🔐 Resetting password with token:', token); // Debug log
       const response = await authService.resetPassword(token, password);
       setStatus('success');
       setMessage(response.message || 'Password reset successfully! Redirecting to login...');
       setTimeout(() => navigate('/login'), 3000);
     } catch (error) {
+      console.error('❌ Reset password error:', error); // Debug log
       setStatus('error');
       setMessage(error.message || 'Failed to reset password. The link may be invalid or expired.');
     } finally {
@@ -54,6 +80,7 @@ const ResetPassword = () => {
             <span className="text-3xl font-bold text-white">Dealcross</span>
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">Reset Password</h1>
+          <p className="text-blue-200 text-sm">Enter your new password below</p>
         </div>
 
         {/* Form / Status */}
@@ -72,54 +99,101 @@ const ResetPassword = () => {
                 to="/login"
                 className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
               >
-                Go to Login
+                Go to Login Now
               </Link>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {status === 'error' && (
-                <div className="flex items-center gap-2 text-red-600 dark:text-red-400 mb-2">
-                  <XCircle className="w-5 h-5" />
-                  <span>{message}</span>
+            <>
+              {/* ✅ NEW: Show error if no token */}
+              {!token && (
+                <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-red-800 dark:text-red-200 font-semibold mb-2">
+                        Invalid Reset Link
+                      </p>
+                      <p className="text-sm text-red-700 dark:text-red-300 mb-3">
+                        This password reset link is invalid or has expired.
+                      </p>
+                      <Link
+                        to="/forgot-password"
+                        className="inline-block text-sm text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100 underline font-medium"
+                      >
+                        Request a new password reset link
+                      </Link>
+                    </div>
+                  </div>
                 </div>
               )}
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                  placeholder="New Password"
-                  required
-                />
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                  placeholder="Confirm New Password"
-                  required
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <Loader className="w-5 h-5 animate-spin" />
-                    Resetting...
-                  </>
-                ) : (
-                  'Reset Password'
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {status === 'error' && message && (
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                      <XCircle className="w-5 h-5 flex-shrink-0" />
+                      <span className="text-sm">{message}</span>
+                    </div>
+                  </div>
                 )}
-              </button>
-            </form>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    New Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                      placeholder="Enter new password"
+                      required
+                      minLength={8}
+                      disabled={!token}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Must be at least 8 characters long
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Confirm New Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
+                      placeholder="Confirm new password"
+                      required
+                      minLength={8}
+                      disabled={!token}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || !token}
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <Loader className="w-5 h-5 animate-spin" />
+                      Resetting...
+                    </>
+                  ) : (
+                    'Reset Password'
+                  )}
+                </button>
+              </form>
+            </>
           )}
         </div>
 
