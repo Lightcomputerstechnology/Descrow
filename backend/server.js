@@ -19,6 +19,7 @@ const paymentRoutes = require('./routes/payment.routes');
 const adminRoutes = require('./routes/admin.routes');
 const apiKeyRoutes = require('./routes/apiKey.routes');
 const verifyRoutes = require('./routes/verify.routes');
+const notificationRoutes = require('./routes/notification.routes'); // ← NEW
 
 const app = express();
 app.set('trust proxy', 1);
@@ -36,22 +37,17 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'https://descrow-5l46.onrender.com',
-  'https://dealcross.net',              // ← NEW
-  'https://www.dealcross.net',          // ← NEW
+  'https://dealcross.net',
+  'https://www.dealcross.net',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log('❌ Blocked origin:', origin);  // For debugging
-      callback(new Error('Not allowed by CORS'));
-    }
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    console.log('❌ Blocked origin:', origin);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
@@ -110,6 +106,7 @@ app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/escrow', escrowRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/notifications', notificationRoutes); // ← NEW ROUTE
 app.use('/api/delivery', deliveryRoutes);
 app.use('/api/disputes', disputeRoutes);
 app.use('/api/payments', paymentRoutes);
