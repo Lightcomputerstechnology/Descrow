@@ -16,6 +16,7 @@ import ResetPassword from './pages/ResetPassword';
 // User Pages
 import UnifiedDashboard from './pages/UnifiedDashboard';
 import EscrowDetails from './pages/EscrowDetails';
+import ProfilePage from './pages/Profile/ProfilePage'; // ✅ NEW
 
 // Admin Pages
 import AdminLogin from './pages/admin/AdminLogin';
@@ -30,10 +31,9 @@ import AdminManagementPage from './pages/admin/AdminManagementPage';
 
 import { authService } from './services/authService';
 
-// ✅ NEW: Simple 404 Component
+// ✅ Simple 404 Component
 const NotFound = () => {
   const location = useLocation();
-  
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
       <div className="text-center">
@@ -57,12 +57,11 @@ function App() {
   const [admin, setAdmin] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Check for existing session on mount
   useEffect(() => {
     const initAuth = () => {
       const token = localStorage.getItem('token');
       const currentUser = authService.getCurrentUser();
-      
+
       if (token && currentUser && currentUser.verified) {
         setUser(currentUser);
       } else {
@@ -88,49 +87,35 @@ function App() {
     initAuth();
   }, []);
 
-  // Protected Route Component for Users
   const ProtectedRoute = ({ children }) => {
-    if (loading) {
+    if (loading)
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       );
-    }
 
-    if (!user) {
-      return <Navigate to="/login" replace />;
-    }
-
-    if (!user.verified) {
-      return <Navigate to="/login" replace />;
-    }
-
+    if (!user) return <Navigate to="/login" replace />;
+    if (!user.verified) return <Navigate to="/login" replace />;
     return children;
   };
 
-  // Admin Protected Route Component
   const AdminProtectedRoute = ({ children, requiredPermission }) => {
-    if (loading) {
+    if (loading)
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-900">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600"></div>
         </div>
       );
-    }
 
-    if (!admin) {
-      return <Navigate to="/admin/login" replace />;
-    }
+    if (!admin) return <Navigate to="/admin/login" replace />;
 
-    if (requiredPermission && admin.role !== 'master' && !admin.permissions?.[requiredPermission]) {
+    if (requiredPermission && admin.role !== 'master' && !admin.permissions?.[requiredPermission])
       return <Navigate to="/admin/dashboard" replace />;
-    }
 
     return children;
   };
 
-  // Show Navbar only for non-admin, non-auth routes
   const showNavbar = () => {
     const path = window.location.pathname;
     const noNavbarRoutes = [
@@ -145,13 +130,12 @@ function App() {
     return !noNavbarRoutes.some(route => path.startsWith(route));
   };
 
-  if (loading) {
+  if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
       </div>
     );
-  }
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors duration-300">
@@ -159,24 +143,9 @@ function App() {
         position="top-right"
         toastOptions={{
           duration: 4000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-          success: {
-            duration: 3000,
-            iconTheme: {
-              primary: '#4ade80',
-              secondary: '#fff',
-            },
-          },
-          error: {
-            duration: 4000,
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff',
-            },
-          },
+          style: { background: '#363636', color: '#fff' },
+          success: { duration: 3000, iconTheme: { primary: '#4ade80', secondary: '#fff' } },
+          error: { duration: 4000, iconTheme: { primary: '#ef4444', secondary: '#fff' } },
         }}
       />
 
@@ -212,6 +181,14 @@ function App() {
           element={
             <ProtectedRoute>
               <EscrowDetails />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
             </ProtectedRoute>
           }
         />
