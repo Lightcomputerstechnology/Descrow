@@ -1,58 +1,80 @@
 const express = require('express');
 const router = express.Router();
-const { body } = require('express-validator');
 const escrowController = require('../controllers/escrow.controller');
-const { protect, verifyAPIKey } = require('../middleware/auth.middleware');
+const { authenticate } = require('../middleware/auth');
+const { createEscrowValidator } = require('../validators/escrow.validator');
 
-// Create new escrow (User or API)
-router.post('/create',
-  [
-    body('sellerEmail').isEmail().withMessage('Valid seller email is required'),
-    body('itemName').trim().notEmpty().withMessage('Item name is required'),
-    body('amount').isFloat({ min: 0 }).withMessage('Valid amount is required'),
-    body('currency')
-      .optional()
-      .isIn(['USD', 'EUR', 'GBP', 'NGN', 'CNY', 'JPY', 'AUD', 'CAD', 'INR', 'ZAR'])
-      .withMessage('Invalid currency'),
-    body('paymentMethod')
-      .isIn(['flutterwave', 'paystack', 'nowpayments', 'bank_transfer'])
-      .withMessage('Valid payment method is required'),
-    body('location').trim().notEmpty().withMessage('Location is required'),
-    body('itemCondition').trim().notEmpty().withMessage('Item condition is required'),
+// 🔒 Apply authentication to all escrow routes
+router.use(authenticate);
 
-    // Validate buyerEmail only for API requests (no authenticated user)
-    body('buyerEmail')
-      .if((value, { req }) => !req.user)
-      .isEmail()
-      .withMessage('Valid buyer email is required for API requests')
-  ],
-  (req, res, next) => {
-    // Check if request has API key or user token
-    if (req.headers['x-api-key']) {
-      return verifyAPIKey(req, res, next);
-    } else {
-      return protect(req, res, next);
-    }
-  },
-  escrowController.createEscrow
-);
+/**
+ * @route   POST /api/v1/escrows/create
+ * @desc    Create a new escrow transaction
+ */
+router.post('/create', createEscrowValidator, escrowController.createEscrow);
 
-// Get all escrows for a user
-router.get('/user/:userId', protect, escrowController.getUserEscrows);
+/**
+ * @route   GET /api/v1/escrows/my-escrows
+ * @desc    Get all escrows for the authenticated user
+ */
+router.get('/my-escrows', escrowController.getMyEscrows);
 
-// Get single escrow by ID
-router.get('/:escrowId', protect, escrowController.getEscrowById);
+/**
+ * @route   GET /api/v1/escrows/dashboard-stats
+ * @desc    Get dashboard statistics for the user
+ */
+router.get('/dashboard-stats', escrowController.getDashboardStats);
 
-// Update escrow status
-router.patch('/:escrowId/status', protect, escrowController.updateEscrowStatus);
+/**
+ * @route   GET /api/v1/escrows/calculate-fees
+ * @desc    Preview escrow service fees before creating
+ */
+router.get('/calculate-fees', escrowController.calculateFeePreview);
 
-// Release payment (buyer confirms delivery)
-router.post('/:escrowId/release', protect, escrowController.releasePayment);
+/**
+ * @route   GET /api/v1/escrows/:id
+ * @desc    Get details of a single escrow by ID
+ */
+router.get('/:id', escrowController.getEscrowById);
 
-// Cancel escrow
-router.post('/:escrowId/cancel', protect, escrowController.cancelEscrow);
+/**
+ * @route   POST /api/v1/escrows/:id/accept
+ * @desc    Accept an escrow offer (seller action)
+ */
+// router.post('/:id/accept', isSeller, escrowController.acceptEscrow);
+router.post('/:id/accept', escrowController.acceptEscrow);
 
-// Get escrow statistics
-router.get('/stats/user', protect, escrowController.getUserStats);
+/**
+ * @route   POST /api/v1/escrows/:id/fund
+ * @desc    Fund escrow (buyer action)
+ */
+// router.post('/:id/fund', isBuyer, escrowController.fundEscrow);
+router.post('/:id/fund', escrowController.fundEscrow);
+
+/**
+ * @route   POST /api/v1/escrows/:id/deliver
+ * @desc    Mark escrow item as delivered (seller action)
+ */
+// router.post('/:id/deliver', isSeller, escrowController.markDelivered);
+router.post('/:id/deliver', escrowController.markDelivered);
+
+/**
+ * @route   POST /api/v1/escrows/:id/confirm
+ * @desc    Confirm delivery (buyer action)
+ */
+// router.post('/:id/confirm', isBuyer, escrowController.confirmDelivery);
+router.post('/:id/confirm', escrowController.confirmDelivery);
+
+/**
+ * @route   POST /api/v1/escrows/:id/dispute
+ * @desc    Raise a dispute for the escrow (either party)
+ */
+router.post('/:id/dispute', escrowController.raiseDispute);
+
+/**
+ * @route   POST /api/v1/escrows/:id/cancel
+ * @desc    Cancel escrow (allowed before funding)
+ */
+router.post('/:id/cancel', escrowController.cancelEscrow);
 
 module.exports = router;
