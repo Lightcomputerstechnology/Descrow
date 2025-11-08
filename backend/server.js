@@ -8,9 +8,11 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 
-// Import Routes
+// ==================== IMPORT ROUTES ====================
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
+const profileRoutes = require('./routes/profile.routes'); // ✅ NEW
+const securityRoutes = require('./routes/security.routes'); // ✅ NEW
 const escrowRoutes = require('./routes/escrow.routes');
 const chatRoutes = require('./routes/chat.routes');
 const deliveryRoutes = require('./routes/delivery.routes');
@@ -19,7 +21,7 @@ const paymentRoutes = require('./routes/payment.routes');
 const adminRoutes = require('./routes/admin.routes');
 const apiKeyRoutes = require('./routes/apiKey.routes');
 const verifyRoutes = require('./routes/verify.routes');
-const notificationRoutes = require('./routes/notification.routes'); // ← NEW
+const notificationRoutes = require('./routes/notification.routes'); // ✅
 
 const app = express();
 app.set('trust proxy', 1);
@@ -32,7 +34,7 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 // Compression
 app.use(compression());
 
-// CORS - UPDATED TO INCLUDE dealcross.net
+// CORS - allow dealcross.net and localhost
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
@@ -92,7 +94,13 @@ mongoose.connect(process.env.MONGODB_URI)
   });
 
 // ==================== HEALTH CHECK ====================
-app.get('/', (req, res) => res.json({ success: true, message: 'Dealcross API running', version: '1.0.0', timestamp: new Date() }));
+app.get('/', (req, res) => res.json({ 
+  success: true, 
+  message: 'Dealcross API running', 
+  version: '1.0.0', 
+  timestamp: new Date() 
+}));
+
 app.get('/api/health', (req, res) => res.json({
   success: true,
   status: 'healthy',
@@ -104,9 +112,11 @@ app.get('/api/health', (req, res) => res.json({
 // ==================== API ROUTES ====================
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/profile', profileRoutes); // ✅ NEW
+app.use('/api/security', securityRoutes); // ✅ NEW
 app.use('/api/escrow', escrowRoutes);
 app.use('/api/chat', chatRoutes);
-app.use('/api/notifications', notificationRoutes); // ← NEW ROUTE
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/delivery', deliveryRoutes);
 app.use('/api/disputes', disputeRoutes);
 app.use('/api/payments', paymentRoutes);
@@ -115,7 +125,14 @@ app.use('/api/api-keys', apiKeyRoutes);
 app.use('/api/verify-email', verifyRoutes);
 
 // ==================== ERROR HANDLING ====================
-app.use((req, res, next) => res.status(404).json({ success: false, message: 'Route not found', path: req.originalUrl, method: req.method }));
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found',
+    path: req.originalUrl,
+    method: req.method
+  });
+});
 
 app.use((err, req, res, next) => {
   console.error('❌ Error:', err);
