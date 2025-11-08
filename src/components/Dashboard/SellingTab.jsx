@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Store, DollarSign, Loader, TrendingUp } from 'lucide-react';
+import { Store, DollarSign, Loader, TrendingUp, Download } from 'lucide-react'; // ← Added Download
 import StatsCard from './StatsCard';
 import EscrowCard from './EscrowCard';
 import SearchFilter from './SearchFilter';
+import ExportModal from './ExportModal'; // ← Added
 import escrowService from '../../services/escrowService';
 import toast from 'react-hot-toast';
 
@@ -12,6 +13,7 @@ const SellingTab = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [escrows, setEscrows] = useState([]);
   const [stats, setStats] = useState(null);
+  const [showExportModal, setShowExportModal] = useState(false); // ← Added
   const [filters, setFilters] = useState({
     role: 'seller',
     status: 'all',
@@ -30,21 +32,16 @@ const SellingTab = ({ user }) => {
   const fetchSellingData = async () => {
     try {
       setLoading(true);
-
-      // Fetch escrows with filters
       const response = await escrowService.getMyEscrows(filters);
-      
       if (response.success) {
         setEscrows(response.data.escrows);
         setPagination(response.data.pagination);
       }
 
-      // Fetch stats
       const statsResponse = await escrowService.getDashboardStats();
       if (statsResponse.success) {
         setStats(statsResponse.data.selling);
       }
-
     } catch (error) {
       console.error('Failed to fetch selling data:', error);
       toast.error('Failed to load transactions');
@@ -137,11 +134,22 @@ const SellingTab = ({ user }) => {
       )}
 
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">My Sales</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-          Manage all your selling transactions
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">My Sales</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            Manage all your selling transactions
+          </p>
+        </div>
+
+        {/* Export Button */}
+        <button
+          onClick={() => setShowExportModal(true)}
+          className="flex items-center gap-2 px-6 py-3 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+        >
+          <Download className="w-5 h-5" />
+          Export
+        </button>
       </div>
 
       {/* Search & Filters */}
@@ -230,6 +238,15 @@ const SellingTab = ({ user }) => {
             Share your email with potential buyers to receive escrow requests
           </p>
         </div>
+      )}
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <ExportModal
+          transactions={escrows}
+          user={user}
+          onClose={() => setShowExportModal(false)}
+        />
       )}
     </div>
   );
