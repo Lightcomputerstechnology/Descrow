@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Password is required'],
     minlength: [8, 'Password must be at least 8 characters'],
-    select: false // Don't return password by default
+    select: false
   },
   role: {
     type: String,
@@ -41,7 +41,7 @@ const userSchema = new mongoose.Schema({
     default: 'pending'
   },
   kycDocuments: [{
-    type: String // URLs to uploaded documents
+    type: String
   }],
   totalTransactions: {
     type: Number,
@@ -60,7 +60,7 @@ const userSchema = new mongoose.Schema({
     trim: true
   },
   avatar: {
-    type: String // URL to profile picture
+    type: String
   },
   twoFactorEnabled: {
     type: Boolean,
@@ -76,16 +76,30 @@ const userSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  // ← Added notification settings
+  notificationSettings: {
+    email: {
+      escrowUpdates: { type: Boolean, default: true },
+      messages: { type: Boolean, default: true },
+      disputes: { type: Boolean, default: true },
+      payments: { type: Boolean, default: true },
+      marketing: { type: Boolean, default: false }
+    },
+    push: {
+      escrowUpdates: { type: Boolean, default: true },
+      messages: { type: Boolean, default: true },
+      disputes: { type: Boolean, default: true },
+      payments: { type: Boolean, default: true }
+    }
   }
 }, {
-  timestamps: true // Adds createdAt and updatedAt
+  timestamps: true
 });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) {
-    return next();
-  }
+  if (!this.isModified('password')) return next();
   
   try {
     const salt = await bcrypt.genSalt(10);
@@ -96,36 +110,19 @@ userSchema.pre('save', async function(next) {
   }
 });
 
-// Method to compare passwords
+// Compare passwords
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Method to get tier limits
+// Get tier limits
 userSchema.methods.getTierLimits = function() {
   const limits = {
-    free: {
-      maxTransactionAmount: 500,
-      maxTransactionsPerMonth: 5,
-      transactionFee: 0.05 // 5%
-    },
-    basic: {
-      maxTransactionAmount: 5000,
-      maxTransactionsPerMonth: 50,
-      transactionFee: 0.03 // 3%
-    },
-    pro: {
-      maxTransactionAmount: 50000,
-      maxTransactionsPerMonth: -1, // Unlimited
-      transactionFee: 0.02 // 2%
-    },
-    enterprise: {
-      maxTransactionAmount: -1, // Unlimited
-      maxTransactionsPerMonth: -1, // Unlimited
-      transactionFee: 0.015 // 1.5%
-    }
+    free: { maxTransactionAmount: 500, maxTransactionsPerMonth: 5, transactionFee: 0.05 },
+    basic: { maxTransactionAmount: 5000, maxTransactionsPerMonth: 50, transactionFee: 0.03 },
+    pro: { maxTransactionAmount: 50000, maxTransactionsPerMonth: -1, transactionFee: 0.02 },
+    enterprise: { maxTransactionAmount: -1, maxTransactionsPerMonth: -1, transactionFee: 0.015 }
   };
-  
   return limits[this.tier];
 };
 
