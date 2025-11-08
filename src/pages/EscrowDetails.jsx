@@ -1,152 +1,459 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Shield, DollarSign, MessageCircle } from 'lucide-react';
-import { escrowService } from '../services/escrowService';
-import { chatService } from '../services/chatService';
+import { 
+  ArrowLeft, 
+  User, 
+  Mail, 
+  Phone,
+  Package,
+  DollarSign,
+  Calendar,
+  Loader,
+  ExternalLink,
+  Copy,
+  CheckCircle
+} from 'lucide-react';
+import StatusStepper from '../components/Escrow/StatusStepper';
+import ActionButtons from '../components/Escrow/ActionButtons';
+import PaymentModal from '../components/Escrow/PaymentModal';
+import DeliveryModal from '../components/Escrow/DeliveryModal';
+import DisputeModal from '../components/Escrow/DisputeModal';
+import ChatBox from '../components/Escrow/ChatBox';
+import escrowService from '../services/escrowService';
 import { authService } from '../services/authService';
+import { getStatusInfo, formatCurrency, formatDate } from '../utils/escrowHelpers';
+import toast from 'react-hot-toast';
 
 const EscrowDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [escrow, setEscrow] = useState(null);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [user, setUser] = useState(null);
+  const [escrow, setEscrow] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  // ✅ Memoized function for fetching escrow details
-  const fetchEscrowDetails = useCallback(async () => {
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    setCurrentUser(user);
+    fetchEscrowDetails();
+  }, [id]);
+
+  const fetchEscrowDetails = async () => {
     try {
       setLoading(true);
-      const response = await escrowService.getEscrow(id);
-      setEscrow(response.escrow);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load escrow details');
+
+      const response = await escrowService.getEscrowById(id);
+
+      if (response.success) {
+        setEscrow(response.data.escrow);
+        setUserRole(response.data.userRole);
+      } else {
+        toast.error('Escrow not found');
+        navigate('/dashboard');
+      }
+
+    } catch (error) {
+      console.error('Failed to fetch escrow:', error);
+      toast.error('Failed to load escrow details');
+      navigate('/dashboard');
     } finally {
       setLoading(false);
     }
-  }, [id]); // only re-runs when id changes
+  };
 
-  // ✅ Memoized function for fetching chat messages
-  const fetchChatMessages = useCallback(async () => {
-    try {
-      const response = await chatService.getMessages(id);
-      setChatMessages(response.messages || []);
-    } catch (err) {
-      console.error('Failed to fetch chat messages', err);
+  const handleAction = async (action) => {
+    switch (action) {
+      case 'accept':
+        await handleAccept();
+        break;
+      case 'fund':
+        setShowPaymentModal(true);
+        break;
+      case 'deliver':
+        setShowDeliveryModal(true);
+        break;
+      case 'confirm':
+        await handleConfirm();
+        break;
+      case 'dispute':
+        setShowDisputeModal(true);
+        break;
+      case 'cancel':
+        await handleCancel();
+        break;
+      case 'reject':
+        await handleReject();
+        break;
+      default:
+        break;
     }
-  }, [id]);
+  };
 
-  // Fetch escrow details on mount
-  useEffect(() => {
+  const handleAccept = async () => {
+    try {
+      const response = await escrowService.acceptEscrow(id);
+      if (response.success) {
+        toast.success('Deal accepted successfully!');
+        fetchEscrowDetails();
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to accept deal');
+    }
+  };
+
+  const handleConfirm = async () => {
+    try {
+      const response = await escrowService.confirmDelivery(id);
+      if (response.success) {
+        toast.success('Delivery confirmed! Payment is being released.');
+        fetchEscrowDetails();
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to confirm delivery');
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!window.confirm('Are you sure you want to cancel this escrow?')) {
+      return;
+    }
+
+    try {
+      const response = await escrowService.cancelEscrow(id, 'User requested cancellation');
+      if (response.success) {
+        toast.success('Escrow cancelled');
+        fetchEscrowDetails();
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to cancel escrow');
+    }
+  };
+
+  const handleReject = async () => {
+    if (!window.confirm('Are you sure you want to decline this deal?')) {
+      return;
+    }
+
+    try {
+      const response = await escrowService.cancelEscrow(id, 'Seller declined the deal');
+      if (response.success) {
+        toast.success('Deal declined');
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to decline deal');
+    }
+  };
+
+  const handleCopyId = () => {
+    navigator.clipboard.writeText(escrow._id);
+    setCopied(true);
+    toast.success('Escrow ID copied to clipboard');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleModalSuccess = () => {
+    setShowPaymentModal(false);
+    setShowDeliveryModal(false);
+    setShowDisputeModal(false);
     fetchEscrowDetails();
-    const currentUser = authService.getCurrentUser();
-    setUser(currentUser);
-  }, [fetchEscrowDetails]);
-
-  // Fetch chat messages periodically
-  useEffect(() => {
-    fetchChatMessages();
-    const interval = setInterval(fetchChatMessages, 5000);
-    return () => clearInterval(interval);
-  }, [fetchChatMessages]);
-
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!newMessage.trim()) return;
-
-    try {
-      await chatService.sendMessage(id, newMessage);
-      setNewMessage('');
-      fetchChatMessages(); // refresh chat
-    } catch (err) {
-      console.error('Failed to send message', err);
-    }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
-        Loading escrow details...
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <Loader className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-red-400">
-        {error}
-      </div>
-    );
+  if (!escrow || !currentUser) {
+    return null;
   }
 
-  if (!escrow) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
-        No escrow details found.
-      </div>
-    );
-  }
+  const statusInfo = getStatusInfo(escrow.status);
+  const otherParty = userRole === 'buyer' ? escrow.seller : escrow.buyer;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
-      <div className="max-w-4xl mx-auto bg-gray-800 rounded-lg shadow-lg p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Shield className="text-blue-400 w-6 h-6" />
-          <h1 className="text-2xl font-semibold">Escrow Transaction Details</h1>
-        </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pb-12">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-4 transition"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            Back to Dashboard
+          </button>
 
-        <div className="space-y-4">
-          <p><strong>ID:</strong> {escrow.id}</p>
-          <p><strong>Buyer:</strong> {escrow.buyer?.name}</p>
-          <p><strong>Seller:</strong> {escrow.seller?.name}</p>
-          <p><strong>Amount:</strong> <DollarSign className="inline-block w-4 h-4 text-green-400" /> {escrow.amount}</p>
-          <p><strong>Status:</strong> {escrow.status}</p>
-        </div>
-
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
-            <MessageCircle className="w-5 h-5 text-blue-400" />
-            Chat Room
-          </h2>
-          <div className="bg-gray-700 rounded-lg p-4 h-64 overflow-y-auto">
-            {chatMessages.length === 0 ? (
-              <p className="text-gray-400 text-sm">No messages yet</p>
-            ) : (
-              chatMessages.map((msg, idx) => (
-                <div
-                  key={idx}
-                  className={`mb-2 p-2 rounded-lg ${
-                    msg.senderId === user?.id
-                      ? 'bg-blue-600 text-right ml-auto max-w-[75%]'
-                      : 'bg-gray-600 text-left mr-auto max-w-[75%]'
-                  }`}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                {escrow.title}
+              </h1>
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={handleCopyId}
+                  className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition"
                 >
-                  <p className="text-sm font-medium">{msg.senderName}</p>
-                  <p className="text-sm">{msg.content}</p>
-                </div>
-              ))
-            )}
-          </div>
+                  <span>ID: {escrow._id.slice(-8)}</span>
+                  {copied ? (
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                </button>
+                <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`}>
+                  <span>{statusInfo.icon}</span>
+                  {statusInfo.text}
+                </span>
+                {userRole && (
+                  <span className="px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-sm font-medium">
+                    You are the {userRole}
+                  </span>
+                )}
+              </div>
+            </div>
 
-          <form onSubmit={handleSendMessage} className="mt-4 flex gap-2">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type your message..."
-              className="flex-1 px-4 py-2 rounded-lg bg-gray-800 border border-gray-600 text-white focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              type="submit"
-              className="bg-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition"
-            >
-              Send
-            </button>
-          </form>
+            <div className="text-right">
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                {formatCurrency(escrow.amount, escrow.currency)}
+              </p>
+              {escrow.payment && userRole === 'seller' && (
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  You receive: {formatCurrency(escrow.payment.sellerReceives, escrow.currency)}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Status Stepper */}
+            <StatusStepper currentStatus={escrow.status} timeline={escrow.timeline} />
+
+            {/* Description */}
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                Description
+              </h3>
+              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                {escrow.description}
+              </p>
+            </div>
+
+            {/* Delivery Info (if delivered) */}
+            {escrow.delivery?.deliveredAt && (
+              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                  Delivery Information
+                </h3>
+                {escrow.delivery.trackingNumber && (
+                  <div className="mb-3">
+                    <label className="text-sm text-gray-600 dark:text-gray-400">Tracking Number</label>
+                    <p className="text-gray-900 dark:text-white font-medium">{escrow.delivery.trackingNumber}</p>
+                  </div>
+                )}
+                {escrow.delivery.notes && (
+                  <div className="mb-3">
+                    <label className="text-sm text-gray-600 dark:text-gray-400">Notes</label>
+                    <p className="text-gray-700 dark:text-gray-300">{escrow.delivery.notes}</p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-sm text-gray-600 dark:text-gray-400">Delivered At</label>
+                  <p className="text-gray-900 dark:text-white">{formatDate(escrow.delivery.deliveredAt)}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Chat */}
+            <ChatBox escrowId={escrow._id} currentUser={currentUser} />
+          </div>
+
+          {/* Right Column */}
+          <div className="space-y-6">
+            {/* Action Buttons */}
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Actions
+              </h3>
+              <ActionButtons
+                escrow={escrow}
+                userRole={userRole}
+                onAction={handleAction}
+              />
+            </div>
+
+            {/* Other Party Info */}
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                {userRole === 'buyer' ? 'Seller' : 'Buyer'} Information
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                    <User className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Name</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{otherParty.name}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                    <Mail className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{otherParty.email}</p>
+                  </div>
+                </div>
+
+                {otherParty.phone && (
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                      <Phone className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Phone</p>
+                      <p className="font-medium text-gray-900 dark:text-white">{otherParty.phone}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Transaction Details */}
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Transaction Details
+              </h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Category</span>
+                  <span className="font-medium text-gray-900 dark:text-white capitalize">
+                    {escrow.category.replace('_', ' ')}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Delivery Method</span>
+                  <span className="font-medium text-gray-900 dark:text-white capitalize">
+                    {escrow.delivery?.method}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Created</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {formatDate(escrow.createdAt)}
+                  </span>
+                </div>
+                {escrow.payment && (
+                  <>
+                    <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <div className="flex justify-between mb-2">
+                        <span className="text-gray-600 dark:text-gray-400">Amount</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {formatCurrency(escrow.payment.amount)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between mb-2">
+                        <span className="text-gray-600 dark:text-gray-400">Platform Fee</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {formatCurrency(escrow.payment.platformFee)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          {userRole === 'buyer' ? 'You Paid' : 'You Receive'}
+                        </span>
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          {formatCurrency(
+                            userRole === 'buyer' 
+                              ? escrow.payment.buyerPays 
+                              : escrow.payment.sellerReceives
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Dispute Info (if disputed) */}
+            {escrow.dispute?.isDisputed && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6">
+                <h3 className="text-lg font-semibold text-red-900 dark:text-red-200 mb-3">
+                  Dispute Information
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <span className="text-red-700 dark:text-red-300">Status:</span>
+                    <span className="ml-2 font-medium text-red-900 dark:text-red-200 capitalize">
+                      {escrow.dispute.status.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-red-700 dark:text-red-300">Raised:</span>
+                    <span className="ml-2 font-medium text-red-900 dark:text-red-200">
+                      {formatDate(escrow.dispute.raisedAt)}
+                    </span>
+                  </div>
+                  {escrow.dispute.reason && (
+                    <div className="pt-2 border-t border-red-200 dark:border-red-700">
+                      <span className="text-red-700 dark:text-red-300 block mb-1">Reason:</span>
+                      <p className="text-red-900 dark:text-red-200">
+                        {escrow.dispute.reason}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Modals */}
+      {showPaymentModal && (
+        <PaymentModal
+          escrow={escrow}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={handleModalSuccess}
+        />
+      )}
+
+      {showDeliveryModal && (
+        <DeliveryModal
+          escrow={escrow}
+          onClose={() => setShowDeliveryModal(false)}
+          onSuccess={handleModalSuccess}
+        />
+      )}
+
+      {showDisputeModal && (
+        <DisputeModal
+          escrow={escrow}
+          onClose={() => setShowDisputeModal(false)}
+          onSuccess={handleModalSuccess}
+        />
+      )}
     </div>
   );
 };
