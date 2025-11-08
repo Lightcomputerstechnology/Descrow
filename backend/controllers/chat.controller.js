@@ -1,22 +1,18 @@
-const Chat = require('../models/Chat.model');
-const Escrow = require('../models/Escrow.model');
-const { validationResult } = require('express-validator');
+const Chat = require('../models/Chat');
+const Escrow = require('../models/Escrow');
+const { createNotification } = require('../utils/notificationHelper');
 
-// Send Message
-exports.sendMessage = async (req, res) => {
+/**
+ * Get messages for an escrow
+ */
+exports.getMessages = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        errors: errors.array()
-      });
-    }
+    const { escrowId } = req.params;
+    const userId = req.user.id;
+    const { page = 1, limit = 50 } = req.query;
 
-    const { escrowId, message, attachments } = req.body;
-
-    // Find escrow
-    const escrow = await Escrow.findOne({ escrowId });
+    // Verify user is part of the escrow
+    const escrow = await Escrow.findById(escrowId);
     if (!escrow) {
       return res.status(404).json({
         success: false,
@@ -24,162 +20,164 @@ exports.sendMessage = async (req, res) => {
       });
     }
 
-    // Check if chat is unlocked
-    if (!escrow.chatUnlocked) {
+    const isBuyer = escrow.buyer.toString() === userId;
+    const isSeller = escrow.seller.toString() === userId;
+
+    if (!isBuyer && !isSeller) {
       return res.status(403).json({
         success: false,
-        message: 'Chat is locked until payment is confirmed'
+        message: 'You do not have access to this chat'
       });
     }
 
-    // Verify user is part of this escrow
-    const userId = req.user._id.toString();
-    if (escrow.buyer.toString() !== userId && escrow.seller.toString() !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to access this chat'
-      });
-    }
+    // Fetch messages
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Create or get chat
-    let chat = await Chat.findOne({ escrow: escrow._id });
-    if (!chat) {
-      chat = await Chat.create({
-        escrow: escrow._id,
-        participants: [escrow.buyer, escrow.seller],
-        messages: []
-      });
-    }
+    const [messages, total] = await Promise.all([
+      Chat.find({ escrow: escrowId })
+        .populate('sender', 'name profilePicture')
+        .sort({ createdAt: 1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      Chat.countDocuments({ escrow: escrowId })
+    ]);
 
-    // Add message
-    chat.messages.push({
-      sender: req.user._id,
-      message,
-      attachments: attachments || [],
-      timestamp: new Date()
+    // Mark messages as read
+    await Chat.updateMany(
+      { 
+        escrow: escrowId, 
+        sender: { $ne: userId },
+        isRead: false 
+      },
+      { 
+        isRead: true,
+        readAt: new Date()
+      }
+    );
+
+    res.json({
+      success: true,
+      data: {
+        messages,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / parseInt(limit))
+        }
+      }
     });
 
-    chat.lastMessage = message;
-    chat.lastMessageAt = new Date();
-    await chat.save();
+  } catch (error) {
+    console.error('Get messages error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch messages'
+    });
+  }
+};
 
-    // Populate sender info
-    await chat.populate('messages.sender', 'name avatar');
+/**
+ * Send a message
+ */
+exports.sendMessage = async (req, res) => {
+  try {
+    const { escrowId } = req.params;
+    const { message, attachments } = req.body;
+    const userId = req.user.id;
+
+    if (!message || message.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message cannot be empty'
+      });
+    }
+
+    // Verify user is part of the escrow
+    const escrow = await Escrow.findById(escrowId).populate('buyer seller', 'name');
+    if (!escrow) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escrow not found'
+      });
+    }
+
+    const isBuyer = escrow.buyer._id.toString() === userId;
+    const isSeller = escrow.seller._id.toString() === userId;
+
+    if (!isBuyer && !isSeller) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have access to this chat'
+      });
+    }
+
+    // Create message
+    const chat = await Chat.create({
+      escrow: escrowId,
+      sender: userId,
+      message: message.trim(),
+      attachments: attachments || []
+    });
+
+    await chat.populate('sender', 'name profilePicture');
+
+    // Notify other party
+    const otherParty = isBuyer ? escrow.seller : escrow.buyer;
+    await createNotification(
+      otherParty._id,
+      'message_received',
+      'New Message',
+      `${req.user.name} sent you a message in escrow #${escrow._id.toString().slice(-6)}`,
+      `/escrow/${escrow._id}`,
+      { escrowId: escrow._id }
+    );
 
     res.status(201).json({
       success: true,
-      message: 'Message sent successfully',
-      chat: chat.messages[chat.messages.length - 1]
+      data: chat
     });
 
   } catch (error) {
     console.error('Send message error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to send message',
-      error: error.message
+      message: error.message || 'Failed to send message'
     });
   }
 };
 
-// Get Chat Messages
-exports.getChatMessages = async (req, res) => {
+/**
+ * Get unread message count for user
+ */
+exports.getUnreadCount = async (req, res) => {
   try {
-    const { escrowId } = req.params;
+    const userId = req.user.id;
 
-    // Find escrow
-    const escrow = await Escrow.findOne({ escrowId });
-    if (!escrow) {
-      return res.status(404).json({
-        success: false,
-        message: 'Escrow not found'
-      });
-    }
+    // Get all escrows where user is buyer or seller
+    const escrows = await Escrow.find({
+      $or: [{ buyer: userId }, { seller: userId }]
+    }).select('_id');
 
-    // Verify user is part of this escrow
-    const userId = req.user._id.toString();
-    if (escrow.buyer.toString() !== userId && escrow.seller.toString() !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to access this chat'
-      });
-    }
+    const escrowIds = escrows.map(e => e._id);
 
-    // Get chat
-    let chat = await Chat.findOne({ escrow: escrow._id })
-      .populate('messages.sender', 'name avatar');
+    // Count unread messages
+    const unreadCount = await Chat.countDocuments({
+      escrow: { $in: escrowIds },
+      sender: { $ne: userId },
+      isRead: false
+    });
 
-    if (!chat) {
-      // Return empty chat if doesn't exist yet
-      return res.status(200).json({
-        success: true,
-        chat: {
-          escrow: escrow._id,
-          messages: [],
-          chatUnlocked: escrow.chatUnlocked
-        }
-      });
-    }
-
-    res.status(200).json({
+    res.json({
       success: true,
-      chat: {
-        ...chat.toObject(),
-        chatUnlocked: escrow.chatUnlocked
-      }
+      data: { unreadCount }
     });
 
   } catch (error) {
-    console.error('Get chat messages error:', error);
+    console.error('Get unread count error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch chat messages',
-      error: error.message
-    });
-  }
-};
-
-// Mark Messages as Read
-exports.markAsRead = async (req, res) => {
-  try {
-    const { escrowId } = req.params;
-
-    const escrow = await Escrow.findOne({ escrowId });
-    if (!escrow) {
-      return res.status(404).json({
-        success: false,
-        message: 'Escrow not found'
-      });
-    }
-
-    const chat = await Chat.findOne({ escrow: escrow._id });
-    if (!chat) {
-      return res.status(404).json({
-        success: false,
-        message: 'Chat not found'
-      });
-    }
-
-    // Mark all messages as read for current user
-    chat.messages.forEach(msg => {
-      if (msg.sender.toString() !== req.user._id.toString()) {
-        msg.read = true;
-      }
-    });
-
-    await chat.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Messages marked as read'
-    });
-
-  } catch (error) {
-    console.error('Mark as read error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to mark messages as read',
-      error: error.message
+      message: error.message || 'Failed to fetch unread count'
     });
   }
 };
