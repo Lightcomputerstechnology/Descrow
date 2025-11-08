@@ -26,34 +26,15 @@ const adminSchema = new mongoose.Schema({
     required: true
   },
   permissions: {
-    viewTransactions: {
-      type: Boolean,
-      default: false
-    },
-    manageDisputes: {
-      type: Boolean,
-      default: false
-    },
-    verifyUsers: {
-      type: Boolean,
-      default: false
-    },
-    viewAnalytics: {
-      type: Boolean,
-      default: false
-    },
-    managePayments: {
-      type: Boolean,
-      default: false
-    },
-    manageAPI: {
-      type: Boolean,
-      default: false
-    },
-    manageAdmins: {
-      type: Boolean,
-      default: false
-    }
+    viewTransactions: { type: Boolean, default: false },
+    manageDisputes: { type: Boolean, default: false },
+    verifyUsers: { type: Boolean, default: false },
+    viewAnalytics: { type: Boolean, default: false },
+    managePayments: { type: Boolean, default: false },
+    manageAPI: { type: Boolean, default: false },
+    manageAdmins: { type: Boolean, default: false },
+    manageFees: { type: Boolean, default: false },      // ← Added
+    manageSettings: { type: Boolean, default: false }   // ← Added
   },
   status: {
     type: String,
@@ -76,11 +57,9 @@ const adminSchema = new mongoose.Schema({
 });
 
 // Hash password before saving
-adminSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) {
-    return next();
-  }
-  
+adminSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
@@ -90,13 +69,13 @@ adminSchema.pre('save', async function(next) {
   }
 });
 
-// Method to compare passwords
-adminSchema.methods.comparePassword = async function(candidatePassword) {
+// Compare passwords
+adminSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
 // Master admin gets all permissions
-adminSchema.pre('save', function(next) {
+adminSchema.pre('save', function (next) {
   if (this.role === 'master') {
     this.permissions = {
       viewTransactions: true,
@@ -105,7 +84,9 @@ adminSchema.pre('save', function(next) {
       viewAnalytics: true,
       managePayments: true,
       manageAPI: true,
-      manageAdmins: true
+      manageAdmins: true,
+      manageFees: true,       // ← Automatically enabled for master
+      manageSettings: true    // ← Automatically enabled for master
     };
   }
   next();
