@@ -5,41 +5,56 @@ const chatSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Escrow',
     required: true,
-    unique: true
+    index: true
   },
-  participants: [{
+  sender: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  receiver: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
-  }],
-  messages: [{
-    sender: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
-    },
-    message: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    attachments: [String],
-    read: {
-      type: Boolean,
-      default: false
-    },
-    timestamp: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  lastMessage: {
-    type: String
   },
-  lastMessageAt: {
-    type: Date
+  type: {
+    type: String,
+    enum: ['text', 'file', 'system'],
+    default: 'text'
+  },
+  message: {
+    type: String,
+    trim: true,
+    maxlength: 1000
+  },
+  attachments: [{
+    url: String,  // File link
+    name: String,
+    size: Number, // Bytes
+    mimetype: String
+  }],
+  isRead: {
+    type: Boolean,
+    default: false
+  },
+  readAt: Date
+}, { timestamps: true });
+
+// Indexing
+chatSchema.index({ escrow: 1, createdAt: -1 });
+chatSchema.index({ sender: 1 });
+chatSchema.index({ receiver: 1 });
+
+// Virtual: chat room ID
+chatSchema.virtual('chatRoom').get(function() {
+  return `escrow_${this.escrow}`;
+});
+
+// Pre-save: mark system messages
+chatSchema.pre('save', function(next) {
+  if (!this.sender) {
+    this.type = 'system';
   }
-}, {
-  timestamps: true
+  next();
 });
 
 module.exports = mongoose.model('Chat', chatSchema);
