@@ -16,6 +16,11 @@ import EscrowCard from './EscrowCard';
 import escrowService from '../../services/escrowService';
 import toast from 'react-hot-toast';
 
+// ✅ Added imports
+import VolumeChart from '../../components/Dashboard/Charts/VolumeChart';
+import PieChartComponent from '../../components/Dashboard/Charts/PieChartComponent';
+import StatusDonutChart from '../../components/Dashboard/Charts/StatusDonutChart';
+
 const OverviewTab = ({ user }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -182,6 +187,28 @@ const OverviewTab = ({ user }) => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ✅ Charts Section */}
+      <div>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Analytics</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <PieChartComponent 
+            data={[
+              { name: 'Buying', value: buyingStats.totalValue || 0, color: '#3B82F6' },
+              { name: 'Selling', value: sellingStats.totalValue || 0, color: '#8B5CF6' }
+            ]}
+          />
+          <StatusDonutChart 
+            data={[
+              { name: 'Completed', value: (buyingStats.completed || 0) + (sellingStats.completed || 0), color: '#10B981' },
+              { name: 'In Progress', value: (buyingStats.funded || 0) + (buyingStats.delivered || 0), color: '#F59E0B' },
+              { name: 'Pending', value: (buyingStats.pending || 0) + (sellingStats.pending || 0), color: '#3B82F6' },
+              { name: 'Disputed', value: (buyingStats.disputed || 0) + (sellingStats.disputed || 0), color: '#EF4444' }
+            ]}
+          />
+        </div>
+        <VolumeChart />
       </div>
 
       {/* Recent Activity */}
