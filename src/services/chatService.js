@@ -1,20 +1,16 @@
 // src/services/chatService.js
-// Handles chat and messaging logic for users and admins
+// Handles chat and messaging logic for users
 
 import axios from 'axios';
 
-// Use environment variable or fallback
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
-// Axios instance for authenticated requests
+// Axios instance with auth token
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
-// Add token automatically if available
+// Automatically attach token from localStorage
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
@@ -24,18 +20,29 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ============================
-// 🔹 Chat Service Methods
-// ============================
-
 const chatService = {
   /**
-   * Send a message between buyer, seller, or admin.
-   * @param {Object} data - { senderId, receiverId, message, dealId }
+   * Send a message in a specific escrow chat
+   * Supports attachments
+   * @param {String} escrowId
+   * @param {Object} data - { message: String, attachments: File[] }
    */
-  async sendMessage(data) {
+  async sendMessage(escrowId, data) {
     try {
-      const response = await api.post('/chat/send', data);
+      const formData = new FormData();
+      formData.append('message', data.message);
+
+      if (data.attachments && data.attachments.length > 0) {
+        data.attachments.forEach((file, index) => {
+          formData.append('attachments', file);
+        });
+      }
+
+      const response = await api.post(
+        `/chat/${escrowId}/messages`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
       return response.data;
     } catch (error) {
       console.error('Error sending message:', error.response?.data || error.message);
@@ -44,12 +51,13 @@ const chatService = {
   },
 
   /**
-   * Get chat messages between two users (by deal or user ID).
-   * @param {String} dealId - The deal identifier or chat room ID
+   * Fetch messages for a specific escrow
+   * @param {String} escrowId
+   * @param {Object} params - { page, limit }
    */
-  async getMessages(dealId) {
+  async getMessages(escrowId, params = {}) {
     try {
-      const response = await api.get(`/chat/messages/${dealId}`);
+      const response = await api.get(`/chat/${escrowId}/messages`, { params });
       return response.data;
     } catch (error) {
       console.error('Error fetching messages:', error.response?.data || error.message);
@@ -58,43 +66,15 @@ const chatService = {
   },
 
   /**
-   * Get all chat threads for a user (e.g., list of all deal chats).
+   * Get unread message count for the current user
    */
-  async getUserChats() {
+  async getUnreadCount() {
     try {
-      const response = await api.get('/chat/threads');
+      const response = await api.get('/chat/unread-count');
       return response.data;
     } catch (error) {
-      console.error('Error fetching chat threads:', error.response?.data || error.message);
-      throw error.response?.data || { message: 'Failed to fetch chat threads' };
-    }
-  },
-
-  /**
-   * Mark all messages in a conversation as read.
-   * @param {String} dealId
-   */
-  async markAsRead(dealId) {
-    try {
-      const response = await api.patch(`/chat/read/${dealId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error marking messages as read:', error.response?.data || error.message);
-      throw error.response?.data || { message: 'Failed to mark as read' };
-    }
-  },
-
-  /**
-   * Delete a chat thread (admin or user).
-   * @param {String} threadId
-   */
-  async deleteThread(threadId) {
-    try {
-      const response = await api.delete(`/chat/thread/${threadId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error deleting chat thread:', error.response?.data || error.message);
-      throw error.response?.data || { message: 'Failed to delete thread' };
+      console.error('Error fetching unread count:', error.response?.data || error.message);
+      throw error.response?.data || { message: 'Failed to fetch unread count' };
     }
   },
 };
