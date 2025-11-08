@@ -1,30 +1,27 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User.model');
-const Admin = require('../models/Admin.model');
+const User = require('../models/User');
 
-// Protect user routes
-exports.protect = async (req, res, next) => {
+/**
+ * Authenticate user via JWT token (required)
+ */
+exports.authenticate = async (req, res, next) => {
   try {
-    let token;
-
-    // Get token from header
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-      token = req.headers.authorization.split(' ')[1];
-    }
+    // Extract token from Authorization header
+    const token = req.header('Authorization')?.replace('Bearer ', '');
 
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Not authorized to access this route'
+        message: 'Authentication required'
       });
     }
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Get user from token
-    const user = await User.findById(decoded.id);
-    
+    // Find user and exclude sensitive fields
+    const user = await User.findById(decoded.id).select('-password');
+
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -32,142 +29,54 @@ exports.protect = async (req, res, next) => {
       });
     }
 
-    if (!user.isActive) {
+    if (!user.verified) {
       return res.status(403).json({
         success: false,
-        message: 'Account is suspended'
+        message: 'Please verify your email first'
       });
     }
 
+    if (user.status === 'suspended') {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account has been suspended'
+      });
+    }
+
+    // Attach user to request
     req.user = user;
     next();
 
   } catch (error) {
-    console.error('Auth middleware error:', error);
-    res.status(401).json({
-      success: false,
-      message: 'Not authorized to access this route'
-    });
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ success: false, message: 'Invalid token' });
+    }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ success: false, message: 'Token expired' });
+    }
+    console.error('Authentication error:', error);
+    res.status(500).json({ success: false, message: 'Authentication failed' });
   }
 };
 
-// Protect admin routes
-exports.protectAdmin = async (req, res, next) => {
+/**
+ * Optional authentication (doesn't block request if no token)
+ */
+exports.optionalAuth = async (req, res, next) => {
   try {
-    let token;
+    const token = req.header('Authorization')?.replace('Bearer ', '');
 
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-      token = req.headers.authorization.split(' ')[1];
+    if (token) {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findById(decoded.id).select('-password');
+      if (user && user.verified) {
+        req.user = user;
+      }
     }
 
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized - Admin access required'
-      });
-    }
-
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Get admin from token
-    const admin = await Admin.findById(decoded.id);
-    
-    if (!admin) {
-      return res.status(401).json({
-        success: false,
-        message: 'Admin not found'
-      });
-    }
-
-    if (admin.status !== 'active') {
-      return res.status(403).json({
-        success: false,
-        message: 'Admin account is suspended'
-      });
-    }
-
-    req.admin = admin;
     next();
-
   } catch (error) {
-    console.error('Admin auth middleware error:', error);
-    res.status(401).json({
-      success: false,
-      message: 'Not authorized - Admin access required'
-    });
-  }
-};
-
-// Check specific admin permission
-exports.checkPermission = (permission) => {
-  return (req, res, next) => {
-    if (!req.admin) {
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized'
-      });
-    }
-
-    if (req.admin.role === 'master' || req.admin.permissions[permission]) {
-      next();
-    } else {
-      res.status(403).json({
-        success: false,
-        message: 'You do not have permission to perform this action'
-      });
-    }
-  };
-};
-
-// Verify API key
-exports.verifyAPIKey = async (req, res, next) => {
-  try {
-    const apiKey = req.headers['x-api-key'];
-
-    if (!apiKey) {
-      return res.status(401).json({
-        success: false,
-        message: 'API key is required'
-      });
-    }
-
-    const APIKey = require('../models/APIKey.model');
-    const keyData = await APIKey.findOne({ apiKey, status: 'active' });
-
-    if (!keyData) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid or revoked API key'
-      });
-    }
-
-    // Check rate limit
-    const now = new Date();
-    const hourAgo = new Date(now.getTime() - (60 * 60 * 1000));
-    
-    // Simple rate limiting (can be improved with Redis)
-    if (keyData.requestsToday >= keyData.rateLimit) {
-      return res.status(429).json({
-        success: false,
-        message: 'Rate limit exceeded'
-      });
-    }
-
-    // Update usage stats
-    keyData.requestsToday += 1;
-    keyData.requestsThisMonth += 1;
-    keyData.lastUsed = now;
-    await keyData.save();
-
-    req.apiKey = keyData;
+    // Ignore errors in optional auth
     next();
-
-  } catch (error) {
-    console.error('API key verification error:', error);
-    res.status(401).json({
-      success: false,
-      message: 'API key verification failed'
-    });
   }
 };
