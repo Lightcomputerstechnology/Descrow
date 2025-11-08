@@ -16,7 +16,8 @@ import ResetPassword from './pages/ResetPassword';
 // User Pages
 import UnifiedDashboard from './pages/UnifiedDashboard';
 import EscrowDetails from './pages/EscrowDetails';
-import ProfilePage from './pages/Profile/ProfilePage'; // ✅ NEW
+import ProfilePage from './pages/Profile/ProfilePage';
+import NotificationsPage from './pages/NotificationsPage'; // ✅ NEW IMPORT
 
 // Admin Pages
 import AdminLogin from './pages/admin/AdminLogin';
@@ -189,6 +190,14 @@ function App() {
           element={
             <ProtectedRoute>
               <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <NotificationsPage />
             </ProtectedRoute>
           }
         />
