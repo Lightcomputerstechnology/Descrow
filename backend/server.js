@@ -22,6 +22,7 @@ const adminRoutes = require('./routes/admin.routes');
 const apiKeyRoutes = require('./routes/apiKey.routes');
 const verifyRoutes = require('./routes/verify.routes');
 const notificationRoutes = require('./routes/notification.routes'); // ✅
+const platformSettingsRoutes = require('./routes/platformSettings.routes');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -123,6 +124,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/api-keys', apiKeyRoutes);
 app.use('/api/verify-email', verifyRoutes);
+app.use('/api/platform', platformSettingsRoutes);
 
 // ==================== ERROR HANDLING ====================
 app.use((req, res) => {
