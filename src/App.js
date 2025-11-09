@@ -17,7 +17,7 @@ import ResetPassword from './pages/ResetPassword';
 import UnifiedDashboard from './pages/UnifiedDashboard';
 import EscrowDetails from './pages/EscrowDetails';
 import ProfilePage from './pages/Profile/ProfilePage';
-import NotificationsPage from './pages/NotificationsPage'; // ✅ NEW IMPORT
+import NotificationsPage from './pages/NotificationsPage';
 
 // Admin Pages
 import AdminLogin from './pages/admin/AdminLogin';
@@ -29,6 +29,7 @@ import AnalyticsPage from './pages/admin/AnalyticsPage';
 import PaymentGatewaysPage from './pages/admin/PaymentGatewaysPage';
 import APIManagementPage from './pages/admin/APIManagementPage';
 import AdminManagementPage from './pages/admin/AdminManagementPage';
+import FeeManagementPage from './pages/admin/FeeManagementPage'; // ✅ NEW IMPORT
 
 import { authService } from './services/authService';
 
@@ -272,6 +273,16 @@ function App() {
           element={
             <AdminProtectedRoute requiredPermission="manageAdmins">
               <AdminManagementPage admin={admin} />
+            </AdminProtectedRoute>
+          }
+        />
+
+        {/* ✅ NEW FEE MANAGEMENT ROUTE */}
+        <Route
+          path="/admin/fees"
+          element={
+            <AdminProtectedRoute requiredPermission="manageFees">
+              <FeeManagementPage admin={admin} />
             </AdminProtectedRoute>
           }
         />
