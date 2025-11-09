@@ -18,7 +18,9 @@
     "react-router-dom": "^6.16.0",
     "react-scripts": "5.0.1",
     "react-hook-form": "^7.59.5",
-    "recharts": "^2.7.0"
+    "recharts": "^2.7.0",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.5.28"
   },
   "scripts": {
     "start": "react-scripts start",
