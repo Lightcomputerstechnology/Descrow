@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { X, AlertCircle, Loader, Upload } from 'lucide-react';
 import escrowService from 'services/escrowService';
 import toast from 'react-hot-toast';
+
 const DisputeModal = ({ escrow, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     reason: '',
-    evidenceUrls: []
+    evidenceUrls: [],
   });
   const [errors, setErrors] = useState({});
 
@@ -24,12 +25,13 @@ const DisputeModal = ({ escrow, onClose, onSuccess }) => {
       const response = await escrowService.raiseDispute(escrow._id, formData);
 
       if (response.success) {
-        toast.success('Dispute raised successfully. Admin will review within 24-48 hours.');
+        toast.success(
+          'Dispute raised successfully. Admin will review within 24-48 hours.'
+        );
         onSuccess && onSuccess();
       } else {
         toast.error(response.message || 'Failed to raise dispute');
       }
-
     } catch (error) {
       console.error('Dispute error:', error);
       toast.error(error.response?.data?.message || 'Failed to raise dispute');
@@ -45,7 +47,6 @@ const DisputeModal = ({ escrow, onClose, onSuccess }) => {
         <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
-              <AlertCircle className="w-6 h-6 text-red-600​​​​​​​​​​​​​​​​
               <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
             </div>
             <div>
@@ -96,11 +97,15 @@ const DisputeModal = ({ escrow, onClose, onSuccess }) => {
               placeholder="Describe the issue in detail..."
               rows={6}
               className={`w-full px-4 py-2.5 bg-white dark:bg-gray-800 border rounded-lg focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400 outline-none transition text-gray-900 dark:text-white resize-none ${
-                errors.reason ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
+                errors.reason
+                  ? 'border-red-500'
+                  : 'border-gray-300 dark:border-gray-700'
               }`}
             />
             {errors.reason && (
-              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.reason}</p>
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                {errors.reason}
+              </p>
             )}
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
               Be specific: What went wrong? What was expected vs what happened?
@@ -128,7 +133,8 @@ const DisputeModal = ({ escrow, onClose, onSuccess }) => {
               </button>
             </div>
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-500">
-              Recommended: Chat logs, photos of item condition, tracking info, etc.
+              Recommended: Chat logs, photos of item condition, tracking info,
+              etc.
             </p>
           </div>
 
