@@ -6,11 +6,19 @@ const PlatformSettings = require('../models/PlatformSettings');
  * @returns {Object} Fee breakdown
  */
 const calculateFees = async (amount) => {
+  // ✅ FIX: Convert amount to number first
+  const numAmount = parseFloat(amount);
+  
+  // ✅ Validate amount
+  if (isNaN(numAmount) || numAmount <= 0) {
+    throw new Error('Invalid transaction amount');
+  }
+
   const settings = await PlatformSettings.getSettings();
   const { percentage, minimumFee, maximumPercentage, buyerShare, sellerShare } = settings.fees;
 
   // Calculate total fee as percentage
-  let totalFee = (amount * percentage) / 100;
+  let totalFee = (numAmount * percentage) / 100;
   
   // Apply minimum fee
   if (totalFee < minimumFee) {
@@ -18,7 +26,7 @@ const calculateFees = async (amount) => {
   }
   
   // Apply maximum cap
-  const maxFee = (amount * maximumPercentage) / 100;
+  const maxFee = (numAmount * maximumPercentage) / 100;
   if (totalFee > maxFee) {
     totalFee = maxFee;
   }
@@ -28,12 +36,12 @@ const calculateFees = async (amount) => {
   const sellerFee = (totalFee * sellerShare) / 100;
 
   return {
-    amount: parseFloat(amount.toFixed(2)),
+    amount: parseFloat(numAmount.toFixed(2)),
     totalFee: parseFloat(totalFee.toFixed(2)),
     buyerFee: parseFloat(buyerFee.toFixed(2)),
     sellerFee: parseFloat(sellerFee.toFixed(2)),
-    buyerPays: parseFloat((amount + buyerFee).toFixed(2)),
-    sellerReceives: parseFloat((amount - sellerFee).toFixed(2)),
+    buyerPays: parseFloat((numAmount + buyerFee).toFixed(2)),
+    sellerReceives: parseFloat((numAmount - sellerFee).toFixed(2)),
     platformEarns: parseFloat(totalFee.toFixed(2)),
     feePercentage: percentage
   };
