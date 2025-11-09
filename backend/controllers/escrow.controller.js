@@ -1,4 +1,4 @@
-const Escrow = require('../models/Escrow');
+const Escrow = require('../models/Escrow.model');
 const User = require('../models/User.model');
 const { calculateFees } = require('../utils/feeCalculator');
 const { notifyEscrowParties, createNotification } = require('../utils/notificationHelper');
