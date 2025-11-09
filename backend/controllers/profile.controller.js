@@ -1,4 +1,4 @@
-const User = require('../models/User');
+const User = require('../models/User.model');
 const KYCVerification = require('../models/KYCVerification');
 const multer = require('multer');
 const path = require('path');
