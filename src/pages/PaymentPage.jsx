@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import axios from 'axios';
 
 const PaymentPage = () => {
-  const { escrowId } = useParams();
+  const { escrowId } = useParams(); // This is the MongoDB _id from the URL
   const navigate = useNavigate();
   const [escrow, setEscrow] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -21,7 +21,8 @@ const PaymentPage = () => {
   const fetchEscrowDetails = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/escrow/${escrowId}`, {
+      // Use the correct endpoint with MongoDB _id
+      const response = await axios.get(`${API_URL}/escrow/details/${escrowId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -30,8 +31,9 @@ const PaymentPage = () => {
       }
       setLoading(false);
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Failed to load payment details');
+      console.error('Error fetching escrow:', error);
+      toast.error(error.response?.data?.message || 'Failed to load payment details');
+      setLoading(false);
       setTimeout(() => navigate('/dashboard'), 2000);
     }
   };
@@ -49,7 +51,7 @@ const PaymentPage = () => {
       const response = await axios.post(
         `${API_URL}/payments/initialize`,
         {
-          escrowId: escrow.escrowId,
+          escrowId: escrow.escrowId, // Use the escrowId field (e.g., ESC123...)
           paymentMethod: selectedGateway
         },
         { headers: { Authorization: `Bearer ${token}` } }
