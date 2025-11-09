@@ -11,7 +11,8 @@ import {
   Loader,
   ExternalLink,
   Copy,
-  CheckCircle
+  CheckCircle,
+  CreditCard
 } from 'lucide-react';
 import StatusStepper from '../components/Escrow/StatusStepper';
 import ActionButtons from '../components/Escrow/ActionButtons';
@@ -75,7 +76,8 @@ const EscrowDetails = () => {
         await handleAccept();
         break;
       case 'fund':
-        setShowPaymentModal(true);
+        // Navigate to payment page instead of modal
+        navigate(`/payment/${escrow.escrowId || escrow._id}`);
         break;
       case 'deliver':
         setShowDeliveryModal(true);
@@ -167,6 +169,18 @@ const EscrowDetails = () => {
     fetchEscrowDetails();
   };
 
+  // Check if buyer needs to pay
+  const showPayNowButton = () => {
+    if (!escrow || !currentUser || !userRole) return false;
+    
+    // Show "Pay Now" if buyer and status is pending or accepted (before funded)
+    return (
+      userRole === 'buyer' && 
+      (escrow.status === 'pending' || escrow.status === 'accepted') &&
+      !escrow.payment?.paidAt
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
@@ -205,7 +219,7 @@ const EscrowDetails = () => {
                   onClick={handleCopyId}
                   className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition"
                 >
-                  <span>ID: {escrow._id.slice(-8)}</span>
+                  <span>ID: {escrow.escrowId || escrow._id.slice(-8)}</span>
                   {copied ? (
                     <CheckCircle className="w-4 h-4 text-green-600" />
                   ) : (
@@ -243,6 +257,30 @@ const EscrowDetails = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Pay Now Banner - Show prominently for buyers who need to pay */}
+            {showPayNowButton() && (
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-xl p-6 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold text-white mb-2">
+                      Complete Your Payment
+                    </h3>
+                    <p className="text-blue-100 text-sm mb-4">
+                      Secure your transaction by funding this escrow now
+                    </p>
+                    <button
+                      onClick={() => navigate(`/payment/${escrow.escrowId || escrow._id}`)}
+                      className="bg-white text-blue-600 hover:bg-blue-50 px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 shadow-md"
+                    >
+                      <CreditCard className="w-5 h-5" />
+                      Pay Now - {formatCurrency(escrow.amount, escrow.currency)}
+                    </button>
+                  </div>
+                  <CreditCard className="w-16 h-16 text-white opacity-20 hidden md:block" />
+                </div>
+              </div>
+            )}
+
             {/* Status Stepper */}
             <StatusStepper currentStatus={escrow.status} timeline={escrow.timeline} />
 
