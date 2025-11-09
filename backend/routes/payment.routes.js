@@ -24,8 +24,15 @@ router.post(
   paymentController.verifyPayment
 );
 
-// Webhooks
+// ✅ WEBHOOKS - All automatic, no manual confirmation
+router.post('/webhook/paystack', express.raw({ type: 'application/json' }), paymentController.paystackWebhook);
+router.post('/webhook/flutterwave', express.json(), paymentController.flutterwaveWebhook);
+router.post('/webhook/nowpayments', express.json(), paymentController.nowpaymentsWebhook);
+
+// Generic webhook (auto-detects provider)
 router.post('/webhook', express.raw({ type: 'application/json' }), paymentController.paymentWebhook);
+
+// Legacy route (kept for backwards compatibility)
 router.post('/nowpayments/webhook', express.json(), paymentController.nowpaymentsWebhook);
 
 module.exports = router;
