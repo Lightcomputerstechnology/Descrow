@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { X, Download, FileText, FileSpreadsheet, Receipt, Loader } from 'lucide-react';
-import exportService from '../../services/exportService';
+import exportService from 'services/exportService';
 import toast from 'react-hot-toast';
-
 const ExportModal = ({ transactions, user, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [exportOptions, setExportOptions] = useState({
