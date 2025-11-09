@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Loader, Paperclip } from 'lucide-react';
-import chatService from '../../services/chatService';
-import { formatRelativeTime } from '../../utils/escrowHelpers';
+import chatService from 'services/chatService';
+import { formatRelativeTime } from 'utils/escrowHelpers';
 import toast from 'react-hot-toast';
-
 const ChatBox = ({ escrowId, currentUser }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
