@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { X, Package, Loader, Upload } from 'lucide-react';
-import escrowService from '../../services/escrowService';
+import escrowService from 'services/escrowService'; // ← fixed absolute import
 import toast from 'react-hot-toast';
-
 const DeliveryModal = ({ escrow, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
