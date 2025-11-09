@@ -1,20 +1,21 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth.middleware');
 const profileController = require('../controllers/profile.controller');
 
 // All routes require authentication
 router.use(authenticate);
 
+// Profile routes
 router.get('/', profileController.getProfile);
 router.put('/', profileController.updateProfile);
 router.post('/avatar', profileController.uploadAvatar);
 
-// KYC
+// KYC routes
 router.post('/kyc', profileController.submitKYC);
 router.get('/kyc/status', profileController.getKYCStatus);
 
-// Security
+// Security routes
 router.post('/change-password', profileController.changePassword);
 router.post('/delete-account', profileController.deleteAccount);
 
