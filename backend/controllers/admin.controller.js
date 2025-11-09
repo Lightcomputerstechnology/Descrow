@@ -15,7 +15,7 @@ const generateToken = (adminId) => {
 };
 
 // Admin Login
-exports.login = async (req, res) => {
+const login = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -84,7 +84,7 @@ exports.login = async (req, res) => {
 };
 
 // Get Dashboard Stats
-exports.getDashboardStats = async (req, res) => {
+const getDashboardStats = async (req, res) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -138,7 +138,7 @@ exports.getDashboardStats = async (req, res) => {
 };
 
 // Get All Transactions
-exports.getTransactions = async (req, res) => {
+const getTransactions = async (req, res) => {
   try {
     const { status, page = 1, limit = 20, search } = req.query;
 
@@ -179,7 +179,7 @@ exports.getTransactions = async (req, res) => {
 };
 
 // Get All Disputes
-exports.getDisputes = async (req, res) => {
+const getDisputes = async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
 
@@ -215,7 +215,7 @@ exports.getDisputes = async (req, res) => {
 };
 
 // Resolve Dispute
-exports.resolveDispute = async (req, res) => {
+const resolveDispute = async (req, res) => {
   try {
     const { disputeId } = req.params;
     const { resolution, winner, refundAmount, notes } = req.body;
@@ -278,7 +278,7 @@ exports.resolveDispute = async (req, res) => {
 };
 
 // Get All Users
-exports.getUsers = async (req, res) => {
+const getUsers = async (req, res) => {
   try {
     const { verified, kycStatus, tier, page = 1, limit = 20, search } = req.query;
 
@@ -320,7 +320,7 @@ exports.getUsers = async (req, res) => {
 };
 
 // Verify User (Email/KYC)
-exports.verifyUser = async (req, res) => {
+const verifyUser = async (req, res) => {
   try {
     const { userId } = req.params;
     const { verificationType, status, notes } = req.body;
@@ -367,7 +367,7 @@ exports.verifyUser = async (req, res) => {
 };
 
 // Suspend/Activate User
-exports.toggleUserStatus = async (req, res) => {
+const toggleUserStatus = async (req, res) => {
   try {
     const { userId } = req.params;
 
@@ -404,7 +404,7 @@ exports.toggleUserStatus = async (req, res) => {
 };
 
 // Get Analytics
-exports.getAnalytics = async (req, res) => {
+const getAnalytics = async (req, res) => {
   try {
     const { period = '30d' } = req.query;
 
@@ -512,7 +512,7 @@ exports.getAnalytics = async (req, res) => {
 };
 
 // Get All Admins (Master admin only)
-exports.getAdmins = async (req, res) => {
+const getAdmins = async (req, res) => {
   try {
     const admins = await Admin.find()
       .select('-password')
@@ -535,7 +535,7 @@ exports.getAdmins = async (req, res) => {
 };
 
 // Create Sub-Admin (Master admin only)
-exports.createSubAdmin = async (req, res) => {
+const createSubAdmin = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -590,7 +590,7 @@ exports.createSubAdmin = async (req, res) => {
 };
 
 // Update Sub-Admin Permissions (Master admin only)
-exports.updateSubAdminPermissions = async (req, res) => {
+const updateSubAdminPermissions = async (req, res) => {
   try {
     const { adminId } = req.params;
     const { permissions } = req.body;
@@ -630,7 +630,7 @@ exports.updateSubAdminPermissions = async (req, res) => {
 };
 
 // Suspend/Activate Admin (Master admin only)
-exports.toggleAdminStatus = async (req, res) => {
+const toggleAdminStatus = async (req, res) => {
   try {
     const { adminId } = req.params;
 
@@ -669,7 +669,7 @@ exports.toggleAdminStatus = async (req, res) => {
 };
 
 // Delete Sub-Admin (Master admin only)
-exports.deleteSubAdmin = async (req, res) => {
+const deleteSubAdmin = async (req, res) => {
   try {
     const { adminId } = req.params;
 
@@ -703,4 +703,22 @@ exports.deleteSubAdmin = async (req, res) => {
       error: error.message
     });
   }
+};
+
+// Export all functions
+module.exports = {
+  login,
+  getDashboardStats,
+  getTransactions,
+  getDisputes,
+  resolveDispute,
+  getUsers,
+  verifyUser,
+  toggleUserStatus,
+  getAnalytics,
+  getAdmins,
+  createSubAdmin,
+  updateSubAdminPermissions,
+  toggleAdminStatus,
+  deleteSubAdmin
 };
