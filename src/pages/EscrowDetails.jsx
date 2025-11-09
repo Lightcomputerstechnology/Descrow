@@ -76,8 +76,8 @@ const EscrowDetails = () => {
         await handleAccept();
         break;
       case 'fund':
-        // Navigate to payment page instead of modal
-        navigate(`/payment/${escrow.escrowId || escrow._id}`);
+        // Navigate to payment page - handled by banner now
+        navigate(`/payment/${escrow._id}`);
         break;
       case 'deliver':
         setShowDeliveryModal(true);
@@ -269,7 +269,7 @@ const EscrowDetails = () => {
                       Secure your transaction by funding this escrow now
                     </p>
                     <button
-                      onClick={() => navigate(`/payment/${escrow.escrowId || escrow._id}`)}
+                      onClick={() => navigate(`/payment/${escrow._id}`)}
                       className="bg-white text-blue-600 hover:bg-blue-50 px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 shadow-md"
                     >
                       <CreditCard className="w-5 h-5" />
@@ -325,7 +325,7 @@ const EscrowDetails = () => {
 
           {/* Right Column */}
           <div className="space-y-6">
-            {/* Action Buttons */}
+            {/* Action Buttons - Hide "Fund Escrow" button since we have the banner now */}
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Actions
@@ -334,6 +334,7 @@ const EscrowDetails = () => {
                 escrow={escrow}
                 userRole={userRole}
                 onAction={handleAction}
+                hideFundButton={showPayNowButton()} // Pass prop to hide fund button when banner is shown
               />
             </div>
 
