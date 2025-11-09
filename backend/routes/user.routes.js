@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/auth.middleware'); // or authenticate, adjust to your middleware
+const { authenticate } = require('../middleware/auth.middleware'); // ✅ Corrected
 const userController = require('../controllers/user.controller');
 const { uploadMultiple } = require('../middleware/upload.middleware');
 const { body } = require('express-validator');
 
 // Protect all routes
-router.use(protect);
+router.use(authenticate);
 
 // Profile routes
 router.get('/profile', userController.getProfile);
