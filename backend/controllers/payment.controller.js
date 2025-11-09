@@ -58,7 +58,6 @@ exports.initializePayment = async (req, res) => {
         break;
 
       case 'crypto':
-        // CORRECTED: Use Nowpayments
         paymentData = await paymentService.initializeNowpayments(
           escrow.amount,
           escrow.currency,
@@ -120,7 +119,6 @@ exports.verifyPayment = async (req, res) => {
         break;
 
       case 'crypto':
-        // CORRECTED: Verify with Nowpayments
         verificationResult = await paymentService.verifyNowpayments(paymentId || escrow.nowpaymentsId);
         break;
 
@@ -173,7 +171,7 @@ exports.verifyPayment = async (req, res) => {
   }
 };
 
-// Nowpayments Webhook (IPN)
+// ✅ AUTOMATIC Nowpayments Webhook (IPN) - NO MANUAL ADMIN CONFIRMATION
 exports.nowpaymentsWebhook = async (req, res) => {
   try {
     const signature = req.headers['x-nowpayments-sig'];
@@ -186,11 +184,76 @@ exports.nowpaymentsWebhook = async (req, res) => {
       .digest('hex');
 
     if (signature !== expectedSignature) {
+      console.error('Invalid Nowpayments webhook signature');
       return res.status(400).json({ success: false, message: 'Invalid signature' });
     }
 
+    console.log('✅ Nowpayments IPN received:', payload);
+
+    // ✅ AUTOMATIC CONFIRMATION - NO ADMIN NEEDED
     if (payload.payment_status === 'finished') {
-      const escrow = await Escrow.findOne({ paymentReference: payload.order_id });
+      const escrow = await Escrow.findOne({ paymentReference: payload.order_id })
+        .populate('buyer', 'name email')
+        .populate('seller', 'name email');
+
+      if (escrow && escrow.status === 'pending_payment') {
+        console.log(`✅ Auto-confirming crypto payment for escrow ${escrow.escrowId}`);
+
+        escrow.status = 'in_escrow';
+        escrow.chatUnlocked = true;
+        escrow.paymentVerifiedAt = new Date();
+        await escrow.save();
+
+        // Update buyer stats
+        const buyer = await User.findById(escrow.buyer._id);
+        buyer.totalTransactions += 1;
+        buyer.totalSpent += escrow.amount;
+        await buyer.save();
+
+        // Send confirmation emails
+        const emailService = require('../services/email.service');
+        await emailService.sendPaymentConfirmedEmail(
+          escrow.buyer.email,
+          escrow.seller.email,
+          {
+            escrowId: escrow.escrowId,
+            itemName: escrow.itemName,
+            amount: escrow.amount,
+            currency: escrow.currency
+          }
+        );
+
+        console.log(`✅ Crypto payment auto-confirmed for ${escrow.escrowId}`);
+      }
+    }
+
+    res.status(200).json({ success: true });
+
+  } catch (error) {
+    console.error('❌ Nowpayments webhook error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Paystack Webhook
+exports.paystackWebhook = async (req, res) => {
+  try {
+    const hash = crypto
+      .createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
+      .update(JSON.stringify(req.body))
+      .digest('hex');
+
+    if (hash !== req.headers['x-paystack-signature']) {
+      return res.status(400).json({ success: false, message: 'Invalid signature' });
+    }
+
+    const event = req.body;
+
+    if (event.event === 'charge.success') {
+      const reference = event.data.reference;
+      const escrow = await Escrow.findOne({ paymentReference: reference })
+        .populate('buyer', 'name email')
+        .populate('seller', 'name email');
 
       if (escrow && escrow.status === 'pending_payment') {
         escrow.status = 'in_escrow';
@@ -199,26 +262,75 @@ exports.nowpaymentsWebhook = async (req, res) => {
         await escrow.save();
 
         // Update buyer stats
-        const buyer = await User.findById(escrow.buyer);
+        const buyer = await User.findById(escrow.buyer._id);
         buyer.totalTransactions += 1;
         buyer.totalSpent += escrow.amount;
         await buyer.save();
+
+        console.log(`✅ Paystack payment confirmed for ${escrow.escrowId}`);
       }
     }
 
     res.status(200).json({ success: true });
 
   } catch (error) {
-    console.error('Nowpayments webhook error:', error);
+    console.error('Paystack webhook error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// Paystack/Flutterwave Webhooks (existing code remains same)
-exports.paymentWebhook = async (req, res) => {
-  // ... existing code ...
+// Flutterwave Webhook
+exports.flutterwaveWebhook = async (req, res) => {
+  try {
+    const secretHash = process.env.FLUTTERWAVE_WEBHOOK_SECRET;
+    const signature = req.headers['verif-hash'];
+
+    if (!signature || signature !== secretHash) {
+      return res.status(400).json({ success: false, message: 'Invalid signature' });
+    }
+
+    const payload = req.body;
+
+    if (payload.event === 'charge.completed' && payload.data.status === 'successful') {
+      const reference = payload.data.tx_ref;
+      const escrow = await Escrow.findOne({ paymentReference: reference })
+        .populate('buyer', 'name email')
+        .populate('seller', 'name email');
+
+      if (escrow && escrow.status === 'pending_payment') {
+        escrow.status = 'in_escrow';
+        escrow.chatUnlocked = true;
+        escrow.paymentVerifiedAt = new Date();
+        await escrow.save();
+
+        // Update buyer stats
+        const buyer = await User.findById(escrow.buyer._id);
+        buyer.totalTransactions += 1;
+        buyer.totalSpent += escrow.amount;
+        await buyer.save();
+
+        console.log(`✅ Flutterwave payment confirmed for ${escrow.escrowId}`);
+      }
+    }
+
+    res.status(200).json({ success: true });
+
+  } catch (error) {
+    console.error('Flutterwave webhook error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
-exports.verifyWebhookSignature = (payload, signature, provider) => {
-  // ... existing code ...
+// Generic webhook handler
+exports.paymentWebhook = async (req, res) => {
+  const paystackSignature = req.headers['x-paystack-signature'];
+  const flutterwaveSignature = req.headers['verif-hash'];
+
+  if (paystackSignature) {
+    return exports.paystackWebhook(req, res);
+  } else if (flutterwaveSignature) {
+    return exports.flutterwaveWebhook(req, res);
+  } else {
+    return res.status(400).json({ success: false, message: 'Unknown webhook source' });
+  }
 };
