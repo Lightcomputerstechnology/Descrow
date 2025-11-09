@@ -7,8 +7,9 @@ import {
   X, 
   Loader 
 } from 'lucide-react';
-import { getNextAction } from 'utils/escrowHelpers'; // ← fixed absolute import
-const ActionButtons = ({ escrow, userRole, onAction }) => {
+import { getNextAction } from 'utils/escrowHelpers';
+
+const ActionButtons = ({ escrow, userRole, onAction, hideFundButton }) => {
   const [loading, setLoading] = useState(false);
   const nextAction = getNextAction(escrow, userRole);
 
@@ -37,6 +38,10 @@ const ActionButtons = ({ escrow, userRole, onAction }) => {
           );
 
         case 'accepted':
+          // Don't show button here if banner is showing (hideFundButton = true)
+          if (hideFundButton) {
+            return null;
+          }
           return (
             <button
               onClick={() => handleAction('fund')}
