@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, CreditCard, Loader, AlertCircle } from 'lucide-react';
-import escrowService from '../../services/escrowService';
+import escrowService from 'services/escrowService';
 import toast from 'react-hot-toast';
 
 const PaymentModal = ({ escrow, onClose, onSuccess }) => {
