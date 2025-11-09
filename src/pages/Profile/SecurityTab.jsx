@@ -14,10 +14,9 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-import securityService from '../../services/securityService';
-import profileService from '../../services/profileService';
+import securityService from 'services/securityService';
+import profileService from 'services/profileService';
 import toast from 'react-hot-toast';
-
 const SecurityTab = ({ user, onUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [twoFAStatus, setTwoFAStatus] = useState({ enabled: false });
