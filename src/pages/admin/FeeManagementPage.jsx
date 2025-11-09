@@ -348,3 +348,305 @@ const FeeManagementPage = ({ admin }) => {
               className="flex-1 px-4 py-2 border border-blue-600 text-blue-600 rounded-lg font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 transition"
             >
               <BarChart3 className="w​​​​​​​​​​​​​​​​
+              <BarChart3 className="w-5 h-5 inline mr-2" />
+              Preview Impact
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !hasChanges || formData.buyerShare + formData.sellerShare !== 100}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {saving ? (
+                <>
+                  <Loader className="w-5 h-5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-5 h-5" />
+                  Save Changes
+                </>
+              )}
+            </button>
+          </div>
+
+          {hasChanges && (
+            <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <p className="text-sm text-yellow-800 dark:text-yellow-300 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                You have unsaved changes
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Fee Calculator */}
+        <div className="space-y-6">
+          {/* Live Calculator */}
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
+                <Calculator className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Fee Calculator
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Test fee calculation in real-time
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Transaction Amount
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-600 dark:text-gray-400">$</span>
+                <input
+                  type="number"
+                  value={testAmount}
+                  onChange={(e) => setTestAmount(e.target.value)}
+                  placeholder="100"
+                  className="flex-1 px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-400 outline-none transition text-gray-900 dark:text-white"
+                />
+              </div>
+            </div>
+
+            {testResult && (
+              <div className="space-y-3">
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">Transaction Amount:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      ${testResult.amount.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Buyer Fee ({testResult.buyerShare}%):
+                    </span>
+                    <span className="font-medium text-blue-600 dark:text-blue-400">
+                      ${testResult.buyerFee.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      Seller Fee ({testResult.sellerShare}%):
+                    </span>
+                    <span className="font-medium text-purple-600 dark:text-purple-400">
+                      ${testResult.sellerFee.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="font-medium text-gray-900 dark:text-white">Buyer Pays:</span>
+                      <span className="font-bold text-blue-600 dark:text-blue-400">
+                        ${testResult.buyerPays.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="font-medium text-gray-900 dark:text-white">Seller Receives:</span>
+                      <span className="font-bold text-purple-600 dark:text-purple-400">
+                        ${testResult.sellerReceives.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium text-gray-900 dark:text-white">Platform Earns:</span>
+                      <span className="font-bold text-green-600 dark:text-green-400">
+                        ${testResult.platformEarns.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                  <p className="text-xs text-blue-900 dark:text-blue-200">
+                    <Info className="w-4 h-4 inline mr-1" />
+                    Total platform fee: {testResult.feePercentage}% split {testResult.buyerShare}/{testResult.sellerShare}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Revenue Impact Preview */}
+          {impactPreview && (
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
+                  <BarChart3 className="w-6 h-6 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Revenue Impact
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {impactPreview.timeframe}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Transactions:</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {impactPreview.transactionCount}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Current Revenue:</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    ${impactPreview.currentRevenue.toLocaleString()}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Projected Revenue:</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    ${impactPreview.projectedRevenue.toLocaleString()}
+                  </span>
+                </div>
+
+                <div className={`flex justify-between items-center p-3 rounded-lg ${
+                  impactPreview.difference >= 0
+                    ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                    : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+                }`}>
+                  <span className="text-sm font-medium">Difference:</span>
+                  <div className="text-right">
+                    <span className={`font-bold ${
+                      impactPreview.difference >= 0
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-red-600 dark:text-red-400'
+                    }`}>
+                      {impactPreview.difference >= 0 ? '+' : ''}${impactPreview.difference.toLocaleString()}
+                    </span>
+                    <span className={`block text-xs ${
+                      impactPreview.difference >= 0
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-red-600 dark:text-red-400'
+                    }`}>
+                      {impactPreview.percentageChange >= 0 ? '+' : ''}{impactPreview.percentageChange}%
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
+                    <strong>Average Fee per Transaction:</strong>
+                  </p>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600 dark:text-gray-400">Current:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      ${impactPreview.avgCurrentFee.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">Projected:</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      ${impactPreview.avgProjectedFee.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                  <p className="text-sm text-blue-900 dark:text-blue-200">
+                    {impactPreview.suggestion}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Fee History */}
+      {feeHistory && (
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
+              <History className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Last Update
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Fee change history and audit log
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">Last Updated:</span>
+              <span className="font-medium text-gray-900 dark:text-white">
+                {new Date(feeHistory.lastUpdated).toLocaleString()}
+              </span>
+            </div>
+            {feeHistory.updatedBy && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">Updated By:</span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {feeHistory.updatedBy.name} ({feeHistory.updatedBy.email})
+                </span>
+              </div>
+            )}
+            <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Current Settings:</p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-500 dark:text-gray-400">Fee:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {feeHistory.current.percentage}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500 dark:text-gray-400">Min:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    ${feeHistory.current.minimumFee}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500 dark:text-gray-400">Buyer:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {feeHistory.current.buyerShare}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500 dark:text-gray-400">Seller:</span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {feeHistory.current.sellerShare}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info Box */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
+        <div className="flex gap-4">
+          <Info className="w-6 h-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-1" />
+          <div className="text-sm text-blue-900 dark:text-blue-200">
+            <p className="font-semibold mb-2">Fee Management Best Practices:</p>
+            <ul className="space-y-1 list-disc list-inside">
+              <li>Industry standard fees range from 1-4% of transaction value</li>
+              <li>Consider a 50/50 split between buyer and seller for fairness</li>
+              <li>Set a minimum fee to cover small transactions ($0.50 - $1.00)</li>
+              <li>Preview impact before making changes to avoid revenue surprises</li>
+              <li>Monitor transaction volume after fee changes</li>
+              <li>Changes only affect new transactions, existing ones keep old rates</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default FeeManagementPage;
