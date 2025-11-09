@@ -12,8 +12,7 @@ import {
   Clock,
   XCircle
 } from 'lucide-react';
-import { adminService } from '../../services/adminService';
-
+import { adminService } from 'services/adminService';
 const TransactionsPage = ({ admin }) => {
   const navigate = useNavigate();
   const [transactions, setTransactions] = useState([]);
