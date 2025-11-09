@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { adminAuth, checkPermission } = require('../middleware/adminAuth');
+const { protectAdmin } = require('../middleware/admin.middleware');
 const platformSettingsController = require('../controllers/platformSettings.controller');
 
 // Public endpoint for fee calculation
