@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Store, DollarSign, Loader, TrendingUp, Download } from 'lucide-react'; // ← Added Download
 
-import StatsCard from 'components/Dashboard/StatsCard';
-import EscrowCard from 'components/Dashboard/EscrowCard';
-import SearchFilter from 'components/Dashboard/SearchFilter';
-import ExportModal from 'components/Dashboard/ExportModal'; // ← Added
-import escrowService from 'services/escrowService';
+import StatsCard from './StatsCard';
+import EscrowCard from './EscrowCard';
+import SearchFilter from './SearchFilter';
+import ExportModal from './ExportModal'; // ← same folder
+import escrowService from '../../services/escrowService'; // ← relative to src/services/
 import toast from 'react-hot-toast';
 
 const SellingTab = ({ user }) => {
