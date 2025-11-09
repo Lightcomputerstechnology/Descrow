@@ -7,15 +7,14 @@ import {
   FileCheck, 
   ArrowLeft,
   Loader 
-} from 'lucide-react';
+} import { /* your lucide-react icons */ } from 'lucide-react';
 import ProfileTab from './ProfileTab';
 import KYCTab from './KYCTab';
 import SecurityTab from './SecurityTab';
 import SettingsTab from './SettingsTab';
-import profileService from '../../services/profileService';
+import profileService from 'services/profileService';
 import { authService } from 'services/authService';
 import toast from 'react-hot-toast';
-
 const ProfilePage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
