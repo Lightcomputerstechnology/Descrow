@@ -1,8 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, MoreVertical, AlertCircle } from 'lucide-react';
-import { getStatusInfo, formatCurrency, formatRelativeTime, getNextAction } from '../../utils/escrowHelpers';
-
+import { getStatusInfo, formatCurrency, formatRelativeTime, getNextAction } from 'utils/escrowHelpers';
 const EscrowCard = ({ escrow, userRole, onQuickAction }) => {
   const navigate = useNavigate();
   const statusInfo = getStatusInfo(escrow.status);
