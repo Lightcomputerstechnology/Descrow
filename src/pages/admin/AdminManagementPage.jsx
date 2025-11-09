@@ -11,8 +11,7 @@ import {
   UserCheck,
   X
 } from 'lucide-react';
-import { adminService } from '../../services/adminService';
-
+import { adminService } from 'services/adminService'; // ← fixed absolute import
 const AdminManagementPage = ({ admin }) => {
   const navigate = useNavigate();
   const [admins, setAdmins] = useState([]);
