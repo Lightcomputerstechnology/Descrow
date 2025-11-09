@@ -1,3 +1,4 @@
+// File: scripts/createMasterAdmin.js
 const mongoose = require('mongoose');
 const Admin = require('../models/Admin.model');
 require('dotenv').config();
@@ -11,7 +12,18 @@ const createMasterAdmin = async () => {
       email: 'admin@dealcross.com',
       password: 'MasterAdmin123!',
       role: 'master',
-      status: 'active'
+      status: 'active',
+      permissions: {
+        viewTransactions: true,
+        manageDisputes: true,
+        verifyUsers: true,
+        viewAnalytics: true,
+        managePayments: true,
+        manageAPI: true,
+        manageAdmins: true,
+        manageFees: true,       // ✅ Added
+        manageSettings: true    // ✅ Added
+      }
     });
 
     console.log('✅ Master admin created successfully');
