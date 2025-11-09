@@ -9,9 +9,8 @@ import {
   Loader,
   Award
 } from 'lucide-react';
-import profileService from '../../services/profileService';
+import profileService from 'services/profileService'; // ← fixed absolute import
 import toast from 'react-hot-toast';
-
 const KYCTab = ({ user, onUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [kycStatus, setKycStatus] = useState(null);
