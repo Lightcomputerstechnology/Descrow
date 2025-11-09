@@ -11,8 +11,7 @@ import {
   Ban,
   UserCheck
 } from 'lucide-react';
-import { adminService } from '../../services/adminService';
-
+import { adminService } from 'services/adminService';
 const UsersPage = ({ admin }) => {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
