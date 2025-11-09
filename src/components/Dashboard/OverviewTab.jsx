@@ -11,16 +11,16 @@ import {
   Plus,
   ArrowRight
 } from 'lucide-react';
-import StatsCard from './StatsCard';
-import EscrowCard from './EscrowCard';
-import escrowService from '../../services/escrowService';
+
+import StatsCard from 'components/Dashboard/StatsCard';
+import EscrowCard from 'components/Dashboard/EscrowCard';
+import escrowService from 'services/escrowService';
 import toast from 'react-hot-toast';
 
 // ✅ Added imports
-import VolumeChart from '../../components/Dashboard/Charts/VolumeChart';
-import PieChartComponent from '../../components/Dashboard/Charts/PieChartComponent';
-import StatusDonutChart from '../../components/Dashboard/Charts/StatusDonutChart';
-
+import VolumeChart from 'components/Dashboard/Charts/VolumeChart';
+import PieChartComponent from 'components/Dashboard/Charts/PieChartComponent';
+import StatusDonutChart from 'components/Dashboard/Charts/StatusDonutChart';
 const OverviewTab = ({ user }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
