@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User.model');
-const Admin = require('../models/Admin');
+const Admin = require('../models/Admin.model');
 
 /**
  * Authenticate user via JWT token (required)
