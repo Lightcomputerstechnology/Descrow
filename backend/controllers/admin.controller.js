@@ -1,4 +1,4 @@
-lconsole.log('=== LOADING admin.controller.js ===');
+console.log('=== LOADING admin.controller.js ===');
 
 const Admin = require('../models/Admin.model');
 const User = require('../models/User.model');
