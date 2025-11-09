@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Mail, Lock, Eye, EyeOff, Loader, AlertCircle } from 'lucide-react';
-import api from '../../config/api';
-
+import api from 'config/api';
 const AdminLogin = ({ setAdmin }) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
