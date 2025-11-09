@@ -1,4 +1,6 @@
+const express = require('express'); // ✅ Add this line
 const router = express.Router();
+
 const escrowController = require('../controllers/escrow.controller');
 const { authenticate } = require('../middleware/auth.middleware');
 const { createEscrowValidator } = require('../validators/escrow.validator');
