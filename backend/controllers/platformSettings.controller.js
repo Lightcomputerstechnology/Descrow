@@ -1,5 +1,5 @@
 const PlatformSettings = require('../models/PlatformSettings');
-const Escrow = require('../models/Escrow');
+const Escrow = require('../models/Escrow.model');
 
 /**
  * Get current platform settings
