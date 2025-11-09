@@ -1,4 +1,3 @@
-const express = require('express');
 const router = express.Router();
 const escrowController = require('../controllers/escrow.controller');
 const { authenticate } = require('../middleware/auth.middleware');
@@ -32,8 +31,14 @@ router.get('/dashboard-stats', escrowController.getDashboardStats);
 router.get('/calculate-fees', escrowController.calculateFeePreview);
 
 /**
+ * @route   GET /api/v1/escrows/details/:id
+ * @desc    Get escrow details by MongoDB _id (for payment page)
+ */
+router.get('/details/:id', escrowController.getEscrowById);
+
+/**
  * @route   GET /api/v1/escrows/:id
- * @desc    Get details of a single escrow by ID
+ * @desc    Get details of a single escrow by ID (escrowId or _id)
  */
 router.get('/:id', escrowController.getEscrowById);
 
@@ -41,28 +46,24 @@ router.get('/:id', escrowController.getEscrowById);
  * @route   POST /api/v1/escrows/:id/accept
  * @desc    Accept an escrow offer (seller action)
  */
-// router.post('/:id/accept', isSeller, escrowController.acceptEscrow);
 router.post('/:id/accept', escrowController.acceptEscrow);
 
 /**
  * @route   POST /api/v1/escrows/:id/fund
  * @desc    Fund escrow (buyer action)
  */
-// router.post('/:id/fund', isBuyer, escrowController.fundEscrow);
 router.post('/:id/fund', escrowController.fundEscrow);
 
 /**
  * @route   POST /api/v1/escrows/:id/deliver
  * @desc    Mark escrow item as delivered (seller action)
  */
-// router.post('/:id/deliver', isSeller, escrowController.markDelivered);
 router.post('/:id/deliver', escrowController.markDelivered);
 
 /**
  * @route   POST /api/v1/escrows/:id/confirm
  * @desc    Confirm delivery (buyer action)
  */
-// router.post('/:id/confirm', isBuyer, escrowController.confirmDelivery);
 router.post('/:id/confirm', escrowController.confirmDelivery);
 
 /**
