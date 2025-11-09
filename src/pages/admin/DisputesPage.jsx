@@ -11,8 +11,7 @@ import {
   XCircle,
   Clock
 } from 'lucide-react';
-import { adminService } from '../../services/adminService';
-
+import { adminService } from 'services/adminService';
 const DisputesPage = ({ admin }) => {
   const navigate = useNavigate();
   const [disputes, setDisputes] = useState([]);
