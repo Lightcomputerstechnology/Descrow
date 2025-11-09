@@ -55,6 +55,11 @@ exports.authenticate = async (req, res, next) => {
 };
 
 /**
+ * Alias for authenticate so routes using `protect` continue working
+ */
+exports.protect = exports.authenticate;
+
+/**
  * Optional authentication (doesn't block request if no token)
  */
 exports.optionalAuth = async (req, res, next) => {
