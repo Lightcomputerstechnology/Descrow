@@ -11,8 +11,7 @@ import {
   Save,
   AlertCircle
 } from 'lucide-react';
-import { adminService } from '../../services/adminService';
-
+import { adminService } from 'services/adminService';
 const PaymentGatewaysPage = ({ admin }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
