@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Bell, 
-  Check,      // use this instead of CheckCheck
+  Check,
   Trash2, 
   Filter,
   ArrowLeft,
@@ -23,12 +23,12 @@ const NotificationsPage = () => {
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [filter, setFilter] = useState('all'); // 'all', 'unread', 'read'
+  const [filter, setFilter] = useState('all');
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
     total: 0,
-    pages: 1
+    pages: 1,
   });
 
   useEffect(() => {
@@ -52,7 +52,7 @@ const NotificationsPage = () => {
         setPagination(prev => ({
           ...prev,
           total: response.data.pagination.total,
-          pages: response.data.pagination.pages
+          pages: response.data.pagination.pages,
         }));
       }
     } catch (error) {
@@ -122,7 +122,6 @@ const NotificationsPage = () => {
     if (!notification.isRead) {
       handleMarkAsRead(notification._id);
     }
-    
     if (notification.link) {
       navigate(notification.link);
     }
@@ -131,19 +130,18 @@ const NotificationsPage = () => {
   const getNotificationIcon = (type) => {
     const icons = {
       escrow_created: PackageCheck,
-      escrow_accepted: CheckCheck,
+      escrow_accepted: Check,
       escrow_funded: DollarSign,
       escrow_delivered: PackageCheck,
-      escrow_completed: CheckCheck,
+      escrow_completed: Check,
       escrow_cancelled: AlertCircle,
       dispute_raised: AlertCircle,
-      dispute_resolved: CheckCheck,
+      dispute_resolved: Check,
       message_received: MessageCircle,
-      payment_received: DollarSign
+      payment_received: DollarSign,
     };
 
-    const Icon = icons[type] || Bell;
-    return Icon;
+    return icons[type] || Bell;
   };
 
   const getNotificationColor = (type) => {
@@ -157,7 +155,7 @@ const NotificationsPage = () => {
       dispute_raised: 'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400',
       dispute_resolved: 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400',
       message_received: 'bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
-      payment_received: 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400'
+      payment_received: 'bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400',
     };
 
     return colors[type] || 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400';
@@ -237,7 +235,7 @@ const NotificationsPage = () => {
                   onClick={handleMarkAllAsRead}
                   className="flex items-center gap-2 px-4 py-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg font-medium text-sm transition"
                 >
-                  <CheckCheck className="w-4 h-4" />
+                  <Check className="w-4 h-4" />
                   Mark all as read
                 </button>
               )}
@@ -271,7 +269,7 @@ const NotificationsPage = () => {
             <p className="text-gray-600 dark:text-gray-400">
               {filter === 'unread' 
                 ? 'All caught up! Check back later for updates.'
-                : 'We'll notify you when something important happens.'}
+                : "We'll notify you when something important happens."}
             </p>
           </div>
         ) : (
@@ -291,12 +289,10 @@ const NotificationsPage = () => {
                   }`}
                 >
                   <div className="flex items-start gap-4">
-                    {/* Icon */}
                     <div className={`p-2 rounded-lg flex-shrink-0 ${iconColor}`}>
                       <Icon className="w-5 h-5" />
                     </div>
 
-                    {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-3 mb-1">
                         <h4 className="font-semibold text-gray-900 dark:text-white">
@@ -316,7 +312,6 @@ const NotificationsPage = () => {
                           {formatRelativeTime(notification.createdAt)}
                         </span>
 
-                        {/* Actions */}
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition">
                           {!notification.isRead && (
                             <button
@@ -350,7 +345,6 @@ const NotificationsPage = () => {
           </div>
         )}
 
-        {/* Pagination */}
         {pagination.pages > 1 && (
           <div className="flex items-center justify-center gap-2 mt-8">
             <button
