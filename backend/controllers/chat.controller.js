@@ -1,5 +1,5 @@
 const Chat = require('../models/Chat');
-const Escrow = require('../models/Escrow');
+const Escrow = require('../models/Escrow.model');
 const { createNotification } = require('../utils/notificationHelper');
 
 /**
