@@ -9,9 +9,8 @@ import {
   BarChart3,
   PieChart
 } from 'lucide-react';
-import AdminSidebar from '../../components/admin/AdminSidebar';
-import AdminHeader from '../../components/admin/AdminHeader';
-
+import AdminSidebar from 'components/admin/AdminSidebar';
+import AdminHeader from 'components/admin/AdminHeader';
 const AnalyticsPage = ({ admin }) => {
   const [dateRange, setDateRange] = useState('30d'); // 7d, 30d, 90d, 1y
 
