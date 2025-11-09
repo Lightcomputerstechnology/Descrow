@@ -11,9 +11,9 @@ import {
   AlertCircle,
   Eye,
   EyeOff
-} from 'lucide-react';
+} import { /* your lucide-react icons */ } from 'lucide-react';
 import notificationService from 'services/notificationService';
-import profileService from '../../services/profileService';
+import profileService from 'services/profileService';
 import toast from 'react-hot-toast';
 
 const SettingsTab = ({ user, onUpdate }) => {
