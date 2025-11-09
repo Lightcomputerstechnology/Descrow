@@ -37,3 +37,5 @@ router.put(
   checkPermission('manageSettings'),
   platformSettingsController.toggleMaintenance
 );
+
+module.exports = router;
