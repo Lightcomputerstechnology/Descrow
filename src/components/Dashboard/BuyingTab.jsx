@@ -4,10 +4,9 @@ import { Plus, ShoppingCart, Loader, Download } from 'lucide-react';
 import StatsCard from './StatsCard';
 import EscrowCard from './EscrowCard';
 import SearchFilter from './SearchFilter';
-import ExportModal from 'components/ExportModal'; // ← fixed absolute import
-import escrowService from 'services/escrowService'; // ← fixed absolute import
+import ExportModal from './ExportModal'; // ✅ relative import
+import escrowService from '../../services/escrowService'; // ✅ relative import
 import toast from 'react-hot-toast';
-
 const BuyingTab = ({ user }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
