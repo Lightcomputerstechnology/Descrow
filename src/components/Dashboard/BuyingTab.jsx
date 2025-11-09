@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, ShoppingCart, Loader, Download } from 'lucide-react'; // ← Added Download
+import { Plus, ShoppingCart, Loader, Download } from 'lucide-react';
 import StatsCard from './StatsCard';
 import EscrowCard from './EscrowCard';
 import SearchFilter from './SearchFilter';
-import ExportModal from './ExportModal'; // ← Added ExportModal
-import escrowService from '../../services/escrowService';
+import ExportModal from 'components/ExportModal'; // ← fixed absolute import
+import escrowService from 'services/escrowService'; // ← fixed absolute import
 import toast from 'react-hot-toast';
 
 const BuyingTab = ({ user }) => {
