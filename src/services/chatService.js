@@ -33,7 +33,7 @@ const chatService = {
       formData.append('message', data.message);
 
       if (data.attachments && data.attachments.length > 0) {
-        data.attachments.forEach((file, index) => {
+        data.attachments.forEach((file) => {
           formData.append('attachments', file);
         });
       }
@@ -79,4 +79,4 @@ const chatService = {
   },
 };
 
-export { chatService };
+export default chatService;
