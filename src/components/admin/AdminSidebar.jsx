@@ -10,7 +10,8 @@ import {
   Key, 
   UserCog,
   LogOut,
-  Shield
+  Shield,
+  DollarSign // ← ADD THIS IMPORT
 } from 'lucide-react';
 
 const AdminSidebar = ({ admin, activePage }) => {
@@ -60,6 +61,13 @@ const AdminSidebar = ({ admin, activePage }) => {
       permission: 'managePayments'
     },
     { 
+      id: 'fees', 
+      label: 'Fee Management', 
+      icon: DollarSign, 
+      path: '/admin/fees',
+      permission: 'manageFees' // ← ADDED NEW ITEM
+    },
+    { 
       id: 'api', 
       label: 'API Management', 
       icon: Key, 
@@ -82,7 +90,6 @@ const AdminSidebar = ({ admin, activePage }) => {
   };
 
   const handleLogout = () => {
-    // API call to logout
     navigate('/admin/login');
   };
 
