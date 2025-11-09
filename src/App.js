@@ -18,6 +18,7 @@ import UnifiedDashboard from './pages/UnifiedDashboard';
 import EscrowDetails from './pages/EscrowDetails';
 import ProfilePage from './pages/Profile/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
+import PaymentPage from './pages/PaymentPage'; // ✅ NEW IMPORT
 
 // Admin Pages
 import AdminLogin from './pages/admin/AdminLogin';
@@ -203,6 +204,16 @@ function App() {
           }
         />
 
+        {/* ✅ NEW PAYMENT ROUTE (supports query like ?method=crypto) */}
+        <Route
+          path="/payment/:escrowId"
+          element={
+            <ProtectedRoute>
+              <PaymentPage />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Legacy redirects */}
         <Route path="/buyer-dashboard" element={<Navigate to="/dashboard" replace />} />
         <Route path="/seller-dashboard" element={<Navigate to="/dashboard" replace />} />
@@ -276,8 +287,6 @@ function App() {
             </AdminProtectedRoute>
           }
         />
-
-        {/* ✅ NEW FEE MANAGEMENT ROUTE */}
         <Route
           path="/admin/fees"
           element={
