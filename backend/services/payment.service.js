@@ -14,10 +14,10 @@ class PaymentService {
         'https://api.paystack.co/transaction/initialize',
         {
           email,
-          amount: amount * 100,
+          amount: Math.round(amount * 100), // Convert to kobo, ensure integer
           reference,
           metadata,
-          callback_url: `${process.env.FRONTEND_URL}/payment/verify`,
+          callback_url: `${process.env.FRONTEND_URL}/dashboard`,
           channels: ['card', 'bank', 'ussd', 'mobile_money']
         },
         {
@@ -30,13 +30,13 @@ class PaymentService {
 
       return {
         success: true,
-        authorizationUrl: response.data.data.authorization_url,
-        accessCode: response.data.data.access_code,
+        authorization_url: response.data.data.authorization_url,
+        access_code: response.data.data.access_code,
         reference: response.data.data.reference
       };
     } catch (error) {
       console.error('Paystack error:', error.response?.data || error.message);
-      throw new Error('Failed to initialize Paystack payment');
+      throw new Error(error.response?.data?.message || 'Failed to initialize Paystack payment');
     }
   }
 
@@ -73,13 +73,16 @@ class PaymentService {
         {
           tx_ref: reference,
           amount,
-          currency,
-          redirect_url: `${process.env.FRONTEND_URL}/payment/verify`,
+          currency: currency || 'NGN',
+          redirect_url: `${process.env.FRONTEND_URL}/dashboard`,
           payment_options: 'card,banktransfer,ussd,mobilemoney',
-          customer: { email, name: metadata.buyerName || 'Customer' },
+          customer: { 
+            email, 
+            name: metadata.buyerName || 'Customer' 
+          },
           customizations: {
             title: 'Dealcross Escrow Payment',
-            description: `Payment for ${metadata.itemName}`,
+            description: `Payment for ${metadata.itemName || 'escrow transaction'}`,
             logo: `${process.env.FRONTEND_URL}/logo.png`
           },
           meta: metadata
@@ -94,12 +97,12 @@ class PaymentService {
 
       return {
         success: true,
-        paymentLink: response.data.data.link,
+        link: response.data.data.link,
         reference: reference
       };
     } catch (error) {
       console.error('Flutterwave error:', error.response?.data || error.message);
-      throw new Error('Failed to initialize Flutterwave payment');
+      throw new Error(error.response?.data?.message || 'Failed to initialize Flutterwave payment');
     }
   }
 
@@ -128,8 +131,6 @@ class PaymentService {
     }
   }
 
-  // ============== NOWPAYMENTS CRYPTO (CORRECTED) ==============
-
   // Initialize Nowpayments Crypto Payment
   async initializeNowpayments(amount, currency, orderId, orderDescription) {
     try {
@@ -137,13 +138,13 @@ class PaymentService {
         'https://api.nowpayments.io/v1/payment',
         {
           price_amount: amount,
-          price_currency: currency,
-          pay_currency: 'btc', // User can change on payment page
+          price_currency: currency || 'USD',
+          pay_currency: 'btc', // Default, user can change on payment page
           order_id: orderId,
-          order_description: orderDescription,
-          ipn_callback_url: `${process.env.BACKEND_URL}/api/payments/nowpayments/webhook`,
-          success_url: `${process.env.FRONTEND_URL}/payment/success`,
-          cancel_url: `${process.env.FRONTEND_URL}/payment/cancel`
+          order_description: orderDescription || 'Escrow payment',
+          ipn_callback_url: `${process.env.BACKEND_URL}/api/payments/webhook/nowpayments`,
+          success_url: `${process.env.FRONTEND_URL}/dashboard`,
+          cancel_url: `${process.env.FRONTEND_URL}/dashboard`
         },
         {
           headers: {
@@ -155,16 +156,16 @@ class PaymentService {
 
       return {
         success: true,
-        paymentId: response.data.payment_id,
-        paymentUrl: response.data.invoice_url,
-        payAddress: response.data.pay_address,
-        payCurrency: response.data.pay_currency,
-        payAmount: response.data.pay_amount,
-        orderId: response.data.order_id
+        payment_id: response.data.payment_id,
+        invoice_url: response.data.invoice_url,
+        pay_address: response.data.pay_address,
+        pay_currency: response.data.pay_currency,
+        pay_amount: response.data.pay_amount,
+        order_id: response.data.order_id
       };
     } catch (error) {
       console.error('Nowpayments error:', error.response?.data || error.message);
-      throw new Error('Failed to initialize Nowpayments');
+      throw new Error(error.response?.data?.message || 'Failed to initialize Nowpayments');
     }
   }
 
@@ -197,6 +198,43 @@ class PaymentService {
       throw new Error('Failed to verify Nowpayments');
     }
   }
+
+  // Get Nowpayments available currencies
+  async getAvailableCurrencies() {
+    try {
+      const response = await axios.get(
+        'https://api.nowpayments.io/v1/currencies',
+        {
+          headers: { 'x-api-key': this.nowpaymentsApiKey }
+        }
+      );
+      return response.data.currencies;
+    } catch (error) {
+      console.error('Nowpayments currencies error:', error.response?.data || error.message);
+      return ['btc', 'eth', 'usdt', 'ltc', 'bnb']; // Default fallback
+    }
+  }
+
+  // Get estimated price for crypto payment
+  async getEstimatedPrice(amount, currency_from, currency_to = 'btc') {
+    try {
+      const response = await axios.get(
+        `https://api.nowpayments.io/v1/estimate?amount=${amount}&currency_from=${currency_from}&currency_to=${currency_to}`,
+        {
+          headers: { 'x-api-key': this.nowpaymentsApiKey }
+        }
+      );
+      return {
+        success: true,
+        estimated_amount: response.data.estimated_amount,
+        currency_from: response.data.currency_from,
+        currency_to: response.data.currency_to
+      };
+    } catch (error) {
+      console.error('Nowpayments estimate error:', error.response?.data || error.message);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
-module.exports = new PaymentService();
+module.exports = new PaymentService()
