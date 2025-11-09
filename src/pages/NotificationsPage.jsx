@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Bell, 
-  Check, 
-  CheckCheck, 
+  Check,      // use this instead of CheckCheck
   Trash2, 
   Filter,
   ArrowLeft,
