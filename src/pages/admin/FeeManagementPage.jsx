@@ -10,7 +10,7 @@ import {
   History,
   BarChart3,
   Info
-} import { /* your lucide-react icons */ } from 'lucide-react';
+} from 'lucide-react';
 import platformService from 'services/platformService';
 import toast from 'react-hot-toast';
 
