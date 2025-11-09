@@ -1,7 +1,6 @@
 import React from 'react';
 import { Check } from 'lucide-react';
-import { getTimelineSteps } from '../../utils/escrowHelpers';
-
+import { getTimelineSteps } from 'utils/escrowHelpers';
 const StatusStepper = ({ currentStatus, timeline = [] }) => {
   const steps = getTimelineSteps();
   
