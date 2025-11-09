@@ -14,7 +14,7 @@ import OverviewTab from '../../components/Dashboard/OverviewTab';
 import BuyingTab from '../../components/Dashboard/BuyingTab';
 import SellingTab from '../../components/Dashboard/SellingTab';
 import CreateEscrowModal from 'components/CreateEscrowModal';
-import { authService } from '../../services/authService';
+import { authService } from 'services/authService';
 import notificationService from '../../services/notificationService';
 
 const UnifiedDashboard = () => {
