@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Camera, Loader, Save } from 'lucide-react';
-import profileService from '../../services/profileService';
+import profileService from 'services/profileService';
 import toast from 'react-hot-toast';
-
 const ProfileTab = ({ user, onUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
