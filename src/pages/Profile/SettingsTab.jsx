@@ -12,7 +12,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-import notificationService from '../../services/notificationService';
+import notificationService from 'services/notificationService';
 import profileService from '../../services/profileService';
 import toast from 'react-hot-toast';
 
