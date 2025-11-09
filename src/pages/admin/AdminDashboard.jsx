@@ -11,8 +11,7 @@ import {
   LogOut,
   Loader
 } from 'lucide-react';
-import { adminService } from '../../services/adminService';
-
+import { adminService } from 'services/adminService';
 const AdminDashboard = ({ admin }) => {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
