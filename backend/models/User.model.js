@@ -23,7 +23,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['dual'], // All users can buy and sell
+    enum: ['dual'],
     default: 'dual'
   },
   tier: {
@@ -43,6 +43,10 @@ const userSchema = new mongoose.Schema({
   kycDocuments: [{
     type: String
   }],
+  kycVerification: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'KYCVerification'
+  },
   totalTransactions: {
     type: Number,
     default: 0
@@ -59,9 +63,35 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  // ✅ ADDED MISSING FIELDS
+  bio: {
+    type: String,
+    maxlength: 500
+  },
+  address: {
+    street: String,
+    city: String,
+    state: String,
+    country: String,
+    zipCode: String
+  },
+  socialLinks: {
+    twitter: String,
+    linkedin: String,
+    website: String
+  },
+  businessInfo: {
+    companyName: String,
+    taxId: String,
+    industry: String
+  },
+  profilePicture: {
+    type: String
+  },
   avatar: {
     type: String
   },
+  // ✅ END ADDED FIELDS
   twoFactorEnabled: {
     type: Boolean,
     default: false
@@ -77,7 +107,13 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  // ← Added notification settings
+  status: {
+    type: String,
+    enum: ['active', 'suspended', 'deleted'],
+    default: 'active'
+  },
+  deletedAt: Date,
+  deletionReason: String,
   notificationSettings: {
     email: {
       escrowUpdates: { type: Boolean, default: true },
