@@ -7,8 +7,7 @@ import {
   X, 
   Loader 
 } from 'lucide-react';
-import { getNextAction } from '../../utils/escrowHelpers';
-
+import { getNextAction } from 'utils/escrowHelpers'; // ← fixed absolute import
 const ActionButtons = ({ escrow, userRole, onAction }) => {
   const [loading, setLoading] = useState(false);
   const nextAction = getNextAction(escrow, userRole);
