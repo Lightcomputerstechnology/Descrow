@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const escrowController = require('../controllers/escrow.controller');
-const { authenticate } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth.middleware');
 const { createEscrowValidator } = require('../validators/escrow.validator');
 
 // 🔒 Apply authentication to all escrow routes
