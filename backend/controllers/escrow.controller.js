@@ -703,6 +703,37 @@ exports.getEscrowById = async (req, res) => {
       });
     }
 
+    /**
+ * Get single escrow details
+ */
+exports.getEscrowById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    let escrow;
+
+    // Try to find by MongoDB _id first (if it's a valid ObjectId format)
+    if (id.match(/^[0-9a-fA-F]{24}$/)) {
+      escrow = await Escrow.findById(id)
+        .populate('buyer seller', 'name email profilePicture phone')
+        .populate('timeline.actor', 'name');
+    }
+
+    // If not found by _id, try by escrowId field (e.g., ESC123...)
+    if (!escrow) {
+      escrow = await Escrow.findOne({ escrowId: id })
+        .populate('buyer seller', 'name email profilePicture phone')
+        .populate('timeline.actor', 'name');
+    }
+
+    if (!escrow) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escrow not found'
+      });
+    }
+
     // Verify user is part of the escrow
     const isBuyer = escrow.buyer._id.toString() === userId;
     const isSeller = escrow.seller._id.toString() === userId;
