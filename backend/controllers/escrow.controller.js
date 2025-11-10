@@ -692,25 +692,6 @@ exports.getEscrowById = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
 
-    const escrow = await Escrow.findById(id)
-      .populate('buyer seller', 'name email profilePicture phone')
-      .populate('timeline.actor', 'name');
-
-    if (!escrow) {
-      return res.status(404).json({
-        success: false,
-        message: 'Escrow not found'
-      });
-    }
-
-    /**
- * Get single escrow details
- */
-exports.getEscrowById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const userId = req.user.id;
-
     let escrow;
 
     // Try to find by MongoDB _id first (if it's a valid ObjectId format)
