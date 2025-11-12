@@ -60,6 +60,7 @@ const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 
 // ==================== IMPORT ROUTES ====================
+// ✅ IMPORTANT: Import payment routes LAST to avoid circular dependency
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const profileRoutes = require('./routes/profile.routes');
@@ -68,12 +69,13 @@ const escrowRoutes = require('./routes/escrow.routes');
 const chatRoutes = require('./routes/chat.routes');
 const deliveryRoutes = require('./routes/delivery.routes');
 const disputeRoutes = require('./routes/dispute.routes');
-const paymentRoutes = require('./routes/payment.routes');
 const adminRoutes = require('./routes/admin.routes');
 const apiKeyRoutes = require('./routes/apiKey.routes');
 const verifyRoutes = require('./routes/verify.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const platformSettingsRoutes = require('./routes/platformSettings.routes');
+// ✅ Load payment routes LAST
+const paymentRoutes = require('./routes/payment.routes');
 
 const app = express();
 
