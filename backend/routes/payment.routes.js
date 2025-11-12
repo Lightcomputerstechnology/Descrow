@@ -1,9 +1,13 @@
-// backend/routes/payment.routes.js - PRODUCTION READY
+// backend/routes/payment.routes.js - CLEAN VERSION
 const express = require('express');
 const router = express.Router();
-const paymentController = require('../controllers/payment.controller');
-const { authenticateUser } = require('../middleware/auth.middleware');
 const { body } = require('express-validator');
+
+// ✅ Import middleware first
+const { authenticateUser } = require('../middleware/auth.middleware');
+
+// ✅ Import controller AFTER middleware
+const paymentController = require('../controllers/payment.controller');
 
 // ==================== USER ROUTES (Protected) ====================
 
@@ -13,14 +17,12 @@ router.post(
   authenticateUser,
   [
     body('escrowId').notEmpty().withMessage('Escrow ID is required'),
-    body('paymentMethod')
-      .isIn(['paystack', 'flutterwave', 'crypto'])
-      .withMessage('Invalid payment method')
+    body('paymentMethod').isIn(['paystack', 'flutterwave', 'crypto']).withMessage('Invalid payment method')
   ],
   paymentController.initializePayment
 );
 
-// Verify payment (called from frontend after redirect)
+// Verify payment
 router.post(
   '/verify',
   authenticateUser,
@@ -32,12 +34,12 @@ router.post(
 
 // ==================== WEBHOOK ROUTES (Public - No Auth) ====================
 
-// Generic webhook handler
-router.post('/webhook', express.raw({ type: 'application/json' }), paymentController.paymentWebhook);
-
 // Specific webhook endpoints
-router.post('/webhook/paystack', express.raw({ type: 'application/json' }), paymentController.paystackWebhook);
-router.post('/webhook/flutterwave', express.raw({ type: 'application/json' }), paymentController.flutterwaveWebhook);
-router.post('/webhook/nowpayments', express.raw({ type: 'application/json' }), paymentController.nowpaymentsWebhook);
+router.post('/webhook/paystack', express.json(), paymentController.paystackWebhook);
+router.post('/webhook/flutterwave', express.json(), paymentController.flutterwaveWebhook);
+router.post('/webhook/nowpayments', express.json(), paymentController.nowpaymentsWebhook);
+
+// Generic webhook handler (fallback)
+router.post('/webhook', express.json(), paymentController.paymentWebhook);
 
 module.exports = router;
