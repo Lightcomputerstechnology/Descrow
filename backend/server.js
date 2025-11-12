@@ -1,5 +1,55 @@
-// backend/server.js - PRODUCTION READY VERSION
+// backend/server.js - PRODUCTION READY VERSION (with debugging block)
 require('dotenv').config();
+const path = require('path');
+const fs = require('fs');
+
+// ==================== DEBUGGING FILE STRUCTURE (ADDED) ====================
+console.log('='.repeat(60));
+console.log('🔍 DEBUGGING FILE STRUCTURE');
+console.log('='.repeat(60));
+console.log('📂 Current directory:', __dirname);
+console.log('📂 Server file location:', __filename);
+
+// Check controllers folder
+const controllersPath = path.join(__dirname, 'controllers');
+console.log('📂 Looking for controllers at:', controllersPath);
+if (fs.existsSync(controllersPath)) {
+  console.log('✅ Controllers folder EXISTS');
+  const controllerFiles = fs.readdirSync(controllersPath);
+  console.log('📄 Files in controllers:', controllerFiles);
+
+  // Check payment controller specifically
+  if (controllerFiles.includes('payment.controller.js')) {
+    console.log('✅ payment.controller.js FOUND');
+
+    // Try to load it
+    try {
+      const testController = require('./controllers/payment.controller');
+      console.log('✅ payment.controller.js LOADED successfully');
+      console.log('📦 Exported functions:', Object.keys(testController));
+    } catch (err) {
+      console.error('❌ FAILED to load payment.controller.js:', err.message);
+    }
+  } else {
+    console.error('❌ payment.controller.js NOT FOUND in controllers folder');
+  }
+} else {
+  console.error('❌ Controllers folder DOES NOT EXIST at:', controllersPath);
+}
+
+// Check routes folder
+const routesPath = path.join(__dirname, 'routes');
+console.log('📂 Looking for routes at:', routesPath);
+if (fs.existsSync(routesPath)) {
+  console.log('✅ Routes folder EXISTS');
+  console.log('📄 Files in routes:', fs.readdirSync(routesPath));
+} else {
+  console.error('❌ Routes folder DOES NOT EXIST');
+}
+
+console.log('='.repeat(60));
+// ==================== END DEBUGGING BLOCK ====================
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -8,7 +58,6 @@ const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
-const path = require('path');
 
 // ==================== IMPORT ROUTES ====================
 const authRoutes = require('./routes/auth.routes');
@@ -67,11 +116,11 @@ app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    
+
     console.log('❌ Blocked origin:', origin);
     callback(new Error('Not allowed by CORS'));
   },
@@ -85,7 +134,7 @@ app.options('*', cors());
 
 // ==================== BODY PARSERS ====================
 // ✅ FIXED: Reduced limits for production security
-app.use(express.json({ 
+app.use(express.json({
   limit: '2mb',
   verify: (req, res, buf) => {
     // Store raw body for webhook signature verification
@@ -191,9 +240,9 @@ mongoose.connection.on('reconnected', () => {
 
 // ==================== HEALTH CHECK ====================
 app.get('/', (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Dealcross API running', 
+  res.json({
+    success: true,
+    message: 'Dealcross API running',
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString()
@@ -271,42 +320,42 @@ app.use((err, req, res, next) => {
   // Mongoose Validation Error
   if (err.name === 'ValidationError') {
     const errors = Object.values(err.errors).map(e => e.message);
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Validation Error', 
-      errors 
+    return res.status(400).json({
+      success: false,
+      message: 'Validation Error',
+      errors
     });
   }
 
   // Mongoose Duplicate Key Error
   if (err.code === 11000) {
     const field = Object.keys(err.keyPattern)[0];
-    return res.status(400).json({ 
-      success: false, 
-      message: `${field} already exists` 
+    return res.status(400).json({
+      success: false,
+      message: `${field} already exists`
     });
   }
 
   // JWT Errors
   if (err.name === 'JsonWebTokenError') {
-    return res.status(401).json({ 
-      success: false, 
-      message: 'Invalid token' 
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid token'
     });
   }
 
   if (err.name === 'TokenExpiredError') {
-    return res.status(401).json({ 
-      success: false, 
-      message: 'Token expired' 
+    return res.status(401).json({
+      success: false,
+      message: 'Token expired'
     });
   }
 
   // Multer Errors
   if (err.name === 'MulterError') {
-    return res.status(400).json({ 
-      success: false, 
-      message: err.message 
+    return res.status(400).json({
+      success: false,
+      message: err.message
     });
   }
 
@@ -322,9 +371,9 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { 
+    ...(process.env.NODE_ENV === 'development' && {
       stack: err.stack,
-      error: err 
+      error: err
     })
   });
 });
@@ -347,16 +396,16 @@ server.timeout = 30000;
 // ==================== GRACEFUL SHUTDOWN ====================
 const shutdown = async (signal) => {
   console.log(`\n👋 ${signal} received. Starting graceful shutdown...`);
-  
+
   // Stop accepting new connections
   server.close(async () => {
     console.log('💤 HTTP server closed');
-    
+
     try {
       // Close database connection
       await mongoose.connection.close(false);
       console.log('📦 MongoDB connection closed');
-      
+
       // Exit process
       process.exit(0);
     } catch (error) {
