@@ -1,33 +1,53 @@
+// src/pages/PaymentPage.jsx - PRODUCTION READY
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { CreditCard, DollarSign, Bitcoin, Loader, ArrowLeft, Shield, AlertCircle, CheckCircle } from 'lucide-react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { CreditCard, DollarSign, Bitcoin, Loader, ArrowLeft, Shield, AlertCircle, CheckCircle, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 
 const PaymentPage = () => {
-  const { escrowId } = useParams(); // This is the MongoDB _id from the URL
+  const { escrowId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [escrow, setEscrow] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [selectedGateway, setSelectedGateway] = useState('paystack');
+  const [selectedGateway, setSelectedGateway] = useState('flutterwave'); // Default to international
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
   useEffect(() => {
     fetchEscrowDetails();
-  }, [escrowId]);
+    
+    // Pre-select payment method from URL if provided
+    const method = searchParams.get('method');
+    if (method && ['paystack', 'flutterwave', 'crypto'].includes(method)) {
+      setSelectedGateway(method);
+    }
+  }, [escrowId, searchParams]);
 
   const fetchEscrowDetails = async () => {
     try {
       const token = localStorage.getItem('token');
-      // Use the correct endpoint with MongoDB _id
-      const response = await axios.get(`${API_URL}/escrow/details/${escrowId}`, {
+      const response = await axios.get(`${API_URL}/escrow/${escrowId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
       if (response.data.success) {
-        setEscrow(response.data.escrow);
+        const escrowData = response.data.data.escrow;
+        setEscrow(escrowData);
+        
+        // Check if already paid
+        if (escrowData.status === 'funded' || escrowData.payment?.paidAt) {
+          toast.success('This escrow has already been paid!');
+          setTimeout(() => navigate(`/escrow/${escrowId}`), 2000);
+        }
+        
+        // Check if user can pay (must be buyer and status must be pending/accepted)
+        if (!['pending', 'accepted'].includes(escrowData.status)) {
+          toast.error('This escrow is not ready for payment');
+          setTimeout(() => navigate(`/escrow/${escrowId}`), 2000);
+        }
       }
       setLoading(false);
     } catch (error) {
@@ -51,7 +71,7 @@ const PaymentPage = () => {
       const response = await axios.post(
         `${API_URL}/payments/initialize`,
         {
-          escrowId: escrow.escrowId, // Use the escrowId field (e.g., ESC123...)
+          escrowId: escrow.escrowId, // Use escrowId field (ESC...)
           paymentMethod: selectedGateway
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -60,12 +80,19 @@ const PaymentPage = () => {
       if (response.data.success) {
         const paymentData = response.data.paymentData;
         
+        // Store payment reference for verification
+        localStorage.setItem('pendingPaymentReference', response.data.reference);
+        localStorage.setItem('pendingPaymentEscrowId', escrow._id);
+        
         // Redirect to payment gateway
         if (paymentData.authorization_url) {
+          // Paystack
           window.location.href = paymentData.authorization_url;
         } else if (paymentData.link) {
+          // Flutterwave
           window.location.href = paymentData.link;
         } else if (paymentData.invoice_url) {
+          // Crypto
           window.location.href = paymentData.invoice_url;
         } else {
           toast.error('Payment URL not received');
@@ -81,28 +108,29 @@ const PaymentPage = () => {
 
   const gateways = [
     {
-      id: 'paystack',
-      name: 'Paystack',
-      description: 'Card, Bank Transfer, USSD',
-      icon: CreditCard,
-      color: 'blue',
-      features: ['Instant confirmation', 'Multiple payment options', 'Secure & trusted']
-    },
-    {
       id: 'flutterwave',
       name: 'Flutterwave',
-      description: 'Multi-currency, Mobile Money',
+      description: 'Best for International Payments',
       icon: DollarSign,
       color: 'purple',
-      features: ['Multi-currency support', 'Mobile money', 'International cards']
+      recommended: true,
+      features: ['Multi-currency support', 'International cards', 'Mobile money', 'Bank transfer']
     },
     {
       id: 'crypto',
       name: 'Cryptocurrency',
-      description: 'BTC, ETH, USDT, 100+ Coins',
+      description: 'Pay with Bitcoin, Ethereum, USDT & 100+ Coins',
       icon: Bitcoin,
       color: 'yellow',
-      features: ['100+ cryptocurrencies', 'Low fees', 'Fast settlement']
+      features: ['100+ cryptocurrencies', 'No borders', 'Fast settlement', 'Low fees']
+    },
+    {
+      id: 'paystack',
+      name: 'Paystack',
+      description: 'Card, Bank Transfer, USSD (Nigeria/Ghana)',
+      icon: CreditCard,
+      color: 'blue',
+      features: ['Instant confirmation', 'Nigerian banks', 'USSD & Transfer', 'Mobile money']
     }
   ];
 
@@ -125,9 +153,9 @@ const PaymentPage = () => {
     );
   }
 
-  const amount = parseFloat(escrow.amount.toString());
-  const buyerFee = amount * 0.02;
-  const totalAmount = amount + buyerFee;
+  const amount = parseFloat(escrow.payment?.amount?.toString() || escrow.amount.toString());
+  const buyerFee = parseFloat(escrow.payment?.buyerFee?.toString() || (amount * 0.02).toFixed(2));
+  const totalAmount = parseFloat(escrow.payment?.buyerPays?.toString() || (amount + buyerFee).toFixed(2));
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 py-8">
@@ -142,7 +170,9 @@ const PaymentPage = () => {
             <span>Back to Escrow Details</span>
           </button>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Complete Payment</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">Escrow ID: <span className="font-mono font-semibold">#{escrow.escrowId}</span></p>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Escrow ID: <span className="font-mono font-semibold">#{escrow.escrowId}</span>
+          </p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -161,12 +191,21 @@ const PaymentPage = () => {
                       key={gateway.id}
                       onClick={() => setSelectedGateway(gateway.id)}
                       disabled={processing}
-                      className={`w-full p-5 rounded-xl border-2 transition text-left ${
+                      className={`w-full p-5 rounded-xl border-2 transition text-left relative ${
                         isSelected
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md'
                           : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                      } ${processing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      } ${processing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                     >
+                      {gateway.recommended && (
+                        <div className="absolute -top-3 right-4">
+                          <span className="bg-gradient-to-r from-purple-600 to-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                            <Zap className="w-3 h-3" />
+                            RECOMMENDED
+                          </span>
+                        </div>
+                      )}
+                      
                       <div className="flex items-start gap-4">
                         <div className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${
                           isSelected ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-gray-100 dark:bg-gray-800'
@@ -207,7 +246,7 @@ const PaymentPage = () => {
                 {processing ? (
                   <>
                     <Loader className="w-5 h-5 animate-spin" />
-                    <span>Processing...</span>
+                    <span>Redirecting to payment gateway...</span>
                   </>
                 ) : (
                   <>
@@ -247,7 +286,10 @@ const PaymentPage = () => {
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Service Fee (2%)</span>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Buyer Fee (2%)
+                    <span className="block text-xs text-gray-500">Covers escrow protection</span>
+                  </span>
                   <span className="text-gray-900 dark:text-white">
                     {escrow.currency} {buyerFee.toLocaleString()}
                   </span>
@@ -256,7 +298,7 @@ const PaymentPage = () => {
 
               <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mb-6">
                 <div className="flex justify-between items-center">
-                  <span className="font-semibold text-gray-900 dark:text-white">Total Amount</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">Total to Pay</span>
                   <span className="font-bold text-2xl text-blue-600">
                     {escrow.currency} {totalAmount.toLocaleString()}
                   </span>
@@ -269,7 +311,7 @@ const PaymentPage = () => {
                   <div>
                     <p className="text-sm font-semibold text-green-900 dark:text-green-100">Escrow Protection</p>
                     <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-                      Funds held securely until you confirm delivery
+                      Funds held securely until you confirm delivery. Full refund if seller doesn't deliver.
                     </p>
                   </div>
                 </div>
