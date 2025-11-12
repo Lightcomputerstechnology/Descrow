@@ -1,8 +1,8 @@
+// backend/models/Escrow.model.js - PRODUCTION READY
 const mongoose = require('mongoose');
 
-// Create schema
 const escrowSchema = new mongoose.Schema({
-  // Unique Escrow ID (for reference in invoices, UI, etc.)
+  // Unique Escrow ID
   escrowId: {
     type: String,
     unique: true,
@@ -29,7 +29,7 @@ const escrowSchema = new mongoose.Schema({
   currency: {
     type: String,
     default: 'USD',
-    enum: ['USD', 'EUR', 'GBP', 'NGN']
+    enum: ['USD', 'EUR', 'GBP', 'NGN', 'KES', 'GHS', 'ZAR']
   },
 
   // Participants
@@ -46,24 +46,24 @@ const escrowSchema = new mongoose.Schema({
     index: true
   },
 
-  // Status Flow
+  // ✅ FIXED: Proper Status Flow
   status: {
     type: String,
     enum: [
-      'pending',      // Buyer created, waiting for seller
-      'accepted',     // Seller accepted
-      'funded',       // Buyer paid
-      'delivered',    // Seller delivered
-      'completed',    // Buyer confirmed
-      'paid_out',     // Seller paid
-      'cancelled',    // Cancelled
+      'pending',      // Created, waiting for seller acceptance
+      'accepted',     // Seller accepted, waiting for payment
+      'funded',       // ✅ Buyer paid, money in escrow
+      'delivered',    // Seller marked as delivered
+      'completed',    // Buyer confirmed delivery
+      'paid_out',     // Seller received payment
+      'cancelled',    // Cancelled by either party
       'disputed'      // In dispute
     ],
     default: 'pending',
     index: true
   },
 
-  // Timeline tracking (history)
+  // Timeline tracking
   timeline: [{
     status: String,
     timestamp: { type: Date, default: Date.now },
@@ -71,17 +71,31 @@ const escrowSchema = new mongoose.Schema({
     note: String
   }],
 
-  // Payment details
+  // ✅ ENHANCED: Payment details with proper fee tracking
   payment: {
-    method: String,
-    transactionId: String,
+    method: {
+      type: String,
+      enum: ['paystack', 'flutterwave', 'crypto']
+    },
+    reference: String, // Payment reference (unique per transaction)
+    transactionId: String, // Gateway transaction ID
+    paymentId: String, // For crypto (Nowpayments payment_id)
+    
+    // Amounts
+    amount: mongoose.Schema.Types.Decimal128,           // Original item amount
+    buyerFee: mongoose.Schema.Types.Decimal128,         // 2% buyer fee
+    sellerFee: mongoose.Schema.Types.Decimal128,        // 1% seller fee
+    platformFee: mongoose.Schema.Types.Decimal128,      // Total 3% platform fee
+    buyerPays: mongoose.Schema.Types.Decimal128,        // Amount + buyer fee
+    sellerReceives: mongoose.Schema.Types.Decimal128,   // Amount - seller fee
+    
+    // Status tracking
     paidAt: Date,
-    amount: mongoose.Schema.Types.Decimal128,   // Original amount
-    buyerPays: mongoose.Schema.Types.Decimal128, // Amount + buyer fee
-    sellerReceives: mongoose.Schema.Types.Decimal128, // Amount - seller fee
-    platformFee: mongoose.Schema.Types.Decimal128, // Total fee
-    buyerFee: mongoose.Schema.Types.Decimal128,
-    sellerFee: mongoose.Schema.Types.Decimal128
+    verifiedAt: Date,
+    paidOutAt: Date,
+    
+    // Gateway response data
+    gatewayResponse: mongoose.Schema.Types.Mixed
   },
 
   // Delivery details
@@ -94,8 +108,9 @@ const escrowSchema = new mongoose.Schema({
     trackingNumber: String,
     deliveredAt: Date,
     confirmedAt: Date,
+    autoReleaseAt: Date, // Auto-release funds after X days
     evidence: [{
-      type: { type: String }, // 'image', 'document', 'link'
+      type: { type: String },
       url: String,
       uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
       uploadedAt: { type: Date, default: Date.now }
@@ -109,7 +124,7 @@ const escrowSchema = new mongoose.Schema({
     raisedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     raisedAt: Date,
     reason: String,
-    evidence: [String], // URLs
+    evidence: [String],
     status: {
       type: String,
       enum: ['pending', 'under_review', 'resolved'],
@@ -120,7 +135,7 @@ const escrowSchema = new mongoose.Schema({
     resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }
   },
 
-  // Category and metadata
+  // Category
   category: {
     type: String,
     enum: [
@@ -142,14 +157,34 @@ const escrowSchema = new mongoose.Schema({
       comment: String,
       createdAt: Date
     }
+  },
+
+  // ✅ NEW: Chat unlock flag
+  chatUnlocked: {
+    type: Boolean,
+    default: false
   }
 
 }, {
   timestamps: true,
-  toJSON: { virtuals: true },
+  toJSON: { 
+    virtuals: true,
+    transform: function(doc, ret) {
+      // Convert Decimal128 to numbers for JSON
+      if (ret.amount) ret.amount = parseFloat(ret.amount.toString());
+      if (ret.payment) {
+        if (ret.payment.amount) ret.payment.amount = parseFloat(ret.payment.amount.toString());
+        if (ret.payment.buyerFee) ret.payment.buyerFee = parseFloat(ret.payment.buyerFee.toString());
+        if (ret.payment.sellerFee) ret.payment.sellerFee = parseFloat(ret.payment.sellerFee.toString());
+        if (ret.payment.platformFee) ret.payment.platformFee = parseFloat(ret.payment.platformFee.toString());
+        if (ret.payment.buyerPays) ret.payment.buyerPays = parseFloat(ret.payment.buyerPays.toString());
+        if (ret.payment.sellerReceives) ret.payment.sellerReceives = parseFloat(ret.payment.sellerReceives.toString());
+      }
+      return ret;
+    }
+  },
   toObject: { virtuals: true }
 });
-
 
 // ──────────────────────────────
 // INDEXES
@@ -157,6 +192,7 @@ const escrowSchema = new mongoose.Schema({
 escrowSchema.index({ buyer: 1, status: 1 });
 escrowSchema.index({ seller: 1, status: 1 });
 escrowSchema.index({ createdAt: -1 });
+escrowSchema.index({ 'payment.reference': 1 }, { sparse: true });
 
 // ──────────────────────────────
 // PRE-SAVE HOOKS
@@ -165,7 +201,9 @@ escrowSchema.index({ createdAt: -1 });
 // Generate unique Escrow ID
 escrowSchema.pre('save', function(next) {
   if (!this.escrowId) {
-    this.escrowId = 'ESC' + Date.now() + Math.floor(Math.random() * 1000);
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    this.escrowId = `ESC${timestamp}${random}`;
   }
   next();
 });
@@ -173,36 +211,40 @@ escrowSchema.pre('save', function(next) {
 // Prevent buyer = seller
 escrowSchema.pre('validate', function(next) {
   if (this.buyer && this.seller && this.buyer.equals(this.seller)) {
-    return next(new Error('Buyer and Seller cannot be the same user.'));
+    return next(new Error('Buyer and Seller cannot be the same user'));
   }
   next();
 });
 
 // Track status changes in timeline
 escrowSchema.pre('save', function(next) {
-  if (this.isModified('status')) {
+  if (this.isModified('status') && !this.isNew) {
     this.timeline.push({
       status: this.status,
-      timestamp: new Date(),
-      actor: this.buyer // default; controller can overwrite
+      timestamp: new Date()
     });
   }
   next();
 });
 
-// Auto fee calculation (optional business logic)
+// ✅ ENHANCED: Calculate fees properly
 escrowSchema.pre('save', function(next) {
-  if (this.isModified('amount') && !this.payment.platformFee) {
+  if (this.isModified('amount') && !this.payment?.platformFee) {
     const amount = parseFloat(this.amount.toString());
+    
+    // Fee structure: Buyer pays 2%, Seller pays 1%, Platform earns 3%
     const buyerFee = amount * 0.02;
     const sellerFee = amount * 0.01;
+    const platformFee = buyerFee + sellerFee;
+    
     this.payment = {
       ...this.payment,
-      buyerFee,
-      sellerFee,
-      platformFee: buyerFee + sellerFee,
-      buyerPays: amount + buyerFee,
-      sellerReceives: amount - sellerFee
+      amount: this.amount,
+      buyerFee: mongoose.Types.Decimal128.fromString(buyerFee.toFixed(2)),
+      sellerFee: mongoose.Types.Decimal128.fromString(sellerFee.toFixed(2)),
+      platformFee: mongoose.Types.Decimal128.fromString(platformFee.toFixed(2)),
+      buyerPays: mongoose.Types.Decimal128.fromString((amount + buyerFee).toFixed(2)),
+      sellerReceives: mongoose.Types.Decimal128.fromString((amount - sellerFee).toFixed(2))
     };
   }
   next();
@@ -211,16 +253,20 @@ escrowSchema.pre('save', function(next) {
 // ──────────────────────────────
 // VIRTUALS
 // ──────────────────────────────
-
-// Example: quick status check for UI
 escrowSchema.virtual('isCompleted').get(function() {
   return ['completed', 'paid_out'].includes(this.status);
 });
 
 escrowSchema.virtual('isActive').get(function() {
-  return !['cancelled', 'disputed', 'paid_out'].includes(this.status);
+  return !['cancelled', 'disputed', 'paid_out', 'completed'].includes(this.status);
 });
 
+escrowSchema.virtual('canBeFunded').get(function() {
+  return this.status === 'accepted' || this.status === 'pending';
+});
 
-// Export model
+escrowSchema.virtual('canBeDelivered').get(function() {
+  return this.status === 'funded';
+});
+
 module.exports = mongoose.model('Escrow', escrowSchema);
