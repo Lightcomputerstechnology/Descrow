@@ -1,10 +1,12 @@
+// backend/controllers/payment.controller.js - PRODUCTION READY
 const Escrow = require('../models/Escrow.model');
 const User = require('../models/User.model');
 const paymentService = require('../services/payment.service');
+const emailService = require('../services/email.service');
 const { validationResult } = require('express-validator');
 const crypto = require('crypto');
 
-// Initialize Payment
+// ✅ FIXED: Initialize Payment with proper status checks
 exports.initializePayment = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -14,25 +16,51 @@ exports.initializePayment = async (req, res) => {
 
     const { escrowId, paymentMethod } = req.body;
 
-    const escrow = await Escrow.findOne({ escrowId }).populate('buyer', 'email name');
+    // Fetch escrow
+    const escrow = await Escrow.findOne({ escrowId }).populate('buyer seller', 'email name');
     if (!escrow) {
       return res.status(404).json({ success: false, message: 'Escrow not found' });
     }
 
+    // Verify buyer
     if (escrow.buyer._id.toString() !== req.user._id.toString()) {
       return res.status(403).json({ success: false, message: 'Only buyer can initialize payment' });
     }
 
-    if (escrow.status !== 'pending_payment') {
-      return res.status(400).json({ success: false, message: 'Payment already processed' });
+    // ✅ FIXED: Check correct statuses
+    if (!['pending', 'accepted'].includes(escrow.status)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Payment already processed or escrow not ready for payment',
+        currentStatus: escrow.status
+      });
     }
 
-    const reference = `ESC_${escrowId}_${Date.now()}`;
+    // Check if already paid
+    if (escrow.payment?.paidAt) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'This escrow has already been paid'
+      });
+    }
+
+    // Generate unique payment reference
+    const reference = `PAY_${escrowId}_${Date.now()}`;
+    
+    // Calculate amount buyer needs to pay
+    const buyerPays = parseFloat(escrow.payment.buyerPays.toString());
+
     const metadata = {
       escrowId: escrow.escrowId,
+      escrowMongoId: escrow._id.toString(),
       buyerId: escrow.buyer._id.toString(),
       buyerName: escrow.buyer.name,
-      itemName: escrow.itemName
+      sellerId: escrow.seller._id.toString(),
+      sellerName: escrow.seller.name,
+      itemTitle: escrow.title,
+      originalAmount: parseFloat(escrow.amount.toString()),
+      buyerFee: parseFloat(escrow.payment.buyerFee.toString()),
+      totalAmount: buyerPays
     };
 
     let paymentData;
@@ -41,7 +69,7 @@ exports.initializePayment = async (req, res) => {
       case 'paystack':
         paymentData = await paymentService.initializePaystack(
           escrow.buyer.email,
-          escrow.amount,
+          buyerPays,
           reference,
           metadata
         );
@@ -50,7 +78,7 @@ exports.initializePayment = async (req, res) => {
       case 'flutterwave':
         paymentData = await paymentService.initializeFlutterwave(
           escrow.buyer.email,
-          escrow.amount,
+          buyerPays,
           escrow.currency,
           reference,
           metadata
@@ -59,10 +87,10 @@ exports.initializePayment = async (req, res) => {
 
       case 'crypto':
         paymentData = await paymentService.initializeNowpayments(
-          escrow.amount,
+          buyerPays,
           escrow.currency,
           reference,
-          `Payment for ${escrow.itemName}`
+          `Payment for ${escrow.title}`
         );
         break;
 
@@ -73,53 +101,84 @@ exports.initializePayment = async (req, res) => {
         });
     }
 
-    escrow.paymentReference = reference;
-    escrow.paymentMethod = paymentMethod;
+    // Save payment reference
+    escrow.payment.reference = reference;
+    escrow.payment.method = paymentMethod;
     if (paymentMethod === 'crypto') {
-      escrow.nowpaymentsId = paymentData.paymentId;
+      escrow.payment.paymentId = paymentData.payment_id;
     }
     await escrow.save();
+
+    console.log(`✅ Payment initialized: ${reference} for escrow ${escrow.escrowId}`);
 
     res.status(200).json({
       success: true,
       message: 'Payment initialized successfully',
       paymentData,
       reference,
-      escrowId: escrow.escrowId
+      escrowId: escrow.escrowId,
+      amount: buyerPays
     });
 
   } catch (error) {
-    console.error('Initialize payment error:', error);
-    res.status(500).json({ success: false, message: 'Failed to initialize payment', error: error.message });
+    console.error('❌ Initialize payment error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to initialize payment', 
+      error: error.message 
+    });
   }
 };
 
-// Verify Payment
+// ✅ ENHANCED: Verify Payment with idempotency
 exports.verifyPayment = async (req, res) => {
   try {
     const { reference, paymentMethod, transactionId, paymentId } = req.body;
 
-    const escrow = await Escrow.findOne({ paymentReference: reference })
-      .populate('buyer', 'name email')
-      .populate('seller', 'name email');
+    if (!reference) {
+      return res.status(400).json({ success: false, message: 'Payment reference is required' });
+    }
+
+    const escrow = await Escrow.findOne({ 'payment.reference': reference })
+      .populate('buyer seller', 'name email');
 
     if (!escrow) {
-      return res.status(404).json({ success: false, message: 'Escrow not found' });
+      return res.status(404).json({ success: false, message: 'Escrow not found for this payment reference' });
+    }
+
+    // ✅ IDEMPOTENCY: If already funded, return success
+    if (escrow.status === 'funded' && escrow.payment.paidAt) {
+      return res.status(200).json({
+        success: true,
+        message: 'Payment already verified',
+        escrow: {
+          escrowId: escrow.escrowId,
+          status: escrow.status,
+          chatUnlocked: escrow.chatUnlocked
+        }
+      });
     }
 
     let verificationResult;
 
-    switch (paymentMethod) {
+    switch (paymentMethod || escrow.payment.method) {
       case 'paystack':
         verificationResult = await paymentService.verifyPaystack(reference);
         break;
 
       case 'flutterwave':
+        if (!transactionId) {
+          return res.status(400).json({ success: false, message: 'Transaction ID required for Flutterwave' });
+        }
         verificationResult = await paymentService.verifyFlutterwave(transactionId);
         break;
 
       case 'crypto':
-        verificationResult = await paymentService.verifyNowpayments(paymentId || escrow.nowpaymentsId);
+        const cryptoPaymentId = paymentId || escrow.payment.paymentId;
+        if (!cryptoPaymentId) {
+          return res.status(400).json({ success: false, message: 'Payment ID required for crypto' });
+        }
+        verificationResult = await paymentService.verifyNowpayments(cryptoPaymentId);
         break;
 
       default:
@@ -127,33 +186,52 @@ exports.verifyPayment = async (req, res) => {
     }
 
     if (!verificationResult.success) {
-      return res.status(400).json({ success: false, message: 'Payment verification failed' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Payment verification failed',
+        details: verificationResult
+      });
     }
 
-    // Update escrow
-    escrow.status = 'in_escrow';
+    // ✅ Update escrow to FUNDED status
+    escrow.status = 'funded';
     escrow.chatUnlocked = true;
-    escrow.paymentVerifiedAt = new Date();
+    escrow.payment.paidAt = new Date();
+    escrow.payment.verifiedAt = new Date();
+    escrow.payment.transactionId = verificationResult.transactionId || verificationResult.reference;
+    escrow.payment.gatewayResponse = verificationResult;
+    
     await escrow.save();
 
     // Update buyer stats
     const buyer = await User.findById(escrow.buyer._id);
-    buyer.totalTransactions += 1;
-    buyer.totalSpent += escrow.amount;
-    await buyer.save();
+    if (buyer) {
+      buyer.totalTransactions = (buyer.totalTransactions || 0) + 1;
+      buyer.totalSpent = (buyer.totalSpent || 0) + parseFloat(escrow.payment.buyerPays.toString());
+      await buyer.save();
+    }
 
-    // Send emails
-    const emailService = require('../services/email.service');
-    await emailService.sendPaymentConfirmedEmail(
-      escrow.buyer.email,
-      escrow.seller.email,
-      {
-        escrowId: escrow.escrowId,
-        itemName: escrow.itemName,
-        amount: escrow.amount,
-        currency: escrow.currency
-      }
-    );
+    // ✅ Send confirmation emails
+    try {
+      await emailService.sendPaymentConfirmedEmail(
+        escrow.buyer.email,
+        escrow.buyer.name,
+        escrow.seller.email,
+        escrow.seller.name,
+        {
+          escrowId: escrow.escrowId,
+          title: escrow.title,
+          amount: parseFloat(escrow.amount.toString()),
+          currency: escrow.currency,
+          buyerPaid: parseFloat(escrow.payment.buyerPays.toString())
+        }
+      );
+    } catch (emailError) {
+      console.error('❌ Failed to send confirmation email:', emailError);
+      // Don't fail the payment if email fails
+    }
+
+    console.log(`✅ Payment verified and escrow funded: ${escrow.escrowId}`);
 
     res.status(200).json({
       success: true,
@@ -161,17 +239,22 @@ exports.verifyPayment = async (req, res) => {
       escrow: {
         escrowId: escrow.escrowId,
         status: escrow.status,
-        chatUnlocked: escrow.chatUnlocked
+        chatUnlocked: escrow.chatUnlocked,
+        paidAt: escrow.payment.paidAt
       }
     });
 
   } catch (error) {
-    console.error('Verify payment error:', error);
-    res.status(500).json({ success: false, message: 'Failed to verify payment', error: error.message });
+    console.error('❌ Verify payment error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to verify payment', 
+      error: error.message 
+    });
   }
 };
 
-// ✅ AUTOMATIC Nowpayments Webhook (IPN) - NO MANUAL ADMIN CONFIRMATION
+// ✅ ENHANCED: Nowpayments Webhook with proper idempotency
 exports.nowpaymentsWebhook = async (req, res) => {
   try {
     const signature = req.headers['x-nowpayments-sig'];
@@ -184,47 +267,73 @@ exports.nowpaymentsWebhook = async (req, res) => {
       .digest('hex');
 
     if (signature !== expectedSignature) {
-      console.error('Invalid Nowpayments webhook signature');
+      console.error('❌ Invalid Nowpayments webhook signature');
       return res.status(400).json({ success: false, message: 'Invalid signature' });
     }
 
     console.log('✅ Nowpayments IPN received:', payload);
 
-    // ✅ AUTOMATIC CONFIRMATION - NO ADMIN NEEDED
+    // Only process 'finished' payments
     if (payload.payment_status === 'finished') {
-      const escrow = await Escrow.findOne({ paymentReference: payload.order_id })
-        .populate('buyer', 'name email')
-        .populate('seller', 'name email');
+      const escrow = await Escrow.findOne({ 'payment.reference': payload.order_id })
+        .populate('buyer seller', 'name email');
 
-      if (escrow && escrow.status === 'pending_payment') {
-        console.log(`✅ Auto-confirming crypto payment for escrow ${escrow.escrowId}`);
+      if (!escrow) {
+        console.error(`❌ Escrow not found for order_id: ${payload.order_id}`);
+        return res.status(404).json({ success: false, message: 'Escrow not found' });
+      }
 
-        escrow.status = 'in_escrow';
-        escrow.chatUnlocked = true;
-        escrow.paymentVerifiedAt = new Date();
-        await escrow.save();
+      // ✅ IDEMPOTENCY: Skip if already funded
+      if (escrow.status === 'funded' && escrow.payment.paidAt) {
+        console.log(`⚠️ Escrow ${escrow.escrowId} already funded, skipping duplicate webhook`);
+        return res.status(200).json({ success: true, message: 'Already processed' });
+      }
 
-        // Update buyer stats
-        const buyer = await User.findById(escrow.buyer._id);
-        buyer.totalTransactions += 1;
-        buyer.totalSpent += escrow.amount;
+      // Check if payment is still in pending/accepted state
+      if (!['pending', 'accepted'].includes(escrow.status)) {
+        console.log(`⚠️ Escrow ${escrow.escrowId} status is ${escrow.status}, cannot fund`);
+        return res.status(400).json({ success: false, message: 'Invalid escrow status' });
+      }
+
+      console.log(`✅ Auto-confirming crypto payment for escrow ${escrow.escrowId}`);
+
+      // Update escrow
+      escrow.status = 'funded';
+      escrow.chatUnlocked = true;
+      escrow.payment.paidAt = new Date();
+      escrow.payment.verifiedAt = new Date();
+      escrow.payment.paymentId = payload.payment_id;
+      escrow.payment.gatewayResponse = payload;
+      await escrow.save();
+
+      // Update buyer stats
+      const buyer = await User.findById(escrow.buyer._id);
+      if (buyer) {
+        buyer.totalTransactions = (buyer.totalTransactions || 0) + 1;
+        buyer.totalSpent = (buyer.totalSpent || 0) + parseFloat(escrow.payment.buyerPays.toString());
         await buyer.save();
+      }
 
-        // Send confirmation emails
-        const emailService = require('../services/email.service');
+      // Send confirmation emails
+      try {
         await emailService.sendPaymentConfirmedEmail(
           escrow.buyer.email,
+          escrow.buyer.name,
           escrow.seller.email,
+          escrow.seller.name,
           {
             escrowId: escrow.escrowId,
-            itemName: escrow.itemName,
-            amount: escrow.amount,
-            currency: escrow.currency
+            title: escrow.title,
+            amount: parseFloat(escrow.amount.toString()),
+            currency: escrow.currency,
+            buyerPaid: parseFloat(escrow.payment.buyerPays.toString())
           }
         );
-
-        console.log(`✅ Crypto payment auto-confirmed for ${escrow.escrowId}`);
+      } catch (emailError) {
+        console.error('❌ Failed to send webhook email:', emailError);
       }
+
+      console.log(`✅ Crypto payment auto-confirmed for ${escrow.escrowId}`);
     }
 
     res.status(200).json({ success: true });
@@ -235,7 +344,7 @@ exports.nowpaymentsWebhook = async (req, res) => {
   }
 };
 
-// Paystack Webhook
+// ✅ ENHANCED: Paystack Webhook with idempotency
 exports.paystackWebhook = async (req, res) => {
   try {
     const hash = crypto
@@ -244,79 +353,159 @@ exports.paystackWebhook = async (req, res) => {
       .digest('hex');
 
     if (hash !== req.headers['x-paystack-signature']) {
+      console.error('❌ Invalid Paystack signature');
       return res.status(400).json({ success: false, message: 'Invalid signature' });
     }
 
     const event = req.body;
+    console.log('✅ Paystack webhook received:', event.event);
 
     if (event.event === 'charge.success') {
       const reference = event.data.reference;
-      const escrow = await Escrow.findOne({ paymentReference: reference })
-        .populate('buyer', 'name email')
-        .populate('seller', 'name email');
+      const escrow = await Escrow.findOne({ 'payment.reference': reference })
+        .populate('buyer seller', 'name email');
 
-      if (escrow && escrow.status === 'pending_payment') {
-        escrow.status = 'in_escrow';
-        escrow.chatUnlocked = true;
-        escrow.paymentVerifiedAt = new Date();
-        await escrow.save();
-
-        // Update buyer stats
-        const buyer = await User.findById(escrow.buyer._id);
-        buyer.totalTransactions += 1;
-        buyer.totalSpent += escrow.amount;
-        await buyer.save();
-
-        console.log(`✅ Paystack payment confirmed for ${escrow.escrowId}`);
+      if (!escrow) {
+        console.error(`❌ Escrow not found for reference: ${reference}`);
+        return res.status(404).json({ success: false, message: 'Escrow not found' });
       }
+
+      // ✅ IDEMPOTENCY
+      if (escrow.status === 'funded' && escrow.payment.paidAt) {
+        console.log(`⚠️ Escrow ${escrow.escrowId} already funded`);
+        return res.status(200).json({ success: true, message: 'Already processed' });
+      }
+
+      if (!['pending', 'accepted'].includes(escrow.status)) {
+        console.log(`⚠️ Escrow ${escrow.escrowId} status is ${escrow.status}`);
+        return res.status(400).json({ success: false, message: 'Invalid status' });
+      }
+
+      // Update escrow
+      escrow.status = 'funded';
+      escrow.chatUnlocked = true;
+      escrow.payment.paidAt = new Date();
+      escrow.payment.verifiedAt = new Date();
+      escrow.payment.transactionId = event.data.id;
+      escrow.payment.gatewayResponse = event.data;
+      await escrow.save();
+
+      // Update buyer stats
+      const buyer = await User.findById(escrow.buyer._id);
+      if (buyer) {
+        buyer.totalTransactions = (buyer.totalTransactions || 0) + 1;
+        buyer.totalSpent = (buyer.totalSpent || 0) + parseFloat(escrow.payment.buyerPays.toString());
+        await buyer.save();
+      }
+
+      // Send emails
+      try {
+        await emailService.sendPaymentConfirmedEmail(
+          escrow.buyer.email,
+          escrow.buyer.name,
+          escrow.seller.email,
+          escrow.seller.name,
+          {
+            escrowId: escrow.escrowId,
+            title: escrow.title,
+            amount: parseFloat(escrow.amount.toString()),
+            currency: escrow.currency,
+            buyerPaid: parseFloat(escrow.payment.buyerPays.toString())
+          }
+        );
+      } catch (emailError) {
+        console.error('❌ Email error:', emailError);
+      }
+
+      console.log(`✅ Paystack payment confirmed for ${escrow.escrowId}`);
     }
 
     res.status(200).json({ success: true });
 
   } catch (error) {
-    console.error('Paystack webhook error:', error);
+    console.error('❌ Paystack webhook error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// Flutterwave Webhook
+// ✅ ENHANCED: Flutterwave Webhook with idempotency
 exports.flutterwaveWebhook = async (req, res) => {
   try {
     const secretHash = process.env.FLUTTERWAVE_WEBHOOK_SECRET;
     const signature = req.headers['verif-hash'];
 
     if (!signature || signature !== secretHash) {
+      console.error('❌ Invalid Flutterwave signature');
       return res.status(400).json({ success: false, message: 'Invalid signature' });
     }
 
     const payload = req.body;
+    console.log('✅ Flutterwave webhook received:', payload.event);
 
     if (payload.event === 'charge.completed' && payload.data.status === 'successful') {
       const reference = payload.data.tx_ref;
-      const escrow = await Escrow.findOne({ paymentReference: reference })
-        .populate('buyer', 'name email')
-        .populate('seller', 'name email');
+      const escrow = await Escrow.findOne({ 'payment.reference': reference })
+        .populate('buyer seller', 'name email');
 
-      if (escrow && escrow.status === 'pending_payment') {
-        escrow.status = 'in_escrow';
-        escrow.chatUnlocked = true;
-        escrow.paymentVerifiedAt = new Date();
-        await escrow.save();
-
-        // Update buyer stats
-        const buyer = await User.findById(escrow.buyer._id);
-        buyer.totalTransactions += 1;
-        buyer.totalSpent += escrow.amount;
-        await buyer.save();
-
-        console.log(`✅ Flutterwave payment confirmed for ${escrow.escrowId}`);
+      if (!escrow) {
+        console.error(`❌ Escrow not found for reference: ${reference}`);
+        return res.status(404).json({ success: false, message: 'Escrow not found' });
       }
+
+      // ✅ IDEMPOTENCY
+      if (escrow.status === 'funded' && escrow.payment.paidAt) {
+        console.log(`⚠️ Escrow ${escrow.escrowId} already funded`);
+        return res.status(200).json({ success: true, message: 'Already processed' });
+      }
+
+      if (!['pending', 'accepted'].includes(escrow.status)) {
+        console.log(`⚠️ Escrow ${escrow.escrowId} status is ${escrow.status}`);
+        return res.status(400).json({ success: false, message: 'Invalid status' });
+      }
+
+      // Update escrow
+      escrow.status = 'funded';
+      escrow.chatUnlocked = true;
+      escrow.payment.paidAt = new Date();
+      escrow.payment.verifiedAt = new Date();
+      escrow.payment.transactionId = payload.data.id;
+      escrow.payment.gatewayResponse = payload.data;
+      await escrow.save();
+
+      // Update buyer stats
+      const buyer = await User.findById(escrow.buyer._id);
+      if (buyer) {
+        buyer.totalTransactions = (buyer.totalTransactions || 0) + 1;
+        buyer.totalSpent = (buyer.totalSpent || 0) + parseFloat(escrow.payment.buyerPays.toString());
+        await buyer.save();
+      }
+
+      // Send emails
+      try {
+        await emailService.sendPaymentConfirmedEmail(
+          escrow.buyer.email,
+          escrow.buyer.name,
+          escrow.seller.email,
+          escrow.seller.name,
+          {
+            escrowId: escrow.escrowId,
+            title: escrow.title,
+            amount: parseFloat(escrow.amount.toString()),
+            currency: escrow.currency,
+            buyerPaid: parseFloat(escrow.payment.buyerPays.toString())
+          }
+        );
+      } catch (emailError) {
+        console.error('❌ Email error:', emailError);
+      }
+
+      console.log(`✅ Flutterwave payment confirmed for ${escrow.escrowId}`);
     }
 
     res.status(200).json({ success: true });
 
   } catch (error) {
-    console.error('Flutterwave webhook error:', error);
+    console.error('❌ Flutterwave webhook error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -325,12 +514,17 @@ exports.flutterwaveWebhook = async (req, res) => {
 exports.paymentWebhook = async (req, res) => {
   const paystackSignature = req.headers['x-paystack-signature'];
   const flutterwaveSignature = req.headers['verif-hash'];
+  const nowpaymentsSignature = req.headers['x-nowpayments-sig'];
 
   if (paystackSignature) {
     return exports.paystackWebhook(req, res);
   } else if (flutterwaveSignature) {
     return exports.flutterwaveWebhook(req, res);
+  } else if (nowpaymentsSignature) {
+    return exports.nowpaymentsWebhook(req, res);
   } else {
     return res.status(400).json({ success: false, message: 'Unknown webhook source' });
   }
 };
+
+module.exports = exports;
