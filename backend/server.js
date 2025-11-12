@@ -1,55 +1,6 @@
-// backend/server.js - PRODUCTION READY VERSION (with debugging block)
+// backend/server.js - PRODUCTION READY VERSION
 require('dotenv').config();
 const path = require('path');
-const fs = require('fs');
-
-// ==================== DEBUGGING FILE STRUCTURE (ADDED) ====================
-console.log('='.repeat(60));
-console.log('🔍 DEBUGGING FILE STRUCTURE');
-console.log('='.repeat(60));
-console.log('📂 Current directory:', __dirname);
-console.log('📂 Server file location:', __filename);
-
-// Check controllers folder
-const controllersPath = path.join(__dirname, 'controllers');
-console.log('📂 Looking for controllers at:', controllersPath);
-if (fs.existsSync(controllersPath)) {
-  console.log('✅ Controllers folder EXISTS');
-  const controllerFiles = fs.readdirSync(controllersPath);
-  console.log('📄 Files in controllers:', controllerFiles);
-
-  // Check payment controller specifically
-  if (controllerFiles.includes('payment.controller.js')) {
-    console.log('✅ payment.controller.js FOUND');
-
-    // Try to load it
-    try {
-      const testController = require('./controllers/payment.controller');
-      console.log('✅ payment.controller.js LOADED successfully');
-      console.log('📦 Exported functions:', Object.keys(testController));
-    } catch (err) {
-      console.error('❌ FAILED to load payment.controller.js:', err.message);
-    }
-  } else {
-    console.error('❌ payment.controller.js NOT FOUND in controllers folder');
-  }
-} else {
-  console.error('❌ Controllers folder DOES NOT EXIST at:', controllersPath);
-}
-
-// Check routes folder
-const routesPath = path.join(__dirname, 'routes');
-console.log('📂 Looking for routes at:', routesPath);
-if (fs.existsSync(routesPath)) {
-  console.log('✅ Routes folder EXISTS');
-  console.log('📄 Files in routes:', fs.readdirSync(routesPath));
-} else {
-  console.error('❌ Routes folder DOES NOT EXIST');
-}
-
-console.log('='.repeat(60));
-// ==================== END DEBUGGING BLOCK ====================
-
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -60,7 +11,6 @@ const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
 
 // ==================== IMPORT ROUTES ====================
-// ✅ IMPORTANT: Import payment routes LAST to avoid circular dependency
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const profileRoutes = require('./routes/profile.routes');
@@ -74,7 +24,6 @@ const apiKeyRoutes = require('./routes/apiKey.routes');
 const verifyRoutes = require('./routes/verify.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const platformSettingsRoutes = require('./routes/platformSettings.routes');
-// ✅ Load payment routes LAST
 const paymentRoutes = require('./routes/payment.routes');
 
 const app = express();
@@ -135,7 +84,6 @@ app.use(cors({
 app.options('*', cors());
 
 // ==================== BODY PARSERS ====================
-// ✅ FIXED: Reduced limits for production security
 app.use(express.json({
   limit: '2mb',
   verify: (req, res, buf) => {
@@ -151,50 +99,41 @@ app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 } else {
-  // Production: Log to file or external service
   app.use(morgan('combined', {
-    skip: (req, res) => res.statusCode < 400 // Only log errors in production
+    skip: (req, res) => res.statusCode < 400
   }));
 }
 
 // ==================== RATE LIMITING ====================
-// ✅ ENHANCED: Stricter rate limiting for production
 
 // General API rate limit
 const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per window
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: { success: false, message: 'Too many requests, please try again later.' },
   standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    console.warn(`⚠️ Rate limit exceeded for IP: ${req.ip}`);
-    res.status(429).json({
-      success: false,
-      message: 'Too many requests, please try again later.'
-    });
-  }
+  legacyHeaders: false
 });
 
 // Strict auth rate limit
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Only 10 auth attempts per 15 minutes
+  windowMs: 15 * 60 * 1000,
+  max: 10,
   message: { success: false, message: 'Too many authentication attempts, try again later.' },
-  skipSuccessfulRequests: true // Don't count successful logins
+  skipSuccessfulRequests: true
 });
 
-// Payment rate limit (prevent spam)
+// Payment rate limit
 const paymentLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 5, // 5 payment initializations per minute
+  windowMs: 60 * 1000,
+  max: 5,
   message: { success: false, message: 'Too many payment attempts, please wait.' }
 });
 
-// Webhook rate limit (allow burst traffic)
+// Webhook rate limit
 const webhookLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 100, // Allow 100 webhook calls per minute
+  max: 100,
   skipFailedRequests: true
 });
 
@@ -206,15 +145,14 @@ app.use('/api/payments/webhook', webhookLimiter);
 
 // ==================== STATIC FILES ====================
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
-  maxAge: '7d', // Cache static files for 7 days
+  maxAge: '7d',
   etag: true
 }));
 
 // ==================== DATABASE CONNECTION ====================
 mongoose.connect(process.env.MONGODB_URI, {
-  // ✅ PRODUCTION OPTIMIZATIONS
-  maxPoolSize: 10, // Maximum 10 connections in pool
-  minPoolSize: 2,  // Minimum 2 connections
+  maxPoolSize: 10,
+  minPoolSize: 2,
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
 })
@@ -227,7 +165,6 @@ mongoose.connect(process.env.MONGODB_URI, {
     process.exit(1);
   });
 
-// ✅ Handle MongoDB connection errors after initial connection
 mongoose.connection.on('error', err => {
   console.error('❌ MongoDB error:', err);
 });
@@ -266,16 +203,6 @@ app.get('/api/health', async (req, res) => {
     }
   };
 
-  // ✅ Check payment gateway health
-  if (process.env.CHECK_PAYMENT_GATEWAYS === 'true') {
-    try {
-      const paymentService = require('./services/payment.service');
-      healthCheck.paymentGateways = await paymentService.healthCheck();
-    } catch (error) {
-      healthCheck.paymentGateways = { error: 'Failed to check gateways' };
-    }
-  }
-
   res.json(healthCheck);
 });
 
@@ -299,6 +226,7 @@ app.use('/api/platform', platformSettingsRoutes);
 
 // 404 Handler
 app.use((req, res) => {
+  console.log(`❌ 404 Not Found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({
     success: false,
     message: 'Route not found',
@@ -310,7 +238,6 @@ app.use((req, res) => {
 
 // Global Error Handler
 app.use((err, req, res, next) => {
-  // Log error
   console.error('❌ Error:', {
     message: err.message,
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
@@ -374,8 +301,7 @@ app.use((err, req, res, next) => {
     success: false,
     message: err.message || 'Internal server error',
     ...(process.env.NODE_ENV === 'development' && {
-      stack: err.stack,
-      error: err
+      stack: err.stack
     })
   });
 });
@@ -392,23 +318,18 @@ const server = app.listen(PORT, () => {
   console.log('='.repeat(60));
 });
 
-// Set server timeout (30 seconds)
 server.timeout = 30000;
 
 // ==================== GRACEFUL SHUTDOWN ====================
 const shutdown = async (signal) => {
   console.log(`\n👋 ${signal} received. Starting graceful shutdown...`);
 
-  // Stop accepting new connections
   server.close(async () => {
     console.log('💤 HTTP server closed');
 
     try {
-      // Close database connection
       await mongoose.connection.close(false);
       console.log('📦 MongoDB connection closed');
-
-      // Exit process
       process.exit(0);
     } catch (error) {
       console.error('❌ Error during shutdown:', error);
@@ -416,19 +337,16 @@ const shutdown = async (signal) => {
     }
   });
 
-  // Force shutdown after 10 seconds
   setTimeout(() => {
     console.error('⚠️ Forcing shutdown after timeout');
     process.exit(1);
   }, 10000);
 };
 
-// Handle shutdown signals
 ['SIGINT', 'SIGTERM'].forEach(signal => {
   process.on(signal, () => shutdown(signal));
 });
 
-// Handle uncaught errors
 process.on('unhandledRejection', (reason, promise) => {
   console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
   shutdown('UNHANDLED_REJECTION');
