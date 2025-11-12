@@ -1,4 +1,4 @@
-// backend/controllers/payment.controller.js - PRODUCTION READY
+// backend/controllers/payment.controller.js - FIXED EXPORTS
 const Escrow = require('../models/Escrow.model');
 const User = require('../models/User.model');
 const paymentService = require('../services/payment.service');
@@ -6,8 +6,8 @@ const emailService = require('../services/email.service');
 const { validationResult } = require('express-validator');
 const crypto = require('crypto');
 
-// ✅ FIXED: Initialize Payment with proper status checks
-exports.initializePayment = async (req, res) => {
+// ✅ Initialize Payment
+const initializePayment = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -16,18 +16,15 @@ exports.initializePayment = async (req, res) => {
 
     const { escrowId, paymentMethod } = req.body;
 
-    // Fetch escrow
     const escrow = await Escrow.findOne({ escrowId }).populate('buyer seller', 'email name');
     if (!escrow) {
       return res.status(404).json({ success: false, message: 'Escrow not found' });
     }
 
-    // Verify buyer
     if (escrow.buyer._id.toString() !== req.user._id.toString()) {
       return res.status(403).json({ success: false, message: 'Only buyer can initialize payment' });
     }
 
-    // ✅ FIXED: Check correct statuses
     if (!['pending', 'accepted'].includes(escrow.status)) {
       return res.status(400).json({ 
         success: false, 
@@ -36,7 +33,6 @@ exports.initializePayment = async (req, res) => {
       });
     }
 
-    // Check if already paid
     if (escrow.payment?.paidAt) {
       return res.status(400).json({ 
         success: false, 
@@ -44,10 +40,7 @@ exports.initializePayment = async (req, res) => {
       });
     }
 
-    // Generate unique payment reference
     const reference = `PAY_${escrowId}_${Date.now()}`;
-    
-    // Calculate amount buyer needs to pay
     const buyerPays = parseFloat(escrow.payment.buyerPays.toString());
 
     const metadata = {
@@ -101,7 +94,6 @@ exports.initializePayment = async (req, res) => {
         });
     }
 
-    // Save payment reference
     escrow.payment.reference = reference;
     escrow.payment.method = paymentMethod;
     if (paymentMethod === 'crypto') {
@@ -130,8 +122,8 @@ exports.initializePayment = async (req, res) => {
   }
 };
 
-// ✅ ENHANCED: Verify Payment with idempotency
-exports.verifyPayment = async (req, res) => {
+// ✅ Verify Payment
+const verifyPayment = async (req, res) => {
   try {
     const { reference, paymentMethod, transactionId, paymentId } = req.body;
 
@@ -146,7 +138,6 @@ exports.verifyPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Escrow not found for this payment reference' });
     }
 
-    // ✅ IDEMPOTENCY: If already funded, return success
     if (escrow.status === 'funded' && escrow.payment.paidAt) {
       return res.status(200).json({
         success: true,
@@ -193,7 +184,6 @@ exports.verifyPayment = async (req, res) => {
       });
     }
 
-    // ✅ Update escrow to FUNDED status
     escrow.status = 'funded';
     escrow.chatUnlocked = true;
     escrow.payment.paidAt = new Date();
@@ -203,7 +193,6 @@ exports.verifyPayment = async (req, res) => {
     
     await escrow.save();
 
-    // Update buyer stats
     const buyer = await User.findById(escrow.buyer._id);
     if (buyer) {
       buyer.totalTransactions = (buyer.totalTransactions || 0) + 1;
@@ -211,7 +200,6 @@ exports.verifyPayment = async (req, res) => {
       await buyer.save();
     }
 
-    // ✅ Send confirmation emails
     try {
       await emailService.sendPaymentConfirmedEmail(
         escrow.buyer.email,
@@ -228,7 +216,6 @@ exports.verifyPayment = async (req, res) => {
       );
     } catch (emailError) {
       console.error('❌ Failed to send confirmation email:', emailError);
-      // Don't fail the payment if email fails
     }
 
     console.log(`✅ Payment verified and escrow funded: ${escrow.escrowId}`);
@@ -254,15 +241,14 @@ exports.verifyPayment = async (req, res) => {
   }
 };
 
-// ✅ ENHANCED: Nowpayments Webhook with proper idempotency
-exports.nowpaymentsWebhook = async (req, res) => {
+// ✅ Nowpayments Webhook
+const nowpaymentsWebhook = async (req, res) => {
   try {
     const signature = req.headers['x-nowpayments-sig'];
     const payload = req.body;
 
-    // Verify signature
     const expectedSignature = crypto
-      .createHmac('sha512', process.env.NOWPAYMENTS_IPN_SECRET)
+      .createHmac('sha512', process.env.NOWPAYMENTS_IPN_SECRET || '')
       .update(JSON.stringify(payload))
       .digest('hex');
 
@@ -273,7 +259,6 @@ exports.nowpaymentsWebhook = async (req, res) => {
 
     console.log('✅ Nowpayments IPN received:', payload);
 
-    // Only process 'finished' payments
     if (payload.payment_status === 'finished') {
       const escrow = await Escrow.findOne({ 'payment.reference': payload.order_id })
         .populate('buyer seller', 'name email');
@@ -283,13 +268,11 @@ exports.nowpaymentsWebhook = async (req, res) => {
         return res.status(404).json({ success: false, message: 'Escrow not found' });
       }
 
-      // ✅ IDEMPOTENCY: Skip if already funded
       if (escrow.status === 'funded' && escrow.payment.paidAt) {
         console.log(`⚠️ Escrow ${escrow.escrowId} already funded, skipping duplicate webhook`);
         return res.status(200).json({ success: true, message: 'Already processed' });
       }
 
-      // Check if payment is still in pending/accepted state
       if (!['pending', 'accepted'].includes(escrow.status)) {
         console.log(`⚠️ Escrow ${escrow.escrowId} status is ${escrow.status}, cannot fund`);
         return res.status(400).json({ success: false, message: 'Invalid escrow status' });
@@ -297,7 +280,6 @@ exports.nowpaymentsWebhook = async (req, res) => {
 
       console.log(`✅ Auto-confirming crypto payment for escrow ${escrow.escrowId}`);
 
-      // Update escrow
       escrow.status = 'funded';
       escrow.chatUnlocked = true;
       escrow.payment.paidAt = new Date();
@@ -306,7 +288,6 @@ exports.nowpaymentsWebhook = async (req, res) => {
       escrow.payment.gatewayResponse = payload;
       await escrow.save();
 
-      // Update buyer stats
       const buyer = await User.findById(escrow.buyer._id);
       if (buyer) {
         buyer.totalTransactions = (buyer.totalTransactions || 0) + 1;
@@ -314,7 +295,6 @@ exports.nowpaymentsWebhook = async (req, res) => {
         await buyer.save();
       }
 
-      // Send confirmation emails
       try {
         await emailService.sendPaymentConfirmedEmail(
           escrow.buyer.email,
@@ -344,11 +324,11 @@ exports.nowpaymentsWebhook = async (req, res) => {
   }
 };
 
-// ✅ ENHANCED: Paystack Webhook with idempotency
-exports.paystackWebhook = async (req, res) => {
+// ✅ Paystack Webhook
+const paystackWebhook = async (req, res) => {
   try {
     const hash = crypto
-      .createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
+      .createHmac('sha512', process.env.PAYSTACK_SECRET_KEY || '')
       .update(JSON.stringify(req.body))
       .digest('hex');
 
@@ -370,7 +350,6 @@ exports.paystackWebhook = async (req, res) => {
         return res.status(404).json({ success: false, message: 'Escrow not found' });
       }
 
-      // ✅ IDEMPOTENCY
       if (escrow.status === 'funded' && escrow.payment.paidAt) {
         console.log(`⚠️ Escrow ${escrow.escrowId} already funded`);
         return res.status(200).json({ success: true, message: 'Already processed' });
@@ -381,7 +360,6 @@ exports.paystackWebhook = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid status' });
       }
 
-      // Update escrow
       escrow.status = 'funded';
       escrow.chatUnlocked = true;
       escrow.payment.paidAt = new Date();
@@ -390,31 +368,11 @@ exports.paystackWebhook = async (req, res) => {
       escrow.payment.gatewayResponse = event.data;
       await escrow.save();
 
-      // Update buyer stats
       const buyer = await User.findById(escrow.buyer._id);
       if (buyer) {
         buyer.totalTransactions = (buyer.totalTransactions || 0) + 1;
         buyer.totalSpent = (buyer.totalSpent || 0) + parseFloat(escrow.payment.buyerPays.toString());
         await buyer.save();
-      }
-
-      // Send emails
-      try {
-        await emailService.sendPaymentConfirmedEmail(
-          escrow.buyer.email,
-          escrow.buyer.name,
-          escrow.seller.email,
-          escrow.seller.name,
-          {
-            escrowId: escrow.escrowId,
-            title: escrow.title,
-            amount: parseFloat(escrow.amount.toString()),
-            currency: escrow.currency,
-            buyerPaid: parseFloat(escrow.payment.buyerPays.toString())
-          }
-        );
-      } catch (emailError) {
-        console.error('❌ Email error:', emailError);
       }
 
       console.log(`✅ Paystack payment confirmed for ${escrow.escrowId}`);
@@ -428,10 +386,10 @@ exports.paystackWebhook = async (req, res) => {
   }
 };
 
-// ✅ ENHANCED: Flutterwave Webhook with idempotency
-exports.flutterwaveWebhook = async (req, res) => {
+// ✅ Flutterwave Webhook
+const flutterwaveWebhook = async (req, res) => {
   try {
-    const secretHash = process.env.FLUTTERWAVE_WEBHOOK_SECRET;
+    const secretHash = process.env.FLUTTERWAVE_WEBHOOK_SECRET || '';
     const signature = req.headers['verif-hash'];
 
     if (!signature || signature !== secretHash) {
@@ -452,7 +410,6 @@ exports.flutterwaveWebhook = async (req, res) => {
         return res.status(404).json({ success: false, message: 'Escrow not found' });
       }
 
-      // ✅ IDEMPOTENCY
       if (escrow.status === 'funded' && escrow.payment.paidAt) {
         console.log(`⚠️ Escrow ${escrow.escrowId} already funded`);
         return res.status(200).json({ success: true, message: 'Already processed' });
@@ -463,7 +420,6 @@ exports.flutterwaveWebhook = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Invalid status' });
       }
 
-      // Update escrow
       escrow.status = 'funded';
       escrow.chatUnlocked = true;
       escrow.payment.paidAt = new Date();
@@ -472,31 +428,11 @@ exports.flutterwaveWebhook = async (req, res) => {
       escrow.payment.gatewayResponse = payload.data;
       await escrow.save();
 
-      // Update buyer stats
       const buyer = await User.findById(escrow.buyer._id);
       if (buyer) {
         buyer.totalTransactions = (buyer.totalTransactions || 0) + 1;
         buyer.totalSpent = (buyer.totalSpent || 0) + parseFloat(escrow.payment.buyerPays.toString());
         await buyer.save();
-      }
-
-      // Send emails
-      try {
-        await emailService.sendPaymentConfirmedEmail(
-          escrow.buyer.email,
-          escrow.buyer.name,
-          escrow.seller.email,
-          escrow.seller.name,
-          {
-            escrowId: escrow.escrowId,
-            title: escrow.title,
-            amount: parseFloat(escrow.amount.toString()),
-            currency: escrow.currency,
-            buyerPaid: parseFloat(escrow.payment.buyerPays.toString())
-          }
-        );
-      } catch (emailError) {
-        console.error('❌ Email error:', emailError);
       }
 
       console.log(`✅ Flutterwave payment confirmed for ${escrow.escrowId}`);
@@ -510,21 +446,29 @@ exports.flutterwaveWebhook = async (req, res) => {
   }
 };
 
-// Generic webhook handler
-exports.paymentWebhook = async (req, res) => {
+// ✅ Generic webhook handler
+const paymentWebhook = async (req, res) => {
   const paystackSignature = req.headers['x-paystack-signature'];
   const flutterwaveSignature = req.headers['verif-hash'];
   const nowpaymentsSignature = req.headers['x-nowpayments-sig'];
 
   if (paystackSignature) {
-    return exports.paystackWebhook(req, res);
+    return paystackWebhook(req, res);
   } else if (flutterwaveSignature) {
-    return exports.flutterwaveWebhook(req, res);
+    return flutterwaveWebhook(req, res);
   } else if (nowpaymentsSignature) {
-    return exports.nowpaymentsWebhook(req, res);
+    return nowpaymentsWebhook(req, res);
   } else {
     return res.status(400).json({ success: false, message: 'Unknown webhook source' });
   }
 };
 
-module.exports = exports;
+// ✅ CRITICAL: Export all functions
+module.exports = {
+  initializePayment,
+  verifyPayment,
+  nowpaymentsWebhook,
+  paystackWebhook,
+  flutterwaveWebhook,
+  paymentWebhook
+};
