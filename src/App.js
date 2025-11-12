@@ -18,7 +18,8 @@ import UnifiedDashboard from './pages/UnifiedDashboard';
 import EscrowDetails from './pages/EscrowDetails';
 import ProfilePage from './pages/Profile/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
-import PaymentPage from './pages/PaymentPage'; // ✅ NEW IMPORT
+import PaymentPage from './pages/PaymentPage'; // ✅ Existing
+import PaymentVerificationPage from './pages/PaymentVerificationPage'; // ✅ NEW IMPORT
 
 // Admin Pages
 import AdminLogin from './pages/admin/AdminLogin';
@@ -30,7 +31,7 @@ import AnalyticsPage from './pages/admin/AnalyticsPage';
 import PaymentGatewaysPage from './pages/admin/PaymentGatewaysPage';
 import APIManagementPage from './pages/admin/APIManagementPage';
 import AdminManagementPage from './pages/admin/AdminManagementPage';
-import FeeManagementPage from './pages/admin/FeeManagementPage'; // ✅ NEW IMPORT
+import FeeManagementPage from './pages/admin/FeeManagementPage'; // ✅ Existing
 
 import { authService } from './services/authService';
 
@@ -204,12 +205,20 @@ function App() {
           }
         />
 
-        {/* ✅ NEW PAYMENT ROUTE (supports query like ?method=crypto) */}
+        {/* ✅ PAYMENT ROUTES */}
         <Route
           path="/payment/:escrowId"
           element={
             <ProtectedRoute>
               <PaymentPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payment/verify"
+          element={
+            <ProtectedRoute>
+              <PaymentVerificationPage />
             </ProtectedRoute>
           }
         />
