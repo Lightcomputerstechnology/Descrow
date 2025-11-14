@@ -3,9 +3,15 @@ import React, { useEffect, useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
 
 const ThemeToggle = () => {
-  const [darkMode, setDarkMode] = useState(() =>
-    localStorage.getItem('theme') === 'dark'
-  );
+  const [darkMode, setDarkMode] = useState(() => {
+    // Check localStorage first
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      return savedTheme === 'dark';
+    }
+    // Check system preference
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -19,11 +25,25 @@ const ThemeToggle = () => {
     }
   }, [darkMode]);
 
+  // Listen for system theme changes
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => {
+      if (!localStorage.getItem('theme')) {
+        setDarkMode(e.matches);
+      }
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
   return (
     <button
       onClick={() => setDarkMode(!darkMode)}
-      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300"
-      aria-label="Toggle Theme"
+      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+      aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+      title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       {darkMode ? (
         <Sun className="w-5 h-5 text-yellow-500 transition-transform duration-300 hover:rotate-180" />
