@@ -6,7 +6,7 @@ const emailService = require('../services/email.service');
 const { validationResult } = require('express-validator');
 const crypto = require('crypto');
 
-// ✅ FIXED: Initialize Payment with proper status checks
+// ✅ FIXED: Initialize Payment with proper status checks and currency validation
 exports.initializePayment = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -67,6 +67,13 @@ exports.initializePayment = async (req, res) => {
 
     switch (paymentMethod) {
       case 'paystack':
+        // ✅ Paystack ONLY supports NGN
+        if (escrow.currency !== 'NGN') {
+          return res.status(400).json({
+            success: false,
+            message: `Paystack only supports Nigerian Naira (NGN). Your escrow is in ${escrow.currency}. Please use Flutterwave or Cryptocurrency payment.`
+          });
+        }
         paymentData = await paymentService.initializePaystack(
           escrow.buyer.email,
           buyerPays,
@@ -76,6 +83,13 @@ exports.initializePayment = async (req, res) => {
         break;
 
       case 'flutterwave':
+        // ✅ Flutterwave supports multiple currencies
+        if (!['USD', 'EUR', 'GBP', 'NGN', 'GHS', 'KES', 'ZAR', 'CAD', 'AUD', 'XOF', 'XAF'].includes(escrow.currency)) {
+          return res.status(400).json({
+            success: false,
+            message: `Currency ${escrow.currency} is not supported by Flutterwave. Please use Cryptocurrency payment.`
+          });
+        }
         paymentData = await paymentService.initializeFlutterwave(
           escrow.buyer.email,
           buyerPays,
@@ -86,6 +100,7 @@ exports.initializePayment = async (req, res) => {
         break;
 
       case 'crypto':
+        // ✅ Crypto supports ALL currencies
         paymentData = await paymentService.initializeNowpayments(
           buyerPays,
           escrow.currency,
@@ -526,6 +541,3 @@ exports.paymentWebhook = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Unknown webhook source' });
   }
 };
-
-// ✅✅✅ IMPORTANT: No module.exports line here! 
-// Using exports.functionName already exports everything
