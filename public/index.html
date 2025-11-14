@@ -2,19 +2,108 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    
+    <!-- CRITICAL: Mobile zoom prevention + responsive design -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+    
+    <!-- Favicon -->
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#2563eb" />
-    <meta
-      name="description"
-      content="SecureEscrow - Safe and secure escrow payment platform for buyers and sellers worldwide"
-    />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    
+    <!-- Theme Color (matches brand) -->
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="msapplication-TileColor" content="#2563eb" />
+    
+    <!-- PWA Manifest -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <title>SecureEscrow - Safe Payment Platform</title>
+    
+    <!-- Primary Meta Tags (SEO CRITICAL) -->
+    <title>Dealcross - Secure Escrow & Trading Platform | Safe Online Transactions</title>
+    <meta name="title" content="Dealcross - Secure Escrow & Trading Platform | Safe Online Transactions" />
+    <meta name="description" content="Dealcross provides secure escrow services for online transactions. Buy and sell with confidence using our trusted escrow protection, real-time tracking, and 24/7 dispute resolution." />
+    <meta name="keywords" content="escrow service, secure payment, online escrow, safe transactions, buyer protection, seller protection, crypto escrow, digital escrow, transaction security, payment protection" />
+    <meta name="author" content="Dealcross" />
+    <meta name="robots" content="index, follow" />
+    <meta name="language" content="English" />
+    <meta name="revisit-after" content="7 days" />
+    
+    <!-- Open Graph / Facebook (Social Media SEO) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://dealcross.net/" />
+    <meta property="og:title" content="Dealcross - Secure Escrow & Trading Platform" />
+    <meta property="og:description" content="Safe and secure escrow payment platform for buyers and sellers worldwide. Buy and sell with confidence." />
+    <meta property="og:image" content="%PUBLIC_URL%/social-preview.jpg" />
+    <meta property="og:site_name" content="Dealcross" />
+    <meta property="og:locale" content="en_US" />
+    
+    <!-- Twitter Card (Twitter SEO) -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://dealcross.net/" />
+    <meta name="twitter:title" content="Dealcross - Secure Escrow & Trading Platform" />
+    <meta name="twitter:description" content="Safe and secure escrow payment platform for buyers and sellers worldwide." />
+    <meta name="twitter:image" content="%PUBLIC_URL%/social-preview.jpg" />
+    <meta name="twitter:creator" content="@dealcross" />
+    
+    <!-- Canonical URL (Prevents duplicate content issues) -->
+    <link rel="canonical" href="https://dealcross.net/" />
+    
+    <!-- Additional SEO Tags -->
+    <meta name="rating" content="General" />
+    <meta name="distribution" content="global" />
+    <meta name="coverage" content="Worldwide" />
+    <meta name="target" content="all" />
+    
+    <!-- Preconnect to external resources for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- Structured Data (JSON-LD for Google Rich Results) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Dealcross",
+      "url": "https://dealcross.net",
+      "logo": "https://dealcross.net/logo.png",
+      "description": "Secure escrow and trading platform for safe online transactions",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "US"
+      },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "Customer Support",
+        "email": "support@dealcross.net"
+      },
+      "sameAs": [
+        "https://twitter.com/dealcross",
+        "https://facebook.com/dealcross",
+        "https://linkedin.com/company/dealcross"
+      ]
+    }
+    </script>
+    
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Dealcross",
+      "url": "https://dealcross.net",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://dealcross.net/search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <noscript>
+      <div style="padding: 20px; text-align: center; font-family: sans-serif;">
+        <h1>JavaScript Required</h1>
+        <p>You need to enable JavaScript to run Dealcross. Please enable JavaScript in your browser settings.</p>
+      </div>
+    </noscript>
     <div id="root"></div>
   </body>
 </html>
