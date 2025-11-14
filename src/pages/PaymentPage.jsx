@@ -1,4 +1,4 @@
-// src/pages/PaymentPage.jsx - PRODUCTION READY
+// src/pages/PaymentPage.jsx - PRODUCTION READY WITH CURRENCY FILTERING
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { CreditCard, DollarSign, Bitcoin, Loader, ArrowLeft, Shield, AlertCircle, CheckCircle, Zap } from 'lucide-react';
@@ -12,19 +12,36 @@ const PaymentPage = () => {
   const [escrow, setEscrow] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [selectedGateway, setSelectedGateway] = useState('flutterwave'); // Default to international
+  const [selectedGateway, setSelectedGateway] = useState('');
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
   useEffect(() => {
     fetchEscrowDetails();
-    
-    // Pre-select payment method from URL if provided
-    const method = searchParams.get('method');
-    if (method && ['paystack', 'flutterwave', 'crypto'].includes(method)) {
-      setSelectedGateway(method);
+  }, [escrowId]);
+
+  // Auto-select best payment method based on currency
+  useEffect(() => {
+    if (escrow) {
+      const method = searchParams.get('method');
+      
+      if (method && ['paystack', 'flutterwave', 'crypto'].includes(method)) {
+        // Check if method is valid for this currency
+        const gateway = allGateways.find(g => g.id === method);
+        if (gateway && isGatewayAvailable(gateway, escrow.currency)) {
+          setSelectedGateway(method);
+          return;
+        }
+      }
+
+      // Auto-select based on currency
+      if (escrow.currency === 'NGN') {
+        setSelectedGateway('paystack'); // Best for Nigeria
+      } else {
+        setSelectedGateway('flutterwave'); // Best for international
+      }
     }
-  }, [escrowId, searchParams]);
+  }, [escrow, searchParams]);
 
   const fetchEscrowDetails = async () => {
     try {
@@ -71,7 +88,7 @@ const PaymentPage = () => {
       const response = await axios.post(
         `${API_URL}/payments/initialize`,
         {
-          escrowId: escrow.escrowId, // Use escrowId field (ESC...)
+          escrowId: escrow.escrowId,
           paymentMethod: selectedGateway
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -86,13 +103,10 @@ const PaymentPage = () => {
         
         // Redirect to payment gateway
         if (paymentData.authorization_url) {
-          // Paystack
           window.location.href = paymentData.authorization_url;
         } else if (paymentData.link) {
-          // Flutterwave
           window.location.href = paymentData.link;
         } else if (paymentData.invoice_url) {
-          // Crypto
           window.location.href = paymentData.invoice_url;
         } else {
           toast.error('Payment URL not received');
@@ -106,14 +120,24 @@ const PaymentPage = () => {
     }
   };
 
-  const gateways = [
+  // Define all gateways with currency support
+  const allGateways = [
+    {
+      id: 'paystack',
+      name: 'Paystack',
+      description: 'Card, Bank Transfer, USSD (Nigeria Only - NGN)',
+      icon: CreditCard,
+      color: 'blue',
+      supportedCurrencies: ['NGN'],
+      features: ['Instant confirmation', 'Nigerian banks', 'USSD & Transfer', 'Mobile money']
+    },
     {
       id: 'flutterwave',
       name: 'Flutterwave',
-      description: 'Best for International Payments',
+      description: 'Multi-currency, Cards, Bank Transfer, Mobile Money',
       icon: DollarSign,
       color: 'purple',
-      recommended: true,
+      supportedCurrencies: ['USD', 'EUR', 'GBP', 'NGN', 'GHS', 'KES', 'ZAR', 'CAD', 'AUD', 'XOF', 'XAF'],
       features: ['Multi-currency support', 'International cards', 'Mobile money', 'Bank transfer']
     },
     {
@@ -122,17 +146,16 @@ const PaymentPage = () => {
       description: 'Pay with Bitcoin, Ethereum, USDT & 100+ Coins',
       icon: Bitcoin,
       color: 'yellow',
+      supportedCurrencies: ['all'],
       features: ['100+ cryptocurrencies', 'No borders', 'Fast settlement', 'Low fees']
-    },
-    {
-      id: 'paystack',
-      name: 'Paystack',
-      description: 'Card, Bank Transfer, USSD (Nigeria/Ghana)',
-      icon: CreditCard,
-      color: 'blue',
-      features: ['Instant confirmation', 'Nigerian banks', 'USSD & Transfer', 'Mobile money']
     }
   ];
+
+  // Helper function to check if gateway is available for currency
+  const isGatewayAvailable = (gateway, currency) => {
+    if (gateway.supportedCurrencies.includes('all')) return true;
+    return gateway.supportedCurrencies.includes(currency);
+  };
 
   if (loading) {
     return (
@@ -148,6 +171,50 @@ const PaymentPage = () => {
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <p className="text-gray-600 dark:text-gray-400">Escrow not found</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Filter gateways based on escrow currency and sort by priority
+  const availableGateways = allGateways
+    .filter(gateway => isGatewayAvailable(gateway, escrow.currency))
+    .sort((a, b) => {
+      // For NGN: Paystack first
+      if (escrow.currency === 'NGN') {
+        if (a.id === 'paystack') return -1;
+        if (b.id === 'paystack') return 1;
+      } else {
+        // For non-NGN: Flutterwave first
+        if (a.id === 'flutterwave') return -1;
+        if (b.id === 'flutterwave') return 1;
+      }
+      return 0;
+    })
+    .map(gateway => ({
+      ...gateway,
+      recommended: (escrow.currency === 'NGN' && gateway.id === 'paystack') || 
+                   (escrow.currency !== 'NGN' && gateway.id === 'flutterwave')
+    }));
+
+  // Show error if no payment methods available
+  if (availableGateways.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
+        <div className="max-w-md bg-white dark:bg-gray-900 rounded-xl p-8 text-center border border-gray-200 dark:border-gray-800">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+            No Payment Methods Available
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Currency {escrow.currency} is not supported by our payment gateways.
+          </p>
+          <button
+            onClick={() => navigate(`/escrow/${escrow._id}`)}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            Go Back
+          </button>
         </div>
       </div>
     );
@@ -179,10 +246,27 @@ const PaymentPage = () => {
           {/* Payment Methods */}
           <div className="lg:col-span-2">
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-800">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Select Payment Method</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Select Payment Method</h2>
+
+              {/* Currency Info Banner */}
+              {escrow.currency !== 'NGN' && (
+                <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                        Payment Currency: {escrow.currency}
+                      </p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                        Paystack is not available for {escrow.currency}. Use Flutterwave or Crypto for international payments.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-4">
-                {gateways.map((gateway) => {
+                {availableGateways.map((gateway) => {
                   const Icon = gateway.icon;
                   const isSelected = selectedGateway === gateway.id;
 
@@ -199,7 +283,7 @@ const PaymentPage = () => {
                     >
                       {gateway.recommended && (
                         <div className="absolute -top-3 right-4">
-                          <span className="bg-gradient-to-r from-purple-600 to-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                          <span className="bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-lg">
                             <Zap className="w-3 h-3" />
                             RECOMMENDED
                           </span>
@@ -275,6 +359,10 @@ const PaymentPage = () => {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">Seller</span>
                   <span className="text-gray-900 dark:text-white">{escrow.seller?.name}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Currency</span>
+                  <span className="text-gray-900 dark:text-white font-semibold">{escrow.currency}</span>
                 </div>
               </div>
 
