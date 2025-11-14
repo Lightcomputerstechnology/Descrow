@@ -58,6 +58,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'https://descrow-5l46.onrender.com',
+  'https://descrow-ow5e.onrender.com',  // ✅ ADDED NEW FRONTEND URL
   'https://dealcross.net',
   'https://www.dealcross.net',
   process.env.FRONTEND_URL
@@ -69,6 +70,7 @@ app.use(cors({
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
+      console.log('✅ Allowed origin:', origin);  // ✅ Added logging for allowed origins
       return callback(null, true);
     }
 
