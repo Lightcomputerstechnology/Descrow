@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth.middleware');
-const ApiKey = require('../models/ApiKey.model');
+const APIKey = require('../models/APIKey.model');
 
 // Get all API keys for user
 router.get('/', protect, async (req, res) => {
