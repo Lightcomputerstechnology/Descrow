@@ -1,5 +1,5 @@
 // backend/middleware/apiAuth.js
-const ApiKey = require('../models/ApiKey.model');
+const APIKey = require('../models/APIKey.model');
 const rateLimit = require('express-rate-limit');
 
 // API Key Authentication
