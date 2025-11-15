@@ -1,7 +1,7 @@
 // backend/routes/apiKey.routes.js - UPDATE WITH FULL FUNCTIONALITY
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/auth');
+const auth = require('../middleware/auth.middleware');
 const ApiKey = require('../models/ApiKey.model');
 
 // Get all API keys for user
