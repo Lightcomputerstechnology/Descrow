@@ -1,8 +1,9 @@
-// File: src/App.js
+// File: src/App.js - COMPLETE PRODUCTION VERSION
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Navbar from './components/Navbar';
+import Footer from './components/Footer';
 
 // Public Pages
 import VerifyEmail from './pages/VerifyEmail';
@@ -13,13 +14,27 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResendVerification from './pages/ResendVerification';
 import ResetPassword from './pages/ResetPassword';
 
+// Footer Pages
+import ContactPage from './pages/ContactPage';
+import AboutPage from './pages/AboutPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsPage from './pages/TermsPage';
+import DocsPage from './pages/DocsPage';
+import FAQPage from './pages/FAQPage';
+import BlogPage from './pages/BlogPage';
+import ReferralPage from './pages/ReferralPage';
+import RefundPolicyPage from './pages/RefundPolicyPage';
+import CareersPage from './pages/CareersPage';
+import APIPage from './pages/APIPage';
+import CookiesPage from './pages/CookiesPage';
+
 // User Pages
 import UnifiedDashboard from './pages/UnifiedDashboard';
 import EscrowDetails from './pages/EscrowDetails';
 import ProfilePage from './pages/Profile/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
-import PaymentPage from './pages/PaymentPage'; // ✅ Existing
-import PaymentVerificationPage from './pages/PaymentVerificationPage'; // ✅ NEW IMPORT
+import PaymentPage from './pages/PaymentPage';
+import PaymentVerificationPage from './pages/PaymentVerificationPage';
 
 // Admin Pages
 import AdminLogin from './pages/admin/AdminLogin';
@@ -31,26 +46,43 @@ import AnalyticsPage from './pages/admin/AnalyticsPage';
 import PaymentGatewaysPage from './pages/admin/PaymentGatewaysPage';
 import APIManagementPage from './pages/admin/APIManagementPage';
 import AdminManagementPage from './pages/admin/AdminManagementPage';
-import FeeManagementPage from './pages/admin/FeeManagementPage'; // ✅ Existing
+import FeeManagementPage from './pages/admin/FeeManagementPage';
 
 import { authService } from './services/authService';
 
-// ✅ Simple 404 Component
+// Enhanced 404 Component
 const NotFound = () => {
   const location = useLocation();
+  
+  useEffect(() => {
+    document.title = '404 - Page Not Found | Dealcross';
+  }, []);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
-      <div className="text-center">
-        <h1 className="text-6xl font-bold text-gray-900 dark:text-white mb-4">404</h1>
-        <p className="text-xl text-gray-600 dark:text-gray-400 mb-8">
-          Page not found: {location.pathname}
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
+      <div className="text-center max-w-md">
+        <h1 className="text-8xl font-bold text-blue-600 dark:text-blue-400 mb-4">404</h1>
+        <h2 className="text-3xl font-semibold text-gray-900 dark:text-white mb-4">Page Not Found</h2>
+        <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">
+          The page you're looking for doesn't exist.
         </p>
-        <a
-          href="/"
-          className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          Go Home
-        </a>
+        <p className="text-sm text-gray-500 dark:text-gray-500 mb-8 font-mono break-all">
+          {location.pathname}
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <a
+            href="/"
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
+          >
+            Go Home
+          </a>
+          <a
+            href="/contact"
+            className="px-6 py-3 bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition font-semibold"
+          >
+            Contact Support
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -134,6 +166,25 @@ function App() {
     return !noNavbarRoutes.some(route => path.startsWith(route));
   };
 
+  const showFooter = () => {
+    const path = window.location.pathname;
+    const noFooterRoutes = [
+      '/login',
+      '/signup',
+      '/verify-email',
+      '/forgot-password',
+      '/reset-password',
+      '/resend-verification',
+      '/admin',
+      '/dashboard',
+      '/escrow',
+      '/profile',
+      '/notifications',
+      '/payment',
+    ];
+    return !noFooterRoutes.some(route => path.startsWith(route));
+  };
+
   if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
@@ -171,6 +222,20 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/resend-verification" element={<ResendVerification />} />
 
+        {/* ==================== FOOTER PAGES ==================== */}
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/docs" element={<DocsPage />} />
+        <Route path="/faq" element={<FAQPage />} />
+        <Route path="/blog" element={<BlogPage />} />
+        <Route path="/referral" element={<ReferralPage />} />
+        <Route path="/refund-policy" element={<RefundPolicyPage />} />
+        <Route path="/careers" element={<CareersPage />} />
+        <Route path="/api" element={<APIPage />} />
+        <Route path="/cookies" element={<CookiesPage />} />
+
         {/* ==================== USER ROUTES (Protected) ==================== */}
         <Route
           path="/dashboard"
@@ -204,8 +269,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-
-        {/* ✅ PAYMENT ROUTES */}
         <Route
           path="/payment/:escrowId"
           element={
@@ -308,6 +371,8 @@ function App() {
         {/* ==================== 404 - MUST BE LAST ==================== */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+
+      {showFooter() && <Footer />}
     </div>
   );
 }
