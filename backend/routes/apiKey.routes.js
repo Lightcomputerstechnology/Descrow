@@ -1,13 +1,13 @@
-// backend/routes/apiKey.routes.js - UPDATE WITH FULL FUNCTIONALITY
+// backend/routes/apiKey.routes.js
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth.middleware');
+const protect = require('../middleware/auth.middleware'); // Changed auth to protect
 const APIKey = require('../models/APIKey.model');
 
 // Get all API keys for user
 router.get('/', protect, async (req, res) => {
   try {
-    const apiKeys = await ApiKey.find({ userId: req.user._id })
+    const apiKeys = await APIKey.find({ userId: req.user._id }) // Changed ApiKey to APIKey
       .select('-secret')
       .sort({ createdAt: -1 });
 
@@ -36,20 +36,19 @@ router.post('/create', protect, async (req, res) => {
     }
 
     // Generate key and secret
-    const { key, secret } = ApiKey.generateKey();
+    const { key, secret } = APIKey.generateKey(); // Changed ApiKey to APIKey
 
     // Create API key
-    const apiKey = await ApiKey.create({
+    const apiKey = await APIKey.create({ // Changed ApiKey to APIKey
       userId: req.user._id,
       name,
       key,
-      secret, // Will be hashed by pre-save hook
+      secret,
       environment: environment || 'sandbox',
       webhookUrl,
       metadata
     });
 
-    // Return key and secret (only time secret is shown)
     res.status(201).json({
       success: true,
       message: 'API key created successfully. Store the secret securely - it won\'t be shown again!',
@@ -57,7 +56,7 @@ router.post('/create', protect, async (req, res) => {
         id: apiKey._id,
         name: apiKey.name,
         key: apiKey.key,
-        secret: secret, // Only shown once!
+        secret: secret,
         environment: apiKey.environment,
         createdAt: apiKey.createdAt
       }
@@ -75,7 +74,7 @@ router.post('/create', protect, async (req, res) => {
 // Revoke API key
 router.delete('/:id', protect, async (req, res) => {
   try {
-    const apiKey = await ApiKey.findOne({
+    const apiKey = await APIKey.findOne({ // Changed ApiKey to APIKey
       _id: req.params.id,
       userId: req.user._id
     });
