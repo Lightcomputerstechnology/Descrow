@@ -26,6 +26,12 @@ const notificationRoutes = require('./routes/notification.routes');
 const platformSettingsRoutes = require('./routes/platformSettings.routes');
 const paymentRoutes = require('./routes/payment.routes');
 
+// NEW: contact routes
+const contactRoutes = require('./routes/contact.routes');
+
+// NEW: public API v1 routes (for third-party integrations / SDK)
+const apiV1Routes = require('./routes/api.v1.routes');
+
 const app = express();
 
 // ==================== TRUST PROXY ====================
@@ -223,6 +229,12 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/api-keys', apiKeyRoutes);
 app.use('/api/verify-email', verifyRoutes);
 app.use('/api/platform', platformSettingsRoutes);
+
+// MOUNT CONTACT ROUTES
+app.use('/api/contact', contactRoutes);
+
+// PUBLIC API ROUTES (v1) - for external integrators / SDKs
+app.use('/api/v1', apiV1Routes);
 
 // ==================== ERROR HANDLING ====================
 
