@@ -33,10 +33,10 @@ exports.authenticate = async (req, res, next) => {
       });
     }
 
-    if (user.status === 'suspended') {
+    if (!user.isActive || user.status === 'suspended') {
       return res.status(403).json({
         success: false,
-        message: 'Your account has been suspended'
+        message: 'Account is suspended or inactive'
       });
     }
 
@@ -49,8 +49,9 @@ exports.authenticate = async (req, res, next) => {
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ success: false, message: 'Token expired' });
     }
+
     console.error('Authentication error:', error);
-    res.status(500).json({ success: false, message: 'Authentication failed' });
+    return res.status(500).json({ success: false, message: 'Authentication failed' });
   }
 };
 
@@ -69,14 +70,15 @@ exports.optionalAuth = async (req, res, next) => {
     if (token) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await User.findById(decoded.id).select('-password');
-      if (user && user.verified) {
+
+      if (user && user.verified && user.isActive) {
         req.user = user;
       }
     }
 
     next();
   } catch (error) {
-    next(); // Ignore errors in optional auth
+    next(); // ignore errors during optional auth
   }
 };
 
@@ -115,21 +117,14 @@ exports.adminAuth = async (req, res, next) => {
     next();
   } catch (error) {
     if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token'
-      });
+      return res.status(401).json({ success: false, message: 'Invalid token' });
     }
     if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Token expired'
-      });
+      return res.status(401).json({ success: false, message: 'Token expired' });
     }
-    res.status(500).json({
-      success: false,
-      message: 'Authentication failed'
-    });
+
+    console.error('AdminAuth error:', error);
+    return res.status(500).json({ success: false, message: 'Authentication failed' });
   }
 };
 
@@ -140,12 +135,18 @@ exports.checkPermission = (permission) => {
   return (req, res, next) => {
     const admin = req.admin;
 
+    if (!admin) {
+      return res.status(401).json({
+        success: false,
+        message: 'Admin authentication required'
+      });
+    }
+
     // Master admin has all permissions
     if (admin.role === 'master') {
       return next();
     }
 
-    // Check specific permission
     if (!admin.permissions || !admin.permissions[permission]) {
       return res.status(403).json({
         success: false,
@@ -155,4 +156,18 @@ exports.checkPermission = (permission) => {
 
     next();
   };
+};
+
+/**
+ * Backward-compatible: old isAdmin middleware
+ * (Uses the new admin system)
+ */
+exports.isAdmin = (req, res, next) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Admin access required'
+    });
+  }
+  next();
 };
