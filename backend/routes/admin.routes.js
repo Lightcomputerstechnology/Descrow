@@ -4,9 +4,11 @@ const adminController = require('../controllers/admin.controller');
 const { protectAdmin, checkPermission, masterOnly } = require('../middleware/admin.middleware');
 const { body } = require('express-validator');
 
-// ----------------- PUBLIC ROUTES -----------------
+// ======================================================
+// =============== PUBLIC ADMIN ROUTES ==================
+// ======================================================
 
-// Admin login
+// Admin Login
 router.post(
   '/login',
   [
@@ -16,12 +18,18 @@ router.post(
   adminController.login
 );
 
-// ----------------- PROTECTED ADMIN ROUTES -----------------
+// ======================================================
+// =============== PROTECTED ADMIN ROUTES ===============
+// ======================================================
 
-// Dashboard
-router.get('/dashboard', protectAdmin, adminController.getDashboardStats);
+// Dashboard Overview
+router.get(
+  '/dashboard',
+  protectAdmin,
+  adminController.getDashboardStats
+);
 
-// Transactions
+// ----------------- Transactions -----------------
 router.get(
   '/transactions',
   protectAdmin,
@@ -29,13 +37,14 @@ router.get(
   adminController.getTransactions
 );
 
-// Disputes
+// ----------------- Disputes -----------------
 router.get(
   '/disputes',
   protectAdmin,
   checkPermission('manageDisputes'),
   adminController.getDisputes
 );
+
 router.put(
   '/disputes/:disputeId/resolve',
   protectAdmin,
@@ -43,19 +52,21 @@ router.put(
   adminController.resolveDispute
 );
 
-// Users
+// ----------------- Users -----------------
 router.get(
   '/users',
   protectAdmin,
   checkPermission('verifyUsers'),
   adminController.getUsers
 );
+
 router.put(
   '/users/:userId/verify',
   protectAdmin,
   checkPermission('verifyUsers'),
   adminController.verifyUser
 );
+
 router.put(
   '/users/:userId/toggle-status',
   protectAdmin,
@@ -63,7 +74,7 @@ router.put(
   adminController.toggleUserStatus
 );
 
-// Analytics
+// ----------------- Analytics -----------------
 router.get(
   '/analytics',
   protectAdmin,
@@ -71,7 +82,9 @@ router.get(
   adminController.getAnalytics
 );
 
-// ----------------- ADMIN MANAGEMENT (MASTER ONLY) -----------------
+// ======================================================
+// ========== ADMIN MANAGEMENT (MASTER ONLY) ============
+// ======================================================
 
 // Get all admins
 router.get(
@@ -81,7 +94,7 @@ router.get(
   adminController.getAdmins
 );
 
-// Create sub-admin
+// Create new sub-admin
 router.post(
   '/admins',
   protectAdmin,
@@ -102,7 +115,7 @@ router.put(
   adminController.updateSubAdminPermissions
 );
 
-// Toggle sub-admin status
+// Toggle sub-admin active/suspended state
 router.put(
   '/admins/:adminId/toggle-status',
   protectAdmin,
