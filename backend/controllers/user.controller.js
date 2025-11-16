@@ -2,6 +2,8 @@ const User = require('../models/User.model');
 const Escrow = require('../models/Escrow.model');
 const { validationResult } = require('express-validator');
 const emailService = require('../services/email.service');
+const feeConfig = require('../config/fee.config');
+const mongoose = require('mongoose');
 
 // Get User Profile
 exports.getProfile = async (req, res) => {
@@ -20,8 +22,10 @@ exports.getProfile = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      user,
-      tierLimits
+      data: {
+        user,
+        tierLimits
+      }
     });
 
   } catch (error) {
@@ -45,7 +49,7 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
-    const { name, phone, avatar } = req.body;
+    const { name, phone, avatar, bio, address, socialLinks, businessInfo } = req.body;
 
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -59,18 +63,28 @@ exports.updateProfile = async (req, res) => {
     if (name) user.name = name;
     if (phone) user.phone = phone;
     if (avatar) user.avatar = avatar;
+    if (bio) user.bio = bio;
+    if (address) user.address = { ...user.address, ...address };
+    if (socialLinks) user.socialLinks = { ...user.socialLinks, ...socialLinks };
+    if (businessInfo) user.businessInfo = { ...user.businessInfo, ...businessInfo };
 
     await user.save();
 
     res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        avatar: user.avatar
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          avatar: user.avatar,
+          bio: user.bio,
+          address: user.address,
+          socialLinks: user.socialLinks,
+          businessInfo: user.businessInfo
+        }
       }
     });
 
@@ -152,7 +166,7 @@ exports.uploadKYC = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'KYC documents uploaded successfully. Verification in progress.',
-      user: {
+      data: {
         kycStatus: user.kycStatus,
         kycDocuments: user.kycDocuments
       }
@@ -168,16 +182,89 @@ exports.uploadKYC = async (req, res) => {
   }
 };
 
-// Upgrade Tier
-exports.upgradeTier = async (req, res) => {
+// ✅ NEW: Get Tier Information
+exports.getTierInfo = async (req, res) => {
   try {
-    const { tier, paymentReference } = req.body;
+    const user = await User.findById(req.user._id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
 
-    const validTiers = ['basic', 'pro', 'enterprise'];
-    if (!validTiers.includes(tier)) {
+    const currentTierInfo = feeConfig.getTierInfo(user.tier);
+    const allTiers = feeConfig.getAllTiers();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        currentTier: user.tier,
+        currentTierInfo,
+        allTiers,
+        monthlyUsage: user.monthlyUsage,
+        subscription: user.subscription
+      }
+    });
+
+  } catch (error) {
+    console.error('Get tier info error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch tier information',
+      error: error.message
+    });
+  }
+};
+
+// ✅ NEW: Calculate Upgrade Benefits
+exports.calculateUpgradeBenefits = async (req, res) => {
+  try {
+    const { targetTier } = req.query;
+    
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const benefits = feeConfig.getUpgradeBenefits(user.tier, targetTier);
+    
+    if (!benefits) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid tier. Choose: basic, pro, or enterprise'
+        message: 'Invalid tier comparison'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: benefits
+    });
+
+  } catch (error) {
+    console.error('Calculate upgrade benefits error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to calculate upgrade benefits',
+      error: error.message
+    });
+  }
+};
+
+// ✅ NEW: Initialize Tier Upgrade Payment
+exports.initiateTierUpgrade = async (req, res) => {
+  try {
+    const { targetTier, currency, paymentMethod } = req.body;
+
+    const validTiers = ['growth', 'enterprise', 'api'];
+    if (!validTiers.includes(targetTier)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid tier. Choose: growth, enterprise, or api'
       });
     }
 
@@ -189,45 +276,208 @@ exports.upgradeTier = async (req, res) => {
       });
     }
 
-    // Check if already on higher or same tier
-    const tierHierarchy = { free: 0, basic: 1, pro: 2, enterprise: 3 };
-    if (tierHierarchy[user.tier] >= tierHierarchy[tier]) {
+    // Check if trying to downgrade
+    const tierHierarchy = { starter: 0, growth: 1, enterprise: 2, api: 3 };
+    if (tierHierarchy[user.tier] >= tierHierarchy[targetTier]) {
       return res.status(400).json({
         success: false,
-        message: 'Cannot downgrade or upgrade to same tier'
+        message: 'Cannot downgrade tier. Please contact support.'
       });
     }
 
-    // Verify payment (simplified - in production, verify with payment gateway)
-    // For now, just upgrade if payment reference provided
-    if (!paymentReference) {
+    const targetTierInfo = feeConfig.getTierInfo(targetTier);
+    const monthlyCost = targetTierInfo.monthlyCost[currency === 'NGN' ? 'NGN' : 'USD'];
+    const setupFee = targetTierInfo.setupFee ? targetTierInfo.setupFee[currency === 'NGN' ? 'NGN' : 'USD'] : 0;
+    
+    // For API tier, add setup fee
+    const totalAmount = targetTier === 'api' ? monthlyCost + setupFee : monthlyCost;
+
+    // Generate payment reference
+    const reference = `TIER_${user._id}_${Date.now()}`;
+
+    const paymentData = {
+      reference,
+      amount: totalAmount,
+      currency: currency || 'USD',
+      targetTier,
+      monthlyCost,
+      setupFee,
+      userId: user._id,
+      email: user.email,
+      description: `Upgrade to ${targetTierInfo.name} tier`
+    };
+
+    // TODO: Initialize payment with actual gateway (Paystack/Flutterwave)
+    // For now, return payment data
+    
+    res.status(200).json({
+      success: true,
+      message: 'Tier upgrade payment initiated',
+      data: paymentData
+    });
+
+  } catch (error) {
+    console.error('Initiate tier upgrade error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to initiate tier upgrade',
+      error: error.message
+    });
+  }
+};
+
+// ✅ NEW: Complete Tier Upgrade (after payment)
+exports.completeTierUpgrade = async (req, res) => {
+  try {
+    const { paymentReference, targetTier } = req.body;
+
+    if (!paymentReference || !targetTier) {
       return res.status(400).json({
         success: false,
-        message: 'Payment reference required'
+        message: 'Payment reference and target tier required'
       });
     }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // TODO: Verify payment with gateway
+    // For now, assume payment is verified
 
     // Upgrade tier
-    user.tier = tier;
+    const oldTier = user.tier;
+    user.tier = targetTier;
+    
+    // Set subscription details
+    user.subscription = {
+      status: 'active',
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      lastPaymentDate: new Date(),
+      autoRenew: true,
+      paymentMethod: 'card' // TODO: Get from payment data
+    };
+
     await user.save();
 
     // Send confirmation email
-    await emailService.sendTierUpgradeEmail(user.email, user.name, tier);
+    const tierInfo = feeConfig.getTierInfo(targetTier);
+    await emailService.sendTierUpgradeEmail(user.email, user.name, tierInfo.name);
 
     res.status(200).json({
       success: true,
-      message: `Successfully upgraded to ${tier} tier`,
-      user: {
-        tier: user.tier,
-        tierLimits: user.getTierLimits()
+      message: `Successfully upgraded from ${oldTier} to ${targetTier} tier`,
+      data: {
+        user: {
+          tier: user.tier,
+          tierLimits: user.getTierLimits(),
+          subscription: user.subscription
+        }
       }
     });
 
   } catch (error) {
-    console.error('Upgrade tier error:', error);
+    console.error('Complete tier upgrade error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to upgrade tier',
+      message: 'Failed to complete tier upgrade',
+      error: error.message
+    });
+  }
+};
+
+// ✅ NEW: Cancel Subscription
+exports.cancelSubscription = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (user.tier === 'starter') {
+      return res.status(400).json({
+        success: false,
+        message: 'Starter tier has no subscription to cancel'
+      });
+    }
+
+    // Mark subscription as cancelled
+    user.subscription.status = 'cancelled';
+    user.subscription.autoRenew = false;
+    
+    // User keeps tier until end date
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Subscription cancelled. You will retain ${user.tier} tier benefits until ${user.subscription.endDate.toDateString()}`,
+      data: {
+        subscription: user.subscription
+      }
+    });
+
+  } catch (error) {
+    console.error('Cancel subscription error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to cancel subscription',
+      error: error.message
+    });
+  }
+};
+
+// ✅ NEW: Renew Subscription
+exports.renewSubscription = async (req, res) => {
+  try {
+    const { paymentReference } = req.body;
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    if (user.tier === 'starter') {
+      return res.status(400).json({
+        success: false,
+        message: 'Starter tier has no subscription'
+      });
+    }
+
+    // TODO: Verify payment with gateway
+
+    // Renew subscription
+    user.subscription.status = 'active';
+    user.subscription.lastPaymentDate = new Date();
+    user.subscription.endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    user.subscription.autoRenew = true;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Subscription renewed successfully',
+      data: {
+        subscription: user.subscription
+      }
+    });
+
+  } catch (error) {
+    console.error('Renew subscription error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to renew subscription',
       error: error.message
     });
   }
@@ -242,8 +492,10 @@ exports.getUserStatistics = async (req, res) => {
     const buyingEscrows = await Escrow.find({ buyer: userId });
     const buyingStats = {
       total: buyingEscrows.length,
-      inEscrow: buyingEscrows.filter(e => e.status === 'in_escrow').length,
-      inTransit: buyingEscrows.filter(e => e.status === 'awaiting_delivery').length,
+      pending: buyingEscrows.filter(e => e.status === 'pending').length,
+      accepted: buyingEscrows.filter(e => e.status === 'accepted').length,
+      funded: buyingEscrows.filter(e => e.status === 'funded').length,
+      delivered: buyingEscrows.filter(e => e.status === 'delivered').length,
       completed: buyingEscrows.filter(e => e.status === 'completed').length,
       disputed: buyingEscrows.filter(e => e.status === 'disputed').length,
       cancelled: buyingEscrows.filter(e => e.status === 'cancelled').length,
@@ -254,38 +506,32 @@ exports.getUserStatistics = async (req, res) => {
     const sellingEscrows = await Escrow.find({ seller: userId });
     const sellingStats = {
       total: sellingEscrows.length,
-      pending: sellingEscrows.filter(e => e.status === 'in_escrow').length,
-      shipped: sellingEscrows.filter(e => e.status === 'awaiting_delivery').length,
+      pending: sellingEscrows.filter(e => e.status === 'pending').length,
+      accepted: sellingEscrows.filter(e => e.status === 'accepted').length,
+      funded: sellingEscrows.filter(e => e.status === 'funded').length,
+      delivered: sellingEscrows.filter(e => e.status === 'delivered').length,
       completed: sellingEscrows.filter(e => e.status === 'completed').length,
       disputed: sellingEscrows.filter(e => e.status === 'disputed').length,
       totalEarned: req.user.totalEarned
     };
 
-    // Monthly transaction count (for tier limits)
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-    const monthlyCount = await Escrow.countDocuments({
-      buyer: userId,
-      createdAt: {
-        $gte: new Date(currentYear, currentMonth, 1),
-        $lt: new Date(currentYear, currentMonth + 1, 1)
-      }
-    });
-
     const tierLimits = req.user.getTierLimits();
 
     res.status(200).json({
       success: true,
-      statistics: {
+      data: {
         buying: buyingStats,
         selling: sellingStats,
         monthlyTransactions: {
-          count: monthlyCount,
+          count: req.user.monthlyUsage.transactionCount,
           limit: tierLimits.maxTransactionsPerMonth,
-          remaining: tierLimits.maxTransactionsPerMonth === -1 ? 'Unlimited' : tierLimits.maxTransactionsPerMonth - monthlyCount
+          remaining: tierLimits.maxTransactionsPerMonth === -1 
+            ? 'Unlimited' 
+            : tierLimits.maxTransactionsPerMonth - req.user.monthlyUsage.transactionCount
         },
         tier: req.user.tier,
-        tierLimits
+        tierLimits,
+        subscription: req.user.subscription
       }
     });
 
@@ -328,9 +574,11 @@ exports.enable2FA = async (req, res) => {
     res.status(200).json({
       success: true,
       message: '2FA setup initiated',
-      qrCode: qrCodeUrl,
-      secret: secret.base32,
-      instructions: 'Scan QR code with Google Authenticator or enter secret manually'
+      data: {
+        qrCode: qrCodeUrl,
+        secret: secret.base32,
+        instructions: 'Scan QR code with Google Authenticator or enter secret manually'
+      }
     });
 
   } catch (error) {
@@ -431,3 +679,5 @@ exports.disable2FA = async (req, res) => {
     });
   }
 };
+
+module.exports = exports;
