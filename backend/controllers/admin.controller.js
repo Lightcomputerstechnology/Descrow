@@ -2,10 +2,13 @@ const Admin = require('../models/Admin.model');
 const User = require('../models/User.model');
 const Escrow = require('../models/Escrow.model');
 const Dispute = require('../models/Dispute.model');
+const feeConfig = require('../config/fee.config');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 
-// Generate JWT Token
+/* =========================================================
+   JWT GENERATOR
+========================================================= */
 const generateToken = (adminId) => {
   return jwt.sign(
     { id: adminId, type: 'admin' },
@@ -14,50 +17,33 @@ const generateToken = (adminId) => {
   );
 };
 
-// Admin Login
+/* =========================================================
+   ADMIN LOGIN
+========================================================= */
 const login = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        errors: errors.array()
-      });
+      return res.status(400).json({ success: false, errors: errors.array() });
     }
 
     const { email, password } = req.body;
-
-    // Find admin and include password
     const admin = await Admin.findOne({ email }).select('+password');
-    if (!admin) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
+    if (!admin) return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
-    // Check if account is active
-    if (admin.status !== 'active') {
+    if (admin.status !== 'active')
       return res.status(403).json({
         success: false,
         message: 'Account is suspended. Contact master admin.'
       });
-    }
 
-    // Verify password
     const isPasswordValid = await admin.comparePassword(password);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
+    if (!isPasswordValid)
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
-    // Update last active
     admin.lastActive = new Date();
     await admin.save();
 
-    // Generate token
     const token = generateToken(admin._id);
 
     res.status(200).json({
@@ -72,18 +58,15 @@ const login = async (req, res) => {
         permissions: admin.permissions
       }
     });
-
   } catch (error) {
     console.error('Admin login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Login failed',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Login failed', error: error.message });
   }
 };
 
-// Get Dashboard Stats
+/* =========================================================
+   DASHBOARD STATS
+========================================================= */
 const getDashboardStats = async (req, res) => {
   try {
     const today = new Date();
@@ -99,57 +82,45 @@ const getDashboardStats = async (req, res) => {
       todayUsers: await User.countDocuments({ createdAt: { $gte: today } })
     };
 
-    // Calculate total platform revenue (admin fees)
     const revenueData = await Escrow.aggregate([
       { $match: { status: 'completed' } },
       { $group: { _id: null, totalRevenue: { $sum: '$adminFee' } } }
     ]);
+
     stats.totalRevenue = revenueData[0]?.totalRevenue || 0;
 
-    // Recent escrows
     const recentEscrows = await Escrow.find()
       .populate('buyer', 'name email')
       .populate('seller', 'name email')
       .sort({ createdAt: -1 })
       .limit(10);
 
-    // Recent disputes
     const recentDisputes = await Dispute.find()
       .populate('escrow')
       .populate('initiatedBy', 'name email')
       .sort({ createdAt: -1 })
       .limit(5);
 
-    res.status(200).json({
-      success: true,
-      stats,
-      recentEscrows,
-      recentDisputes
-    });
-
+    res.status(200).json({ success: true, stats, recentEscrows, recentDisputes });
   } catch (error) {
     console.error('Get dashboard stats error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch dashboard stats',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch dashboard stats', error: error.message });
   }
 };
 
-// Get All Transactions
+/* =========================================================
+   GET TRANSACTIONS
+========================================================= */
 const getTransactions = async (req, res) => {
   try {
     const { status, page = 1, limit = 20, search } = req.query;
 
     const query = {};
     if (status) query.status = status;
-    if (search) {
-      query.$or = [
-        { escrowId: { $regex: search, $options: 'i' } },
-        { itemName: { $regex: search, $options: 'i' } }
-      ];
-    }
+    if (search) query.$or = [
+      { escrowId: { $regex: search, $options: 'i' } },
+      { itemName: { $regex: search, $options: 'i' } }
+    ];
 
     const escrows = await Escrow.find(query)
       .populate('buyer', 'name email verified')
@@ -167,22 +138,18 @@ const getTransactions = async (req, res) => {
       currentPage: page,
       totalCount: count
     });
-
   } catch (error) {
     console.error('Get transactions error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch transactions',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch transactions', error: error.message });
   }
 };
 
-// Get All Disputes
+/* =========================================================
+   GET DISPUTES
+========================================================= */
 const getDisputes = async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
-
     const query = {};
     if (status) query.status = status;
 
@@ -191,7 +158,7 @@ const getDisputes = async (req, res) => {
       .populate('initiatedBy', 'name email')
       .populate('resolvedBy', 'name email')
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
+      .limit(limit)
       .skip((page - 1) * limit);
 
     const count = await Dispute.countDocuments(query);
@@ -203,32 +170,23 @@ const getDisputes = async (req, res) => {
       currentPage: page,
       totalCount: count
     });
-
   } catch (error) {
     console.error('Get disputes error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch disputes',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch disputes', error: error.message });
   }
 };
 
-// Resolve Dispute
+/* =========================================================
+   RESOLVE DISPUTE
+========================================================= */
 const resolveDispute = async (req, res) => {
   try {
     const { disputeId } = req.params;
     const { resolution, winner, refundAmount, notes } = req.body;
 
     const dispute = await Dispute.findById(disputeId).populate('escrow');
-    if (!dispute) {
-      return res.status(404).json({
-        success: false,
-        message: 'Dispute not found'
-      });
-    }
+    if (!dispute) return res.status(404).json({ success: false, message: 'Dispute not found' });
 
-    // Update dispute
     dispute.status = 'resolved';
     dispute.resolution = resolution;
     dispute.winner = winner;
@@ -238,201 +196,294 @@ const resolveDispute = async (req, res) => {
     dispute.adminNotes = notes;
     await dispute.save();
 
-    // Update escrow based on resolution
     const escrow = await Escrow.findById(dispute.escrow._id);
     if (winner === 'buyer') {
       escrow.status = 'cancelled';
-      // Refund logic handled separately
     } else if (winner === 'seller') {
       escrow.status = 'completed';
-      // Release payment to seller
+
       const seller = await User.findById(escrow.seller);
       seller.totalEarned += escrow.netAmount;
       await seller.save();
     }
     await escrow.save();
 
-    // Update admin action count
     const admin = await Admin.findById(req.admin._id);
     admin.actionsCount += 1;
     await admin.save();
 
-    // TODO: Send notification emails when email service functions are added
-    console.log('Dispute resolved - email notification pending');
-
-    res.status(200).json({
-      success: true,
-      message: 'Dispute resolved successfully',
-      dispute
-    });
-
+    res.status(200).json({ success: true, message: 'Dispute resolved successfully', dispute });
   } catch (error) {
     console.error('Resolve dispute error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to resolve dispute',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to resolve dispute', error: error.message });
   }
 };
 
-// Get All Users
+/* =========================================================
+   GET ALL USERS (MERGED VERSION)
+========================================================= */
 const getUsers = async (req, res) => {
   try {
-    const { verified, kycStatus, tier, page = 1, limit = 20, search } = req.query;
+    const { verified, kycStatus, tier, page = 1, limit = 20, search, status } = req.query;
 
     const query = {};
     if (verified !== undefined) query.verified = verified === 'true';
     if (kycStatus) query.kycStatus = kycStatus;
-    if (tier) query.tier = tier;
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
-      ];
-    }
+    if (tier && tier !== 'all') query.tier = tier;
+    if (status && status !== 'all') query.status = status;
+    if (search) query.$or = [
+      { name: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } }
+    ];
 
-    const users = await User.find(query)
-      .select('-password')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+    const skip = (page - 1) * limit;
 
-    const count = await User.countDocuments(query);
+    const [users, total] = await Promise.all([
+      User.find(query)
+        .select('-password -twoFactorSecret')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      User.countDocuments(query)
+    ]);
 
     res.status(200).json({
       success: true,
-      users,
-      totalPages: Math.ceil(count / limit),
-      currentPage: page,
-      totalCount: count
+      data: {
+        users,
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      }
     });
 
   } catch (error) {
-    console.error('Get users error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch users',
-      error: error.message
-    });
+    console.error('Get all users error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch users', error: error.message });
   }
 };
 
-// Verify User (Email/KYC)
-const verifyUser = async (req, res) => {
+/* =========================================================
+   CHANGE USER TIER
+========================================================= */
+const changeUserTier = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { verificationType, status, notes } = req.body;
+    const { newTier, reason } = req.body;
 
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+    const validTiers = ['starter', 'growth', 'enterprise', 'api'];
+    if (!validTiers.includes(newTier)) {
+      return res.status(400).json({ success: false, message: 'Invalid tier' });
     }
 
-    if (verificationType === 'email') {
-      user.verified = true;
-    } else if (verificationType === 'kyc') {
-      user.kycStatus = status; // 'approved' or 'rejected'
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const oldTier = user.tier;
+    user.tier = newTier;
+
+    if (newTier !== 'starter' && oldTier === 'starter') {
+      user.subscription = {
+        status: 'active',
+        startDate: new Date(),
+        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        lastPaymentDate: new Date(),
+        autoRenew: false
+      };
     }
 
     await user.save();
 
-    // Update admin action count
-    const admin = await Admin.findById(req.admin._id);
-    admin.actionsCount += 1;
-    await admin.save();
-
-    // TODO: Send notification email when email service functions are added
-    console.log('User verified - email notification pending');
-
     res.status(200).json({
       success: true,
-      message: `User ${verificationType} ${status || 'verified'} successfully`,
-      user
+      message: `User tier changed from ${oldTier} to ${newTier}`,
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          tier: user.tier,
+          subscription: user.subscription
+        }
+      }
     });
 
   } catch (error) {
-    console.error('Verify user error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to verify user',
-      error: error.message
-    });
+    console.error('Change user tier error:', error);
+    res.status(500).json({ success: false, message: 'Failed to change user tier', error: error.message });
   }
 };
 
-// Suspend/Activate User
+/* =========================================================
+   PLATFORM STATS (MERGED)
+========================================================= */
+const getPlatformStats = async (req, res) => {
+  try {
+    const usersByTier = await User.aggregate([
+      { $group: { _id: '$tier', count: { $sum: 1 } } }
+    ]);
+
+    const totalUsers = await User.countDocuments();
+    const activeUsers = await User.countDocuments({ status: 'active' });
+
+    const escrowStats = await Escrow.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          totalValue: { $sum: { $toDouble: '$amount' } }
+        }
+      }
+    ]);
+
+    const subscriptionRevenue = await User.aggregate([
+      {
+        $match: {
+          tier: { $ne: 'starter' },
+          'subscription.status': 'active'
+        }
+      },
+      { $group: { _id: '$tier', count: { $sum: 1 } } }
+    ]);
+
+    const monthlyRevenue = subscriptionRevenue.reduce((acc, tier) => {
+      const tierInfo = feeConfig.getTierInfo(tier._id);
+      const cost = tierInfo.monthlyCost.NGN || tierInfo.monthlyCost.USD;
+      return acc + tier.count * cost;
+    }, 0);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        users: { total: totalUsers, active: activeUsers, byTier: usersByTier },
+        escrows: escrowStats,
+        revenue: { monthlySubscriptions: monthlyRevenue, currency: 'NGN' }
+      }
+    });
+
+  } catch (error) {
+    console.error('Get platform stats error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch platform statistics', error: error.message });
+  }
+};
+
+/* =========================================================
+   TOGGLE USER STATUS
+========================================================= */
 const toggleUserStatus = async (req, res) => {
   try {
     const { userId } = req.params;
+    const { action, reason } = req.body;
 
     const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (action === 'suspend') {
+      user.status = 'suspended';
+      user.isActive = false;
+    } else if (action === 'activate') {
+      user.status = 'active';
+      user.isActive = true;
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid action' });
     }
 
-    user.isActive = !user.isActive;
     await user.save();
-
-    // Update admin action count
-    const admin = await Admin.findById(req.admin._id);
-    admin.actionsCount += 1;
-    await admin.save();
 
     res.status(200).json({
       success: true,
-      message: `User ${user.isActive ? 'activated' : 'suspended'} successfully`,
-      user
+      message: `User ${action}d successfully`,
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          status: user.status,
+          isActive: user.isActive
+        }
+      }
     });
 
   } catch (error) {
     console.error('Toggle user status error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update user status',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to change user status', error: error.message });
   }
 };
 
-// Get Analytics
+/* =========================================================
+   REVIEW KYC
+========================================================= */
+const reviewKYC = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { action, reason } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (user.kycStatus !== 'pending') {
+      return res.status(400).json({ success: false, message: `KYC is already ${user.kycStatus}` });
+    }
+
+    if (action === 'approve') {
+      user.kycStatus = 'approved';
+      user.isKYCVerified = true;
+    } else if (action === 'reject') {
+      user.kycStatus = 'rejected';
+      user.isKYCVerified = false;
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid action' });
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: `KYC ${action}d successfully`,
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          kycStatus: user.kycStatus,
+          isKYCVerified: user.isKYCVerified
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Review KYC error:', error);
+    res.status(500).json({ success: false, message: 'Failed to review KYC', error: error.message });
+  }
+};
+
+/* =========================================================
+   ANALYTICS
+========================================================= */
 const getAnalytics = async (req, res) => {
   try {
     const { period = '30d' } = req.query;
 
-    // Calculate date range
     const startDate = new Date();
-    if (period === '7d') {
-      startDate.setDate(startDate.getDate() - 7);
-    } else if (period === '30d') {
-      startDate.setDate(startDate.getDate() - 30);
-    } else if (period === '90d') {
-      startDate.setDate(startDate.getDate() - 90);
-    } else if (period === '1y') {
-      startDate.setFullYear(startDate.getFullYear() - 1);
-    }
+    if (period === '7d') startDate.setDate(startDate.getDate() - 7);
+    if (period === '30d') startDate.setDate(startDate.getDate() - 30);
+    if (period === '90d') startDate.setDate(startDate.getDate() - 90);
+    if (period === '1y') startDate.setFullYear(startDate.getFullYear() - 1);
 
-    // Transactions over time
     const transactionsOverTime = await Escrow.aggregate([
       { $match: { createdAt: { $gte: startDate } } },
-      {
-        $group: {
+      { $group: {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
           count: { $sum: 1 },
           totalAmount: { $sum: '$amount' },
           totalFees: { $sum: '$adminFee' }
-        }
-      },
+      }},
       { $sort: { _id: 1 } }
     ]);
 
-    // Revenue by tier
     const revenueByTier = await Escrow.aggregate([
       { $match: { status: 'completed', createdAt: { $gte: startDate } } },
       {
@@ -453,7 +504,6 @@ const getAnalytics = async (req, res) => {
       }
     ]);
 
-    // Payment method distribution
     const paymentMethods = await Escrow.aggregate([
       { $match: { createdAt: { $gte: startDate } } },
       {
@@ -465,18 +515,11 @@ const getAnalytics = async (req, res) => {
       }
     ]);
 
-    // Dispute statistics
     const disputeStats = await Dispute.aggregate([
       { $match: { createdAt: { $gte: startDate } } },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
+      { $group: { _id: '$status', count: { $sum: 1 } } }
     ]);
 
-    // User growth
     const userGrowth = await User.aggregate([
       { $match: { createdAt: { $gte: startDate } } },
       {
@@ -501,15 +544,13 @@ const getAnalytics = async (req, res) => {
 
   } catch (error) {
     console.error('Get analytics error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch analytics',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch analytics', error: error.message });
   }
 };
 
-// Get All Admins (Master admin only)
+/* =========================================================
+   ADMIN MANAGEMENT
+========================================================= */
 const getAdmins = async (req, res) => {
   try {
     const admins = await Admin.find()
@@ -517,44 +558,23 @@ const getAdmins = async (req, res) => {
       .populate('createdBy', 'name email')
       .sort({ createdAt: -1 });
 
-    res.status(200).json({
-      success: true,
-      admins
-    });
-
+    res.status(200).json({ success: true, admins });
   } catch (error) {
     console.error('Get admins error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch admins',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch admins', error: error.message });
   }
 };
 
-// Create Sub-Admin (Master admin only)
 const createSubAdmin = async (req, res) => {
   try {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        errors: errors.array()
-      });
-    }
+    if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
 
     const { name, email, password, permissions } = req.body;
 
-    // Check if email already exists
     const existingAdmin = await Admin.findOne({ email });
-    if (existingAdmin) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email already registered'
-      });
-    }
+    if (existingAdmin) return res.status(400).json({ success: false, message: 'Email already registered' });
 
-    // Create sub-admin
     const subAdmin = await Admin.create({
       name,
       email,
@@ -579,73 +599,40 @@ const createSubAdmin = async (req, res) => {
 
   } catch (error) {
     console.error('Create sub-admin error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create sub-admin',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to create sub-admin', error: error.message });
   }
 };
 
-// Update Sub-Admin Permissions (Master admin only)
 const updateSubAdminPermissions = async (req, res) => {
   try {
     const { adminId } = req.params;
     const { permissions } = req.body;
 
     const admin = await Admin.findById(adminId);
-    if (!admin) {
-      return res.status(404).json({
-        success: false,
-        message: 'Admin not found'
-      });
-    }
+    if (!admin) return res.status(404).json({ success: false, message: 'Admin not found' });
 
-    if (admin.role === 'master') {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot modify master admin permissions'
-      });
-    }
+    if (admin.role === 'master')
+      return res.status(400).json({ success: false, message: 'Cannot modify master admin permissions' });
 
     admin.permissions = permissions;
     await admin.save();
 
-    res.status(200).json({
-      success: true,
-      message: 'Permissions updated successfully',
-      admin
-    });
-
+    res.status(200).json({ success: true, message: 'Permissions updated successfully', admin });
   } catch (error) {
     console.error('Update permissions error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update permissions',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to update permissions', error: error.message });
   }
 };
 
-// Suspend/Activate Admin (Master admin only)
 const toggleAdminStatus = async (req, res) => {
   try {
     const { adminId } = req.params;
 
     const admin = await Admin.findById(adminId);
-    if (!admin) {
-      return res.status(404).json({
-        success: false,
-        message: 'Admin not found'
-      });
-    }
+    if (!admin) return res.status(404).json({ success: false, message: 'Admin not found' });
 
-    if (admin.role === 'master') {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot suspend master admin'
-      });
-    }
+    if (admin.role === 'master')
+      return res.status(400).json({ success: false, message: 'Cannot suspend master admin' });
 
     admin.status = admin.status === 'active' ? 'suspended' : 'active';
     await admin.save();
@@ -655,55 +642,34 @@ const toggleAdminStatus = async (req, res) => {
       message: `Admin ${admin.status === 'active' ? 'activated' : 'suspended'} successfully`,
       admin
     });
-
   } catch (error) {
     console.error('Toggle admin status error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update admin status',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to update admin status', error: error.message });
   }
 };
 
-// Delete Sub-Admin (Master admin only)
 const deleteSubAdmin = async (req, res) => {
   try {
     const { adminId } = req.params;
 
     const admin = await Admin.findById(adminId);
-    if (!admin) {
-      return res.status(404).json({
-        success: false,
-        message: 'Admin not found'
-      });
-    }
+    if (!admin) return res.status(404).json({ success: false, message: 'Admin not found' });
 
-    if (admin.role === 'master') {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot delete master admin'
-      });
-    }
+    if (admin.role === 'master')
+      return res.status(400).json({ success: false, message: 'Cannot delete master admin' });
 
     await Admin.findByIdAndDelete(adminId);
 
-    res.status(200).json({
-      success: true,
-      message: 'Sub-admin deleted successfully'
-    });
-
+    res.status(200).json({ success: true, message: 'Sub-admin deleted successfully' });
   } catch (error) {
     console.error('Delete sub-admin error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to delete sub-admin',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to delete sub-admin', error: error.message });
   }
 };
 
-// Export all functions
+/* =========================================================
+   EXPORT MODULE
+========================================================= */
 module.exports = {
   login,
   getDashboardStats,
@@ -711,8 +677,10 @@ module.exports = {
   getDisputes,
   resolveDispute,
   getUsers,
-  verifyUser,
+  changeUserTier,
+  reviewKYC,
   toggleUserStatus,
+  getPlatformStats,
   getAnalytics,
   getAdmins,
   createSubAdmin,
