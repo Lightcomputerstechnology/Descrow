@@ -1,19 +1,29 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate } = require('../middleware/auth.middleware'); // ✅ Corrected
+const { authenticate } = require('../middleware/auth.middleware'); // ✅ Corrected import
 const userController = require('../controllers/user.controller');
 const { uploadMultiple } = require('../middleware/upload.middleware');
 const { body } = require('express-validator');
 
+// ======================================================
+// ===================== PROTECTED ======================
+// ======================================================
+
 // Protect all routes
 router.use(authenticate);
 
-// Profile routes
+// ======================================================
+// ===================== PROFILE ========================
+// ======================================================
+
 router.get('/profile', userController.getProfile);
 router.put('/profile', userController.updateProfile);
 router.put('/change-password', userController.changePassword);
 
-// KYC upload
+// ======================================================
+// ======================= KYC ==========================
+// ======================================================
+
 router.post(
   '/upload-kyc',
   uploadMultiple('documents', 5),
@@ -23,20 +33,33 @@ router.post(
   }
 );
 
-// Tier upgrade
+// ======================================================
+// ================== TIER UPGRADE ======================
+// ======================================================
+
 router.post(
   '/upgrade-tier',
   [
-    body('tier').isIn(['basic', 'pro', 'enterprise']).withMessage('Invalid tier'),
-    body('paymentReference').notEmpty().withMessage('Payment reference required')
+    body('tier')
+      .isIn(['basic', 'pro', 'enterprise'])
+      .withMessage('Invalid tier'),
+    body('paymentReference')
+      .notEmpty()
+      .withMessage('Payment reference required')
   ],
   userController.upgradeTier
 );
 
-// Statistics
+// ======================================================
+// ==================== STATISTICS ======================
+// ======================================================
+
 router.get('/statistics', userController.getUserStatistics);
 
-// 2FA routes
+// ======================================================
+// ======================== 2FA ==========================
+// ======================================================
+
 router.post('/2fa/enable', userController.enable2FA);
 router.post('/2fa/verify', userController.verify2FA);
 router.post('/2fa/disable', userController.disable2FA);
