@@ -1,4 +1,3 @@
-// backend/models/Escrow.model.js - PRODUCTION READY
 const mongoose = require('mongoose');
 
 const escrowSchema = new mongoose.Schema({
@@ -29,7 +28,7 @@ const escrowSchema = new mongoose.Schema({
   currency: {
     type: String,
     default: 'USD',
-    enum: ['USD', 'EUR', 'GBP', 'NGN', 'KES', 'GHS', 'ZAR']
+    enum: ['USD', 'EUR', 'GBP', 'NGN', 'KES', 'GHS', 'ZAR', 'CAD', 'AUD']
   },
 
   // Participants
@@ -46,13 +45,26 @@ const escrowSchema = new mongoose.Schema({
     index: true
   },
 
-  // ✅ FIXED: Proper Status Flow
+  // ✅ NEW: Tier tracking
+  buyerTier: {
+    type: String,
+    enum: ['starter', 'growth', 'enterprise', 'api'],
+    default: 'starter'
+  },
+  
+  sellerTier: {
+    type: String,
+    enum: ['starter', 'growth', 'enterprise', 'api'],
+    default: 'starter'
+  },
+
+  // Status Flow
   status: {
     type: String,
     enum: [
       'pending',      // Created, waiting for seller acceptance
       'accepted',     // Seller accepted, waiting for payment
-      'funded',       // ✅ Buyer paid, money in escrow
+      'funded',       // Buyer paid, money in escrow
       'delivered',    // Seller marked as delivered
       'completed',    // Buyer confirmed delivery
       'paid_out',     // Seller received payment
@@ -71,23 +83,27 @@ const escrowSchema = new mongoose.Schema({
     note: String
   }],
 
-  // ✅ ENHANCED: Payment details with proper fee tracking
+  // ✅ ENHANCED: Payment details with tier-based fees
   payment: {
     method: {
       type: String,
       enum: ['paystack', 'flutterwave', 'crypto']
     },
-    reference: String, // Payment reference (unique per transaction)
-    transactionId: String, // Gateway transaction ID
-    paymentId: String, // For crypto (Nowpayments payment_id)
+    reference: String,
+    transactionId: String,
+    paymentId: String,
     
     // Amounts
-    amount: mongoose.Schema.Types.Decimal128,           // Original item amount
-    buyerFee: mongoose.Schema.Types.Decimal128,         // 2% buyer fee
-    sellerFee: mongoose.Schema.Types.Decimal128,        // 1% seller fee
-    platformFee: mongoose.Schema.Types.Decimal128,      // Total 3% platform fee
-    buyerPays: mongoose.Schema.Types.Decimal128,        // Amount + buyer fee
-    sellerReceives: mongoose.Schema.Types.Decimal128,   // Amount - seller fee
+    amount: mongoose.Schema.Types.Decimal128,
+    buyerFee: mongoose.Schema.Types.Decimal128,
+    sellerFee: mongoose.Schema.Types.Decimal128,
+    platformFee: mongoose.Schema.Types.Decimal128,
+    buyerPays: mongoose.Schema.Types.Decimal128,
+    sellerReceives: mongoose.Schema.Types.Decimal128,
+    
+    // ✅ NEW: Fee percentages used (for record keeping)
+    buyerFeePercentage: Number,
+    sellerFeePercentage: Number,
     
     // Status tracking
     paidAt: Date,
@@ -97,6 +113,28 @@ const escrowSchema = new mongoose.Schema({
     // Gateway response data
     gatewayResponse: mongoose.Schema.Types.Mixed
   },
+
+  // ✅ NEW: Chat system
+  chat: [{
+    sender: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    message: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    timestamp: {
+      type: Date,
+      default: Date.now
+    },
+    read: {
+      type: Boolean,
+      default: false
+    }
+  }],
 
   // Delivery details
   delivery: {
@@ -108,7 +146,7 @@ const escrowSchema = new mongoose.Schema({
     trackingNumber: String,
     deliveredAt: Date,
     confirmedAt: Date,
-    autoReleaseAt: Date, // Auto-release funds after X days
+    autoReleaseAt: Date,
     evidence: [{
       type: { type: String },
       url: String,
@@ -135,6 +173,23 @@ const escrowSchema = new mongoose.Schema({
     resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }
   },
 
+  // ✅ NEW: Payout tracking
+  payout: {
+    accountId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'BankAccount'
+    },
+    accountNumber: String,
+    bankName: String,
+    amount: mongoose.Schema.Types.Decimal128,
+    transferCode: String,
+    paidOut: {
+      type: Boolean,
+      default: false
+    },
+    paidOutAt: Date
+  },
+
   // Category
   category: {
     type: String,
@@ -159,7 +214,7 @@ const escrowSchema = new mongoose.Schema({
     }
   },
 
-  // ✅ NEW: Chat unlock flag
+  // Chat unlock flag
   chatUnlocked: {
     type: Boolean,
     default: false
@@ -180,23 +235,20 @@ const escrowSchema = new mongoose.Schema({
         if (ret.payment.buyerPays) ret.payment.buyerPays = parseFloat(ret.payment.buyerPays.toString());
         if (ret.payment.sellerReceives) ret.payment.sellerReceives = parseFloat(ret.payment.sellerReceives.toString());
       }
+      if (ret.payout && ret.payout.amount) {
+        ret.payout.amount = parseFloat(ret.payout.amount.toString());
+      }
       return ret;
     }
   },
   toObject: { virtuals: true }
 });
 
-// ──────────────────────────────
 // INDEXES
-// ──────────────────────────────
 escrowSchema.index({ buyer: 1, status: 1 });
 escrowSchema.index({ seller: 1, status: 1 });
 escrowSchema.index({ createdAt: -1 });
 escrowSchema.index({ 'payment.reference': 1 }, { sparse: true });
-
-// ──────────────────────────────
-// PRE-SAVE HOOKS
-// ──────────────────────────────
 
 // Generate unique Escrow ID
 escrowSchema.pre('save', function(next) {
@@ -227,32 +279,7 @@ escrowSchema.pre('save', function(next) {
   next();
 });
 
-// ✅ ENHANCED: Calculate fees properly
-escrowSchema.pre('save', function(next) {
-  if (this.isModified('amount') && !this.payment?.platformFee) {
-    const amount = parseFloat(this.amount.toString());
-    
-    // Fee structure: Buyer pays 2%, Seller pays 1%, Platform earns 3%
-    const buyerFee = amount * 0.02;
-    const sellerFee = amount * 0.01;
-    const platformFee = buyerFee + sellerFee;
-    
-    this.payment = {
-      ...this.payment,
-      amount: this.amount,
-      buyerFee: mongoose.Types.Decimal128.fromString(buyerFee.toFixed(2)),
-      sellerFee: mongoose.Types.Decimal128.fromString(sellerFee.toFixed(2)),
-      platformFee: mongoose.Types.Decimal128.fromString(platformFee.toFixed(2)),
-      buyerPays: mongoose.Types.Decimal128.fromString((amount + buyerFee).toFixed(2)),
-      sellerReceives: mongoose.Types.Decimal128.fromString((amount - sellerFee).toFixed(2))
-    };
-  }
-  next();
-});
-
-// ──────────────────────────────
-// VIRTUALS
-// ──────────────────────────────
+// Virtuals
 escrowSchema.virtual('isCompleted').get(function() {
   return ['completed', 'paid_out'].includes(this.status);
 });
