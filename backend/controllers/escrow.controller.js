@@ -1,10 +1,10 @@
 const Escrow = require('../models/Escrow.model');
 const User = require('../models/User.model');
-const { calculateFees } = require('../utils/feeCalculator');
+const feeConfig = require('../config/fee.config');
 const { notifyEscrowParties, createNotification } = require('../utils/notificationHelper');
 
 /**
- * Create new escrow (Buyer initiates)
+ * Create new escrow (Buyer initiates) - WITH TIER VALIDATION
  */
 exports.createEscrow = async (req, res) => {
   try {
@@ -36,10 +36,32 @@ exports.createEscrow = async (req, res) => {
       });
     }
 
-    // Calculate fees
-    const feeBreakdown = await calculateFees(amount);
+    // ✅ NEW: Get buyer with tier info
+    const buyer = await User.findById(buyerId);
+    
+    // ✅ NEW: Check tier limits
+    const canCreate = buyer.canCreateTransaction(amount, currency || 'USD');
+    if (!canCreate.allowed) {
+      return res.status(403).json({
+        success: false,
+        message: canCreate.reason,
+        limit: canCreate.limit,
+        current: canCreate.current,
+        upgradeRequired: true,
+        currentTier: buyer.tier,
+        suggestedTier: buyer.tier === 'starter' ? 'growth' : 'enterprise'
+      });
+    }
 
-    // Create escrow
+    // ✅ NEW: Calculate tier-based fees
+    const feeBreakdown = feeConfig.calculateFees(
+      amount,
+      currency || 'USD',
+      buyer.tier,
+      'flutterwave' // Default gateway
+    );
+
+    // Create escrow with tier-based payment
     const escrow = await Escrow.create({
       title,
       description,
@@ -47,9 +69,21 @@ exports.createEscrow = async (req, res) => {
       currency: currency || 'USD',
       buyer: buyerId,
       seller: seller._id,
+      buyerTier: buyer.tier,
+      sellerTier: seller.tier,
       category: category || 'other',
       delivery: {
         method: deliveryMethod || 'physical'
+      },
+      payment: {
+        amount: feeBreakdown.amount,
+        buyerFee: feeBreakdown.buyerFee,
+        sellerFee: feeBreakdown.sellerFee,
+        platformFee: feeBreakdown.totalPlatformFee,
+        buyerPays: feeBreakdown.buyerPays,
+        sellerReceives: feeBreakdown.sellerReceives,
+        buyerFeePercentage: feeBreakdown.buyerFeePercentage,
+        sellerFeePercentage: feeBreakdown.sellerFeePercentage
       },
       timeline: [{
         status: 'pending',
@@ -59,25 +93,31 @@ exports.createEscrow = async (req, res) => {
       }]
     });
 
+    // ✅ NEW: Increment monthly usage
+    buyer.monthlyUsage.transactionCount += 1;
+    await buyer.save();
+
     // Notify seller
     await createNotification(
       seller._id,
       'escrow_created',
       'New Escrow Request',
-      `${req.user.name} wants to create a $${amount} escrow deal with you: "${title}"`,
+      `${buyer.name} wants to create a ${currency || 'USD'} ${amount} escrow deal with you: "${title}"`,
       `/escrow/${escrow._id}`,
-      { escrowId: escrow._id, amount, otherParty: req.user.name }
+      { escrowId: escrow._id, amount, otherParty: buyer.name }
     );
 
     // Populate and return
-    await escrow.populate('buyer seller', 'name email profilePicture');
+    await escrow.populate('buyer seller', 'name email profilePicture tier');
 
     res.status(201).json({
       success: true,
       message: 'Escrow created successfully. Waiting for seller acceptance.',
       data: {
         escrow,
-        feeBreakdown
+        feeBreakdown,
+        buyerTier: buyer.tier,
+        tierLimits: buyer.getTierLimits()
       }
     });
 
@@ -160,98 +200,6 @@ exports.acceptEscrow = async (req, res) => {
 };
 
 /**
- * Buyer funds escrow (payment)
- */
-exports.fundEscrow = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { paymentMethod, transactionId } = req.body;
-    const userId = req.user.id;
-
-    const escrow = await Escrow.findById(id).populate('buyer seller', 'name email');
-
-    if (!escrow) {
-      return res.status(404).json({
-        success: false,
-        message: 'Escrow not found'
-      });
-    }
-
-    // Verify user is the buyer
-    if (escrow.buyer._id.toString() !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Only the buyer can fund this escrow'
-      });
-    }
-
-    // Check status
-    if (escrow.status !== 'accepted') {
-      return res.status(400).json({
-        success: false,
-        message: 'Escrow must be accepted before funding'
-      });
-    }
-
-    // Calculate fees
-    const feeBreakdown = await calculateFees(escrow.amount);
-
-    // TODO: Integrate actual payment gateway here
-    // For now, we'll simulate successful payment
-    // const paymentResult = await processPayment(paymentMethod, feeBreakdown.buyerPays);
-
-    // Update escrow with payment details
-    escrow.status = 'funded';
-    escrow.payment = {
-      method: paymentMethod,
-      transactionId: transactionId || `TXN_${Date.now()}`,
-      paidAt: new Date(),
-      amount: escrow.amount,
-      buyerPays: feeBreakdown.buyerPays,
-      sellerReceives: feeBreakdown.sellerReceives,
-      platformFee: feeBreakdown.totalFee,
-      buyerFee: feeBreakdown.buyerFee,
-      sellerFee: feeBreakdown.sellerFee
-    };
-
-    escrow.timeline.push({
-      status: 'funded',
-      timestamp: new Date(),
-      actor: userId,
-      note: `Buyer funded escrow with ${paymentMethod}`
-    });
-
-    await escrow.save();
-
-    // Notify seller
-    await createNotification(
-      escrow.seller._id,
-      'escrow_funded',
-      'Escrow Funded!',
-      `${escrow.buyer.name} has funded the escrow. You can now proceed with delivery.`,
-      `/escrow/${escrow._id}`,
-      { escrowId: escrow._id, amount: escrow.amount, otherParty: escrow.buyer.name }
-    );
-
-    res.json({
-      success: true,
-      message: 'Escrow funded successfully. Money is now held securely.',
-      data: {
-        escrow,
-        payment: escrow.payment
-      }
-    });
-
-  } catch (error) {
-    console.error('Fund escrow error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to fund escrow'
-    });
-  }
-};
-
-/**
  * Seller marks as delivered
  */
 exports.markDelivered = async (req, res) => {
@@ -294,7 +242,7 @@ exports.markDelivered = async (req, res) => {
     // Add evidence if provided
     if (evidenceUrls && Array.isArray(evidenceUrls)) {
       escrow.delivery.evidence = evidenceUrls.map(url => ({
-        type: 'image', // Can be enhanced to detect type
+        type: 'image',
         url,
         uploadedBy: userId,
         uploadedAt: new Date()
@@ -415,7 +363,6 @@ exports.confirmDelivery = async (req, res) => {
 exports.processPayout = async (escrow) => {
   try {
     // TODO: Integrate actual payment gateway payout
-    // const payoutResult = await initiatePayoutToSeller(escrow.seller, escrow.payment.sellerReceives);
 
     escrow.status = 'paid_out';
     escrow.timeline.push({
@@ -426,12 +373,20 @@ exports.processPayout = async (escrow) => {
 
     await escrow.save();
 
+    // Update seller stats
+    const seller = await User.findById(escrow.seller);
+    if (seller) {
+      seller.totalEarned = (seller.totalEarned || 0) + parseFloat(escrow.payment.sellerReceives.toString());
+      seller.totalTransactions = (seller.totalTransactions || 0) + 1;
+      await seller.save();
+    }
+
     // Notify seller
     await createNotification(
       escrow.seller,
       'payment_received',
       'Payment Released!',
-      `You've received $${escrow.payment.sellerReceives} from escrow #${escrow._id.toString().slice(-6)}`,
+      `You've received ${escrow.currency} ${escrow.payment.sellerReceives} from escrow #${escrow.escrowId}`,
       `/escrow/${escrow._id}`,
       { escrowId: escrow._id, amount: escrow.payment.sellerReceives }
     );
@@ -440,7 +395,6 @@ exports.processPayout = async (escrow) => {
 
   } catch (error) {
     console.error('Payout error:', error);
-    // TODO: Add to failed payouts queue for retry
   }
 };
 
@@ -515,7 +469,7 @@ exports.raiseDispute = async (req, res) => {
       otherParty._id,
       'dispute_raised',
       'Dispute Raised',
-      `A dispute has been raised on escrow #${escrow._id.toString().slice(-6)}. Admin will review.`,
+      `A dispute has been raised on escrow #${escrow.escrowId}. Admin will review.`,
       `/escrow/${escrow._id}`,
       { escrowId: escrow._id, amount: escrow.amount }
     );
@@ -582,13 +536,22 @@ exports.cancelEscrow = async (req, res) => {
 
     await escrow.save();
 
+    // ✅ NEW: Decrement buyer's monthly usage if they cancel
+    if (isBuyer) {
+      const buyer = await User.findById(userId);
+      if (buyer && buyer.monthlyUsage.transactionCount > 0) {
+        buyer.monthlyUsage.transactionCount -= 1;
+        await buyer.save();
+      }
+    }
+
     // Notify other party
     const otherParty = isBuyer ? escrow.seller : escrow.buyer;
     await createNotification(
       otherParty._id,
       'escrow_cancelled',
       'Escrow Cancelled',
-      `Escrow #${escrow._id.toString().slice(-6)} has been cancelled.`,
+      `Escrow #${escrow.escrowId} has been cancelled.`,
       `/escrow/${escrow._id}`,
       { escrowId: escrow._id }
     );
@@ -615,7 +578,7 @@ exports.getMyEscrows = async (req, res) => {
   try {
     const userId = req.user.id;
     const { 
-      role, // 'buyer', 'seller', 'all'
+      role,
       status, 
       search, 
       sortBy = 'createdAt', 
@@ -655,7 +618,7 @@ exports.getMyEscrows = async (req, res) => {
 
     const [escrows, total] = await Promise.all([
       Escrow.find(query)
-        .populate('buyer seller', 'name email profilePicture')
+        .populate('buyer seller', 'name email profilePicture tier')
         .sort({ [sortBy]: sortOrder })
         .skip(skip)
         .limit(parseInt(limit)),
@@ -694,17 +657,17 @@ exports.getEscrowById = async (req, res) => {
 
     let escrow;
 
-    // Try to find by MongoDB _id first (if it's a valid ObjectId format)
+    // Try to find by MongoDB _id first
     if (id.match(/^[0-9a-fA-F]{24}$/)) {
       escrow = await Escrow.findById(id)
-        .populate('buyer seller', 'name email profilePicture phone')
+        .populate('buyer seller', 'name email profilePicture phone tier')
         .populate('timeline.actor', 'name');
     }
 
-    // If not found by _id, try by escrowId field (e.g., ESC123...)
+    // If not found by _id, try by escrowId field
     if (!escrow) {
       escrow = await Escrow.findOne({ escrowId: id })
-        .populate('buyer seller', 'name email profilePicture phone')
+        .populate('buyer seller', 'name email profilePicture phone tier')
         .populate('timeline.actor', 'name');
     }
 
@@ -744,11 +707,12 @@ exports.getEscrowById = async (req, res) => {
 };
 
 /**
- * Calculate fees for amount (preview before creating)
+ * ✅ NEW: Calculate fees for amount (preview before creating) - TIER-BASED
  */
 exports.calculateFeePreview = async (req, res) => {
   try {
-    const { amount } = req.query;
+    const { amount, currency } = req.query;
+    const userId = req.user.id;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({
@@ -757,11 +721,37 @@ exports.calculateFeePreview = async (req, res) => {
       });
     }
 
-    const feeBreakdown = await calculateFees(parseFloat(amount));
+    // Get user's tier
+    const user = await User.findById(userId);
+    const userTier = user.tier || 'starter';
+
+    // Calculate fees based on user's tier
+    const feeBreakdown = feeConfig.calculateFees(
+      parseFloat(amount),
+      currency || 'USD',
+      userTier,
+      'flutterwave'
+    );
+
+    // Get tier info
+    const tierInfo = feeConfig.getTierInfo(userTier);
+
+    // Check if amount within limits
+    const withinLimit = feeConfig.isAmountWithinLimit(
+      parseFloat(amount),
+      currency || 'USD',
+      userTier
+    );
 
     res.json({
       success: true,
-      data: feeBreakdown
+      data: {
+        feeBreakdown,
+        userTier,
+        tierInfo,
+        withinLimit,
+        upgradeAvailable: !withinLimit
+      }
     });
 
   } catch (error) {
@@ -780,27 +770,28 @@ exports.getDashboardStats = async (req, res) => {
   try {
     const userId = req.user.id;
 
+    // Get user with tier info
+    const user = await User.findById(userId);
+
     // Aggregate statistics
     const [buyingStats, sellingStats] = await Promise.all([
-      // Buying stats
       Escrow.aggregate([
-        { $match: { buyer: userId } },
+        { $match: { buyer: mongoose.Types.ObjectId(userId) } },
         {
           $group: {
             _id: '$status',
             count: { $sum: 1 },
-            totalAmount: { $sum: '$amount' }
+            totalAmount: { $sum: { $toDouble: '$amount' } }
           }
         }
       ]),
-      // Selling stats
       Escrow.aggregate([
-        { $match: { seller: userId } },
+        { $match: { seller: mongoose.Types.ObjectId(userId) } },
         {
           $group: {
             _id: '$status',
             count: { $sum: 1 },
-            totalAmount: { $sum: '$amount' }
+            totalAmount: { $sum: { $toDouble: '$amount' } }
           }
         }
       ])
@@ -827,6 +818,9 @@ exports.getDashboardStats = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(10);
 
+    // Get tier limits
+    const tierLimits = user.getTierLimits();
+
     res.json({
       success: true,
       data: {
@@ -834,7 +828,10 @@ exports.getDashboardStats = async (req, res) => {
         selling,
         recentTransactions,
         totalTransactions: buying.total + selling.total,
-        totalValue: buying.totalValue + selling.totalValue
+        totalValue: buying.totalValue + selling.totalValue,
+        userTier: user.tier,
+        tierLimits,
+        monthlyUsage: user.monthlyUsage
       }
     });
 
@@ -846,3 +843,5 @@ exports.getDashboardStats = async (req, res) => {
     });
   }
 };
+
+module.exports = exports;
