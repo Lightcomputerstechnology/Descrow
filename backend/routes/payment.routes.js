@@ -1,17 +1,19 @@
-// backend/routes/payment.routes.js - FIXED
+// backend/routes/payment.routes.js - WITH VERIFICATION MIDDLEWARE
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 
-// Import middleware - use 'authenticate' not 'authenticateUser'
+// Import middleware
 const { authenticate } = require('../middleware/auth.middleware');
+const verificationMiddleware = require('../middleware/verification.middleware');
 
 const paymentController = require('../controllers/payment.controller');
 
-// Initialize payment
+// Initialize payment (requires verification)
 router.post(
   '/initialize',
   authenticate,
+  verificationMiddleware,  // ✅ ADDED: Check verification before payment
   [
     body('escrowId').notEmpty().withMessage('Escrow ID is required'),
     body('paymentMethod').isIn(['paystack', 'flutterwave', 'crypto']).withMessage('Invalid payment method')
