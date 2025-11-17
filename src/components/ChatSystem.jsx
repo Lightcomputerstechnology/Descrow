@@ -1,172 +1,159 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Image } from 'lucide-react';
+// src/components/ChatSystem.jsx
+import React, { useState, useEffect, useRef } from 'react';
+import { Send, Paperclip, Loader } from 'lucide-react';
+import axios from 'axios';
+import toast from 'react-hot-toast';
 
-const ChatSystem = ({ escrowId, userId, userName, otherPartyName }) => {
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      senderId: 'other',
-      senderName: otherPartyName,
-      text: 'Hello! Thanks for your purchase. I will ship the item today.',
-      timestamp: '2025-10-26T10:30:00Z',
-      type: 'text'
-    },
-    {
-      id: 2,
-      senderId: userId,
-      senderName: userName,
-      text: 'Great! Looking forward to receiving it. Please send tracking info.',
-      timestamp: '2025-10-26T10:35:00Z',
-      type: 'text'
-    }
-  ]);
-  
+const ChatSystem = ({ escrowId, currentUserId }) => {
+  const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+  // Fetch messages from API
+  const fetchMessages = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/chat/${escrowId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.data.success) setMessages(response.data.data.messages || []);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to fetch messages');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 5000); // Poll every 5s
+    return () => clearInterval(interval);
+  }, [escrowId]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
-    
-    if (newMessage.trim() === '') return;
-
-    const message = {
-      id: messages.length + 1,
-      senderId: userId,
-      senderName: userName,
-      text: newMessage,
-      timestamp: new Date().toISOString(),
-      type: 'text'
-    };
-
-    // API call to send message
-    setMessages([...messages, message]);
-    setNewMessage('');
+    if (!newMessage.trim()) return toast.error('Message cannot be empty');
+    setSending(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${API_URL}/chat/send`,
+        { escrowId, message: newMessage.trim() },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.success) {
+        setMessages([...messages, response.data.data]);
+        setNewMessage('');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to send message');
+    } finally {
+      setSending(false);
+    }
   };
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // API call to upload file
-    const message = {
-      id: messages.length + 1,
-      senderId: userId,
-      senderName: userName,
-      text: file.name,
-      timestamp: new Date().toISOString(),
-      type: 'file',
-      fileUrl: URL.createObjectURL(file)
-    };
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('escrowId', escrowId);
 
-    setMessages([...messages, message]);
-  };
-
-  const formatTime = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    setSending(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`${API_URL}/chat/upload`, formData, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+      });
+      if (response.data.success) setMessages([...messages, response.data.data]);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to upload file');
+    } finally {
+      setSending(false);
+      e.target.value = null;
+    }
   };
 
   return (
-    <div className="flex flex-col h-[600px]">
+    <div className="flex flex-col h-[600px] bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => {
-          const isOwn = message.senderId === userId;
-          
-          return (
-            <div
-              key={message.id}
-              className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-            >
-              <div className={`max-w-[75%] ${isOwn ? 'order-2' : 'order-1'}`}>
-                <div className={`rounded-lg px-4 py-2 ${
-                  isOwn 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-gray-200 text-gray-900'
-                }`}>
-                  {!isOwn && (
-                    <p className="text-xs font-semibold mb-1 opacity-75">
-                      {message.senderName}
-                    </p>
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {loading ? (
+          <div className="flex justify-center items-center h-full">
+            <Loader className="w-8 h-8 animate-spin text-blue-600" />
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+            No messages yet. Start the conversation!
+          </div>
+        ) : (
+          messages.map((msg, index) => {
+            const isCurrentUser = msg.sender?._id === currentUserId;
+            const messageText = msg.message || msg.text || '';
+            return (
+              <div key={index} className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[70%] rounded-lg px-4 py-2 ${isCurrentUser ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'}`}>
+                  {!isCurrentUser && <p className="text-xs font-semibold mb-1 opacity-70">{msg.sender?.name || 'Unknown'}</p>}
+                  {msg.type === 'file' && msg.fileUrl ? (
+                    <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm underline">
+                      <Paperclip className="w-4 h-4" /> {msg.message || msg.text}
+                    </a>
+                  ) : (
+                    <p className="text-sm whitespace-pre-wrap break-words">{messageText}</p>
                   )}
-                  
-                  {message.type === 'text' ? (
-                    <p className="text-sm">{message.text}</p>
-                  ) : message.type === 'file' ? (
-                    <div className="flex items-center gap-2">
-                      <Paperclip className="w-4 h-4" />
-                      <a
-                        href={message.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm underline"
-                      >
-                        {message.text}
-                      </a>
-                    </div>
-                  ) : null}
-                  
-                  <p className={`text-xs mt-1 ${
-                    isOwn ? 'text-blue-100' : 'text-gray-500'
-                  }`}>
-                    {formatTime(message.timestamp)}
+                  <p className="text-xs opacity-60 mt-1">
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-gray-200 p-4 bg-gray-50">
-        <form onSubmit={handleSendMessage} className="flex gap-2">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-            className="hidden"
-            accept="image/*,.pdf,.doc,.docx"
-          />
-          
+      <form onSubmit={handleSendMessage} className="border-t border-gray-200 dark:border-gray-800 p-4">
+        <div className="flex gap-2">
+          <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded-lg transition"
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition"
           >
             <Paperclip className="w-5 h-5" />
           </button>
-
           <input
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Type a message..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            disabled={sending}
+            className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
           />
-
           <button
             type="submit"
-            className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            disabled={sending || !newMessage.trim()}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2"
           >
-            <Send className="w-5 h-5" />
+            {sending ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
           </button>
-        </form>
-        
-        <p className="text-xs text-gray-500 mt-2">
-          All messages are monitored for security purposes
-        </p>
-      </div>
+        </div>
+      </form>
     </div>
   );
 };
