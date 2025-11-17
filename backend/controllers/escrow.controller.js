@@ -978,10 +978,13 @@ exports.getDashboardStats = async (req, res) => {
     // Get user with tier info
     const user = await User.findById(userId);
 
+    // ✅ FIXED: Use new ObjectId() constructor
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+
     // Aggregate statistics
     const [buyingStats, sellingStats] = await Promise.all([
       Escrow.aggregate([
-        { $match: { buyer: mongoose.Types.ObjectId(userId) } },
+        { $match: { buyer: userObjectId } },
         {
           $group: {
             _id: '$status',
@@ -991,7 +994,7 @@ exports.getDashboardStats = async (req, res) => {
         }
       ]),
       Escrow.aggregate([
-        { $match: { seller: mongoose.Types.ObjectId(userId) } },
+        { $match: { seller: userObjectId } },
         {
           $group: {
             _id: '$status',
@@ -1014,6 +1017,7 @@ exports.getDashboardStats = async (req, res) => {
 
     const buying = calculateTotals(buyingStats);
     const selling = calculateTotals(sellingStats);
+
     // Recent transactions
     const recentTransactions = await Escrow.find({
       $or: [{ buyer: userId }, { seller: userId }]
