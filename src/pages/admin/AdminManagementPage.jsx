@@ -329,7 +329,7 @@ const AdminManagementPage = ({ admin }) => {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-red-500"
-                  placeholder="admin@dealcross.com"
+                  placeholder="admin@dealcross.net"
                   required
                 />
               </div>
