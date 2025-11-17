@@ -2,19 +2,19 @@
 
 const express = require('express');
 const router = express.Router();
-const authMiddleware = require('../middleware/auth.middleware');
+const { authenticate } = require('../middleware/auth.middleware');
 const businessController = require('../controllers/business.controller');
 
 // Register business
-router.post('/register', authMiddleware, businessController.registerBusiness);
+router.post('/register', authenticate, businessController.registerBusiness);
 
 // Upload documents
-router.post('/:businessId/documents', authMiddleware, businessController.uploadDocuments);
+router.post('/:businessId/documents', authenticate, businessController.uploadDocuments);
 
 // Get business details
-router.get('/details', authMiddleware, businessController.getBusinessDetails);
+router.get('/details', authenticate, businessController.getBusinessDetails);
 
 // Generate API keys (admin only - add admin middleware)
-router.post('/:businessId/api-keys', authMiddleware, businessController.generateApiKeys);
+router.post('/:businessId/api-keys', authenticate, businessController.generateApiKeys);
 
 module.exports = router;
