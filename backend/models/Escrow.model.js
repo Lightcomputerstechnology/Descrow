@@ -45,7 +45,7 @@ const escrowSchema = new mongoose.Schema({
     index: true
   },
 
-  // ✅ NEW: Tier tracking
+  // Tier tracking
   buyerTier: {
     type: String,
     enum: ['starter', 'growth', 'enterprise', 'api'],
@@ -83,7 +83,7 @@ const escrowSchema = new mongoose.Schema({
     note: String
   }],
 
-  // ✅ ENHANCED: Payment details with tier-based fees
+  // Payment details with tier-based fees
   payment: {
     method: {
       type: String,
@@ -101,7 +101,7 @@ const escrowSchema = new mongoose.Schema({
     buyerPays: mongoose.Schema.Types.Decimal128,
     sellerReceives: mongoose.Schema.Types.Decimal128,
     
-    // ✅ NEW: Fee percentages used (for record keeping)
+    // Fee percentages used (for record keeping)
     buyerFeePercentage: Number,
     sellerFeePercentage: Number,
     
@@ -114,7 +114,7 @@ const escrowSchema = new mongoose.Schema({
     gatewayResponse: mongoose.Schema.Types.Mixed
   },
 
-  // ✅ NEW: Chat system
+  // Chat system
   chat: [{
     sender: {
       type: mongoose.Schema.Types.ObjectId,
@@ -136,23 +136,60 @@ const escrowSchema = new mongoose.Schema({
     }
   }],
 
-  // Delivery details
+  // Delivery details with proof system
   delivery: {
     method: {
       type: String,
       enum: ['physical', 'digital', 'service'],
       default: 'physical'
     },
+    
+    // Delivery proof data
+    proof: {
+      method: {
+        type: String,
+        enum: ['courier', 'personal', 'other']
+      },
+      
+      // Courier delivery
+      courierName: String,
+      trackingNumber: String,
+      
+      // Personal delivery
+      vehicleType: String,
+      plateNumber: String,
+      driverName: String,
+      driverPhoto: String,
+      vehiclePhoto: String,
+      gpsEnabled: Boolean,
+      gpsTrackingId: String,
+      
+      // Other method
+      methodDescription: String,
+      
+      // Common fields
+      estimatedDelivery: Date,
+      packagePhotos: [String],
+      additionalNotes: String,
+      submittedAt: Date,
+      submittedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      }
+    },
+    
     trackingNumber: String,
     deliveredAt: Date,
     confirmedAt: Date,
     autoReleaseAt: Date,
+    
     evidence: [{
       type: { type: String },
       url: String,
       uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
       uploadedAt: { type: Date, default: Date.now }
     }],
+    
     notes: String
   },
 
@@ -173,7 +210,7 @@ const escrowSchema = new mongoose.Schema({
     resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' }
   },
 
-  // ✅ NEW: Payout tracking
+  // Payout tracking
   payout: {
     accountId: {
       type: mongoose.Schema.Types.ObjectId,
