@@ -34,6 +34,35 @@ const userSchema = new mongoose.Schema({
     default: 'starter'
   },
   
+  // ✅ NEW: API Access fields
+  apiAccess: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    apiKey: {
+      type: String,
+      unique: true,
+      sparse: true
+    },
+    apiSecret: {
+      type: String,
+      select: false
+    },
+    createdAt: Date,
+    regeneratedAt: Date,
+    lastUsedAt: Date,
+    revokedAt: Date,
+    requestCount: {
+      type: Number,
+      default: 0
+    },
+    keyHistory: [{
+      apiKey: String,
+      revokedAt: Date
+    }]
+  },
+  
   // ✅ NEW: Subscription tracking
   subscription: {
     status: {
