@@ -27,11 +27,11 @@ const userSchema = new mongoose.Schema({
     default: 'dual'
   },
   
-  // ✅ UPDATED: New tier system
+  // ✅ FIXED: Updated tier system to include 'free'
   tier: {
     type: String,
-    enum: ['starter', 'growth', 'enterprise', 'api'],
-    default: 'starter'
+    enum: ['free', 'starter', 'growth', 'enterprise', 'api'],
+    default: 'free'
   },
   
   // ✅ NEW: API Access fields
@@ -260,9 +260,37 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// ✅ UPDATED: Get tier limits with new structure
+// ✅ UPDATED: Get tier limits with new structure including 'free' tier
 userSchema.methods.getTierLimits = function() {
   const limits = {
+    free: {
+      name: 'Free',
+      maxTransactionAmount: {
+        NGN: 50000,
+        USD: 500
+      },
+      maxTransactionsPerMonth: 5,
+      monthlyCost: {
+        NGN: 0,
+        USD: 0
+      },
+      fees: {
+        NGN: {
+          buyer: 0.03,    // 3%
+          seller: 0.03    // 3%
+        },
+        USD: {
+          buyer: 0.035,   // 3.5%
+          seller: 0.035   // 3.5%
+        },
+        crypto: {
+          buyer: 0.0175,  // 1.75%
+          seller: 0.0175  // 1.75%
+        }
+      },
+      features: ['Basic processing', 'Email support', '5 transactions/month']
+    },
+    
     starter: {
       name: 'Starter',
       maxTransactionAmount: {
@@ -288,7 +316,7 @@ userSchema.methods.getTierLimits = function() {
           seller: 0.0175  // 1.75%
         }
       },
-      features: ['Standard processing', 'Basic support', 'Limited transactions']
+      features: ['Standard processing', 'Basic support', '10 transactions/month']
     },
     
     growth: {
