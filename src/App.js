@@ -1,6 +1,6 @@
-// File: src/App.js - COMPLETE PRODUCTION VERSION
+// File: src/App.js - PRODUCTION READY (Single Toaster)
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -194,13 +194,33 @@ function App() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors duration-300">
+      {/* ==================== SINGLE GLOBAL TOASTER ==================== */}
       <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,
-          style: { background: '#363636', color: '#fff' },
-          success: { duration: 3000, iconTheme: { primary: '#4ade80', secondary: '#fff' } },
-          error: { duration: 4000, iconTheme: { primary: '#ef4444', secondary: '#fff' } },
+          style: {
+            background: '#363636',
+            color: '#fff',
+            padding: '16px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          },
+          success: {
+            duration: 3000,
+            iconTheme: { primary: '#4ade80', secondary: '#fff' },
+            style: { background: '#10b981' },
+          },
+          error: {
+            duration: 4000,
+            iconTheme: { primary: '#ef4444', secondary: '#fff' },
+            style: { background: '#ef4444' },
+          },
+          loading: {
+            duration: Infinity,
+            iconTheme: { primary: '#3b82f6', secondary: '#fff' },
+            style: { background: '#3b82f6' },
+          },
         }}
       />
 
