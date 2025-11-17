@@ -63,6 +63,30 @@ export const adminService = {
     return response.data;
   },
 
+  // User Tier Management
+  changeUserTier: async (userId, newTier, reason) => {
+    const response = await api.put(`/admin/users/${userId}/tier`, {
+      newTier,
+      reason
+    }, getAdminHeaders());
+    return response.data;
+  },
+
+  // KYC Management
+  reviewKYC: async (userId, action, reason) => {
+    const response = await api.put(`/admin/users/${userId}/kyc`, {
+      action, // 'approve' or 'reject'
+      reason
+    }, getAdminHeaders());
+    return response.data;
+  },
+
+  // Platform Statistics
+  getPlatformStats: async () => {
+    const response = await api.get('/admin/stats', getAdminHeaders());
+    return response.data;
+  },
+
   // Analytics
   getAnalytics: async (period) => {
     const response = await api.get('/admin/analytics', {
@@ -106,6 +130,55 @@ export const adminService = {
 
   rejectCryptoPayment: async (escrowId, reason) => {
     const response = await api.post('/payments/crypto/reject', { escrowId, reason }, getAdminHeaders());
+    return response.data;
+  },
+
+  // ✅ NEW: Fee Management Endpoints
+  
+  // Get current fee settings
+  getFeeSettings: async () => {
+    const response = await api.get('/admin/fees', getAdminHeaders());
+    return response.data;
+  },
+
+  // Update single fee field
+  updateFeeSettings: async (payload) => {
+    const response = await api.put('/admin/fees/update', payload, getAdminHeaders());
+    return response.data;
+  },
+
+  // Bulk update entire tier
+  bulkUpdateTierFees: async (tier, updates) => {
+    const response = await api.put('/admin/fees/bulk-update', {
+      tier,
+      updates
+    }, getAdminHeaders());
+    return response.data;
+  },
+
+  // Update gateway costs
+  updateGatewayCosts: async (gateway, currency, field, value) => {
+    const response = await api.put('/admin/fees/gateway-costs', {
+      gateway,
+      currency,
+      field,
+      value
+    }, getAdminHeaders());
+    return response.data;
+  },
+
+  // Get fee change history
+  getFeeHistory: async (page = 1, limit = 20) => {
+    const response = await api.get('/admin/fees/history', {
+      ...getAdminHeaders(),
+      params: { page, limit }
+    });
+    return response.data;
+  },
+
+  // Reset fees to default
+  resetFeesToDefault: async (tier) => {
+    const response = await api.post('/admin/fees/reset', { tier }, getAdminHeaders());
     return response.data;
   }
 };
