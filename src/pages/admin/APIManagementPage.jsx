@@ -137,7 +137,7 @@ const APIManagementPage = ({ admin }) => {
               <div>
                 <p className="text-sm text-gray-400">Documentation</p>
                 <a
-                  href="https://docs.dealcross.com"
+                  href="https://docs.dealcross.net"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-purple-400 hover:text-purple-300 flex items-center gap-1"
