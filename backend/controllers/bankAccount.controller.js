@@ -442,5 +442,3 @@ async function initiatePaystackTransfer(bankAccount, amount, reference) {
     };
   }
 }
-
-module.exports = exports;
