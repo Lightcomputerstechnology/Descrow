@@ -627,7 +627,7 @@ const EscrowDetailsPage = () => {
                             <p className="font-semibold text-gray-900 dark:text-white">
                               {escrow.delivery.proof.driverName}
                             </p>
-                          </div​​​​​​​​​​​​​​​​>
+                          </div>
 
                           {/* GPS Tracking */}
                           {escrow.delivery.proof.gpsEnabled && escrow.delivery.proof.gpsTrackingId && (
@@ -1255,4 +1255,4 @@ const EscrowDetailsPage = () => {
   );
 };
 
-export default EscrowDetailsPage; 
+export default EscrowDetailsPage;
