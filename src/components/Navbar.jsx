@@ -1,8 +1,9 @@
-// File: src/components/Navbar.jsx (SEO + Accessibility Refined)
+// src/components/Navbar.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, Shield } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Logo from './Logo';
 import ThemeToggle from './ThemeToggle';
 import { authService } from '../services/authService';
 
@@ -58,9 +59,9 @@ export default function Navbar({ user: propUser }) {
           <Link
             to="/"
             aria-label="Go to Dealcross homepage"
-            className="flex items-center hover:opacity-80 transition-opacity"
+            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
           >
-            <Shield className="w-8 h-8 text-blue-600 mr-2" aria-hidden="true" />
+            <Logo size="md" />
             <span className="text-xl font-bold text-gray-900 dark:text-white">
               Dealcross
             </span>
@@ -206,10 +207,10 @@ export default function Navbar({ user: propUser }) {
               <div className="flex items-center justify-between mb-8">
                 <Link
                   to="/"
-                  className="flex items-center"
+                  className="flex items-center gap-3"
                   onClick={() => setOpen(false)}
                 >
-                  <Shield className="w-8 h-8 text-blue-600 mr-2" aria-hidden="true" />
+                  <Logo size="md" />
                   <span className="text-xl font-bold text-gray-900 dark:text-white">
                     Dealcross
                   </span>
