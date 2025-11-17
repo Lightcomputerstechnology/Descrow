@@ -1,4 +1,4 @@
-// src/controllers/admin.controller.js - COMPLETE MERGED VERSION
+// src/controllers/admin.controller.js - COMPLETE FIXED VERSION
 const Admin = require('../models/Admin.model');
 const User = require('../models/User.model');
 const Escrow = require('../models/Escrow.model');
@@ -673,19 +673,9 @@ const deleteSubAdmin = async (req, res) => {
    FEE SETTINGS MANAGEMENT
 ========================================================= */
 
-// ✅ ADMIN: Update gateway costs
-const updateGatewayCosts = async (req, res) => {
+// Get current fee settings
+const getFeeSettings = async (req, res) => {
   try {
-    const { gateway, currency, field, value } = req.body;
-
-    const validGateways = ['paystack', 'flutterwave', 'crypto'];
-    if (!validGateways.includes(gateway)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid gateway'
-      });
-    }
-
     let feeSettings = await FeeSettings.findOne({ isActive: true });
 
     if (!feeSettings) {
@@ -695,47 +685,26 @@ const updateGatewayCosts = async (req, res) => {
       });
     }
 
-    // Update gateway cost
-    if (gateway === 'crypto') {
-      feeSettings.gatewayCosts[gateway][field] = parseFloat(value);
-    } else {
-      if (field === 'transferFee' && gateway === 'paystack') {
-        // Paystack has transfer fee tiers
-        const { tier, amount } = value;
-        feeSettings.gatewayCosts.paystack.transferFee[tier] = parseFloat(amount);
-      } else {
-        feeSettings.gatewayCosts[gateway][currency][field] = parseFloat(value);
-      }
-    }
-
-    feeSettings.lastUpdatedBy = req.admin._id;
-    feeSettings.version += 1;
-    await feeSettings.save();
-
-    console.log(`✅ Admin ${req.admin.email} updated ${gateway} gateway costs`);
-
     res.status(200).json({
       success: true,
-      message: 'Gateway costs updated successfully',
-      data: feeSettings.gatewayCosts
+      data: feeSettings
     });
 
   } catch (error) {
-    console.error('Update gateway costs error:', error);
+    console.error('Get fee settings error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to update gateway costs',
+      message: 'Failed to fetch fee settings',
       error: error.message
     });
   }
 };
 
-// ✅ ADMIN: Update fee settings
+// Update fee settings
 const updateFeeSettings = async (req, res) => {
   try {
     const { tier, currency, feeType, field, value } = req.body;
 
-    // Validate inputs
     const validTiers = ['starter', 'growth', 'enterprise', 'api'];
     if (!validTiers.includes(tier)) {
       return res.status(400).json({
@@ -760,7 +729,6 @@ const updateFeeSettings = async (req, res) => {
       });
     }
 
-    // Get current settings
     let feeSettings = await FeeSettings.findOne({ isActive: true });
 
     if (!feeSettings) {
@@ -808,7 +776,7 @@ const updateFeeSettings = async (req, res) => {
   }
 };
 
-// ✅ ADMIN: Bulk update tier fees
+// Bulk update tier fees
 const bulkUpdateTierFees = async (req, res) => {
   try {
     const { tier, updates } = req.body;
@@ -888,7 +856,7 @@ const bulkUpdateTierFees = async (req, res) => {
   }
 };
 
-// ✅ ADMIN: Update gateway costs
+// Update gateway costs
 const updateGatewayCosts = async (req, res) => {
   try {
     const { gateway, currency, field, value } = req.body;
@@ -912,10 +880,10 @@ const updateGatewayCosts = async (req, res) => {
 
     // Update gateway cost
     if (gateway === 'crypto') {
-      feeSettings.gate​​​​​​​​​​​​​​​​feeSettings.gatewayCosts[gateway][field] = parseFloat(value);
+      feeSettings.gatewayCosts[gateway][field] = parseFloat(value);
     } else {
       if (field === 'transferFee' && gateway === 'paystack') {
-        // Paystack has transfer fee tiers
+      // Paystack has transfer fee tiers
         const { tier, amount } = value;
         feeSettings.gatewayCosts.paystack.transferFee[tier] = parseFloat(amount);
       } else {
@@ -945,7 +913,7 @@ const updateGatewayCosts = async (req, res) => {
   }
 };
 
-// ✅ ADMIN: Get fee settings history
+// Get fee settings history
 const getFeeSettingsHistory = async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
@@ -984,7 +952,7 @@ const getFeeSettingsHistory = async (req, res) => {
   }
 };
 
-// ✅ ADMIN: Reset fees to default
+// Reset fees to default
 const resetFeesToDefault = async (req, res) => {
   try {
     const { tier } = req.body;
