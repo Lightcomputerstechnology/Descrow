@@ -1,5 +1,6 @@
 const Escrow = require('../models/Escrow.model');
 const User = require('../models/User.model');
+const mongoose = require('mongoose');
 const feeConfig = require('../config/fee.config');
 const { notifyEscrowParties, createNotification } = require('../utils/notificationHelper');
 
@@ -36,10 +37,10 @@ exports.createEscrow = async (req, res) => {
       });
     }
 
-    // ✅ NEW: Get buyer with tier info
+    // Get buyer with tier info
     const buyer = await User.findById(buyerId);
     
-    // ✅ NEW: Check tier limits
+    // Check tier limits
     const canCreate = buyer.canCreateTransaction(amount, currency || 'USD');
     if (!canCreate.allowed) {
       return res.status(403).json({
@@ -53,7 +54,7 @@ exports.createEscrow = async (req, res) => {
       });
     }
 
-    // ✅ NEW: Calculate tier-based fees
+    // Calculate tier-based fees
     const feeBreakdown = feeConfig.calculateFees(
       amount,
       currency || 'USD',
@@ -93,7 +94,7 @@ exports.createEscrow = async (req, res) => {
       }]
     });
 
-    // ✅ NEW: Increment monthly usage
+    // Increment monthly usage
     buyer.monthlyUsage.transactionCount += 1;
     await buyer.save();
 
@@ -200,7 +201,7 @@ exports.acceptEscrow = async (req, res) => {
 };
 
 /**
- * Seller marks as delivered
+ * Seller marks as delivered (OLD METHOD - kept for backwards compatibility)
  */
 exports.markDelivered = async (req, res) => {
   try {
@@ -279,6 +280,210 @@ exports.markDelivered = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to mark as delivered'
+    });
+  }
+};
+
+/**
+ * Upload delivery proof and mark as delivered (NEW METHOD)
+ */
+exports.uploadDeliveryProof = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      method,
+      courierName,
+      trackingNumber,
+      vehicleType,
+      plateNumber,
+      driverName,
+      driverPhoto,
+      vehiclePhoto,
+      gpsEnabled,
+      methodDescription,
+      estimatedDelivery,
+      packagePhotos,
+      additionalNotes
+    } = req.body;
+    const userId = req.user.id;
+
+    const escrow = await Escrow.findById(id).populate('buyer seller', 'name email');
+
+    if (!escrow) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escrow not found'
+      });
+    }
+
+    // Verify user is the seller
+    if (escrow.seller._id.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the seller can upload delivery proof'
+      });
+    }
+
+    // Check status
+    if (escrow.status !== 'funded') {
+      return res.status(400).json({
+        success: false,
+        message: 'Escrow must be funded before marking as delivered'
+      });
+    }
+
+    // Validate required fields
+    if (!method || !estimatedDelivery || !packagePhotos || packagePhotos.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: method, estimatedDelivery, and at least one package photo'
+      });
+    }
+
+    // Method-specific validation
+    if (method === 'courier' && (!courierName || !trackingNumber)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Courier name and tracking number are required for courier delivery'
+      });
+    }
+
+    if (method === 'personal' && (!vehicleType || !plateNumber || !driverName)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vehicle type, plate number, and driver name are required for personal delivery'
+      });
+    }
+
+    if (method === 'other' && !methodDescription) {
+      return res.status(400).json({
+        success: false,
+        message: 'Method description is required for other delivery methods'
+      });
+    }
+
+    // Generate GPS tracking ID if enabled
+    let gpsTrackingId = null;
+    if (gpsEnabled && method === 'personal') {
+      gpsTrackingId = `GPS_${escrow.escrowId}_${Date.now()}`;
+    }
+
+    // Calculate auto-release date (3 days after expected delivery)
+    const autoReleaseDate = new Date(estimatedDelivery);
+    autoReleaseDate.setDate(autoReleaseDate.getDate() + 3);
+
+    // Update escrow with delivery proof
+    escrow.status = 'delivered';
+    escrow.delivery.proof = {
+      method,
+      courierName,
+      trackingNumber,
+      vehicleType,
+      plateNumber,
+      driverName,
+      driverPhoto,
+      vehiclePhoto,
+      gpsEnabled,
+      gpsTrackingId,
+      methodDescription,
+      estimatedDelivery: new Date(estimatedDelivery),
+      packagePhotos,
+      additionalNotes,
+      submittedAt: new Date(),
+      submittedBy: userId
+    };
+    
+    escrow.delivery.deliveredAt = new Date();
+    escrow.delivery.trackingNumber = trackingNumber;
+    escrow.delivery.autoReleaseAt = autoReleaseDate;
+
+    escrow.timeline.push({
+      status: 'delivered',
+      timestamp: new Date(),
+      actor: userId,
+      note: `Seller uploaded delivery proof and marked as delivered via ${method}`
+    });
+
+    await escrow.save();
+
+    // Notify buyer
+    await createNotification(
+      escrow.buyer._id,
+      'escrow_delivered',
+      'Item Shipped!',
+      `${escrow.seller.name} has shipped your order. ${
+        trackingNumber ? `Tracking: ${trackingNumber}` : ''
+      } Expected delivery: ${new Date(estimatedDelivery).toLocaleDateString()}`,
+      `/escrow/${escrow._id}`,
+      { 
+        escrowId: escrow._id, 
+        trackingNumber,
+        gpsTrackingId,
+        estimatedDelivery
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Delivery proof uploaded successfully',
+      data: {
+        escrow,
+        gpsTrackingUrl: gpsEnabled ? `https://dealcross.net/track/${gpsTrackingId}` : null,
+        autoReleaseDate
+      }
+    });
+
+  } catch (error) {
+    console.error('Upload delivery proof error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to upload delivery proof'
+    });
+  }
+};
+
+/**
+ * Get GPS tracking data (for live tracking)
+ */
+exports.getGPSTracking = async (req, res) => {
+  try {
+    const { gpsTrackingId } = req.params;
+
+    const escrow = await Escrow.findOne({ 'delivery.proof.gpsTrackingId': gpsTrackingId });
+
+    if (!escrow) {
+      return res.status(404).json({
+        success: false,
+        message: 'GPS tracking not found'
+      });
+    }
+
+    // TODO: Integrate with real-time GPS tracking service
+    // For now, return mock data
+    const mockGPSData = {
+      trackingId: gpsTrackingId,
+      currentLocation: {
+        lat: 6.5244,
+        lng: 3.3792,
+        timestamp: new Date()
+      },
+      estimatedArrival: escrow.delivery.proof.estimatedDelivery,
+      driverName: escrow.delivery.proof.driverName,
+      vehicleType: escrow.delivery.proof.vehicleType,
+      plateNumber: escrow.delivery.proof.plateNumber,
+      status: 'in_transit'
+    };
+
+    res.status(200).json({
+      success: true,
+      data: mockGPSData
+    });
+
+  } catch (error) {
+    console.error('Get GPS tracking error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch GPS tracking data'
     });
   }
 };
@@ -536,7 +741,7 @@ exports.cancelEscrow = async (req, res) => {
 
     await escrow.save();
 
-    // ✅ NEW: Decrement buyer's monthly usage if they cancel
+    // Decrement buyer's monthly usage if they cancel
     if (isBuyer) {
       const buyer = await User.findById(userId);
       if (buyer && buyer.monthlyUsage.transactionCount > 0) {
@@ -707,7 +912,7 @@ exports.getEscrowById = async (req, res) => {
 };
 
 /**
- * ✅ NEW: Calculate fees for amount (preview before creating) - TIER-BASED
+ * Calculate fees for amount (preview before creating) - TIER-BASED
  */
 exports.calculateFeePreview = async (req, res) => {
   try {
@@ -809,7 +1014,6 @@ exports.getDashboardStats = async (req, res) => {
 
     const buying = calculateTotals(buyingStats);
     const selling = calculateTotals(sellingStats);
-
     // Recent transactions
     const recentTransactions = await Escrow.find({
       $or: [{ buyer: userId }, { seller: userId }]
@@ -840,6 +1044,81 @@ exports.getDashboardStats = async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch dashboard stats'
+    });
+  }
+};
+
+/**
+ * Fund escrow (buyer makes payment)
+ */
+exports.fundEscrow = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { paymentReference, paymentMethod } = req.body;
+    const userId = req.user.id;
+
+    const escrow = await Escrow.findById(id).populate('buyer seller', 'name email');
+
+    if (!escrow) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escrow not found'
+      });
+    }
+
+    // Verify user is the buyer
+    if (escrow.buyer._id.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the buyer can fund this escrow'
+      });
+    }
+
+    // Check status
+    if (!['pending', 'accepted'].includes(escrow.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot fund escrow in ${escrow.status} status`
+      });
+    }
+
+    // Update payment details
+    escrow.status = 'funded';
+    escrow.payment.method = paymentMethod || 'flutterwave';
+    escrow.payment.reference = paymentReference;
+    escrow.payment.paidAt = new Date();
+    escrow.payment.verifiedAt = new Date();
+
+    escrow.timeline.push({
+      status: 'funded',
+      timestamp: new Date(),
+      actor: userId,
+      note: 'Buyer funded the escrow'
+    });
+
+    await escrow.save();
+
+    // Notify seller
+    await createNotification(
+      escrow.seller._id,
+      'escrow_funded',
+      'Escrow Funded!',
+      `${escrow.buyer.name} has funded the escrow. You can now proceed with delivery.`,
+      `/escrow/${escrow._id}`,
+      { escrowId: escrow._id, amount: escrow.amount, otherParty: escrow.buyer.name }
+    );
+
+    res.json({
+      success: true,
+      message: 'Escrow funded successfully',
+      data: escrow
+    });
+
+  } catch (error) {
+    console.error('Fund escrow error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fund escrow'
     });
   }
 };
