@@ -1,13 +1,45 @@
-// backend/routes/apiKey.routes.js
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/auth.middleware');
+const { authenticate, protect } = require('../middleware/auth.middleware');
+const apiKeyController = require('../controllers/apiKey.controller');
 const APIKey = require('../models/APIKey.model');
+const { body } = require('express-validator');
+
+// Protect all routes - use authenticate as primary
+router.use(authenticate);
+
+// ===== User-based API Key Management (stored in User model) =====
+
+// Generate API keys (first time)
+router.post('/generate', apiKeyController.generateApiKeys);
+
+// Regenerate API keys
+router.post(
+  '/regenerate',
+  [
+    body('confirmPassword').notEmpty().withMessage('Password confirmation required')
+  ],
+  apiKeyController.regenerateApiKeys
+);
+
+// Get API usage statistics
+router.get('/usage', apiKeyController.getApiUsage);
+
+// Revoke API access
+router.post(
+  '/revoke',
+  [
+    body('confirmPassword').notEmpty().withMessage('Password confirmation required')
+  ],
+  apiKeyController.revokeApiAccess
+);
+
+// ===== APIKey Model Management (multiple keys per user) =====
 
 // Get all API keys for user
-router.get('/', protect, async (req, res) => {
+router.get('/list', async (req, res) => {
   try {
-    const apiKeys = await APIKey.find({ userId: req.user._id }) // Changed ApiKey to APIKey
+    const apiKeys = await APIKey.find({ userId: req.user._id })
       .select('-secret')
       .sort({ createdAt: -1 });
 
@@ -24,7 +56,7 @@ router.get('/', protect, async (req, res) => {
 });
 
 // Create new API key
-router.post('/create', protect, async (req, res) => {
+router.post('/create', async (req, res) => {
   try {
     const { name, environment, webhookUrl, metadata } = req.body;
 
@@ -36,10 +68,10 @@ router.post('/create', protect, async (req, res) => {
     }
 
     // Generate key and secret
-    const { key, secret } = APIKey.generateKey(); // Changed ApiKey to APIKey
+    const { key, secret } = APIKey.generateKey();
 
     // Create API key
-    const apiKey = await APIKey.create({ // Changed ApiKey to APIKey
+    const apiKey = await APIKey.create({
       userId: req.user._id,
       name,
       key,
@@ -72,9 +104,9 @@ router.post('/create', protect, async (req, res) => {
 });
 
 // Revoke API key
-router.delete('/:id', protect, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    const apiKey = await APIKey.findOne({ // Changed ApiKey to APIKey
+    const apiKey = await APIKey.findOne({
       _id: req.params.id,
       userId: req.user._id
     });
@@ -101,5 +133,16 @@ router.delete('/:id', protect, async (req, res) => {
     });
   }
 });
+
+// ===== Controller-based routes (using apiKey.controller.js) =====
+
+// Generate API Key (controller version)
+router.post('/key/generate', apiKeyController.generateAPIKey);
+
+// List API Keys (controller version)
+router.get('/keys', apiKeyController.listAPIKeys);
+
+// Revoke specific API Key (controller version)
+router.delete('/key/:keyId', apiKeyController.revokeAPIKey);
 
 module.exports = router;
