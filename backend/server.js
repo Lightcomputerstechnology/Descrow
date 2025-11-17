@@ -1,4 +1,4 @@
-// backend/server.js - PRODUCTION READY VERSION
+// backend/server.js - COMPLETE MERGED VERSION WITH ALL NEW ROUTES
 require('dotenv').config();
 const path = require('path');
 const express = require('express');
@@ -9,6 +9,9 @@ const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const mongoSanitize = require('express-mongo-sanitize');
+
+// ==================== IMPORT CRON JOBS ====================
+const { startSubscriptionCron } = require('./jobs/subscription.cron');
 
 // ==================== IMPORT ROUTES ====================
 const authRoutes = require('./routes/auth.routes');
@@ -25,12 +28,12 @@ const verifyRoutes = require('./routes/verify.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const platformSettingsRoutes = require('./routes/platformSettings.routes');
 const paymentRoutes = require('./routes/payment.routes');
-
-// NEW: contact routes
 const contactRoutes = require('./routes/contact.routes');
-
-// NEW: public API v1 routes (for third-party integrations / SDK)
 const apiV1Routes = require('./routes/api.v1.routes');
+
+// ✅ NEW ROUTES
+const businessRoutes = require('./routes/business.routes');
+const bankAccountRoutes = require('./routes/bankAccount.routes');
 
 const app = express();
 
@@ -64,7 +67,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
   'https://descrow-5l46.onrender.com',
-  'https://descrow-ow5e.onrender.com',  // ✅ ADDED NEW FRONTEND URL
+  'https://descrow-ow5e.onrender.com',
   'https://dealcross.net',
   'https://www.dealcross.net',
   process.env.FRONTEND_URL
@@ -76,7 +79,7 @@ app.use(cors({
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
-      console.log('✅ Allowed origin:', origin);  // ✅ Added logging for allowed origins
+      console.log('✅ Allowed origin:', origin);
       return callback(null, true);
     }
 
@@ -167,6 +170,10 @@ mongoose.connect(process.env.MONGODB_URI, {
   .then(() => {
     console.log(`✅ MongoDB Connected: ${mongoose.connection.name}`);
     console.log(`📊 Database Host: ${mongoose.connection.host}`);
+    
+    // ✅ START CRON JOBS AFTER DATABASE CONNECTION
+    startSubscriptionCron();
+    console.log('⏰ Subscription cron jobs started');
   })
   .catch(err => {
     console.error('❌ MongoDB Connection Error:', err);
@@ -215,25 +222,45 @@ app.get('/api/health', async (req, res) => {
 });
 
 // ==================== API ROUTES ====================
+
+// Authentication & User Management
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/security', securityRoutes);
+app.use('/api/verify-email', verifyRoutes);
+
+// Core Escrow Functionality
 app.use('/api/escrow', escrowRoutes);
 app.use('/api/chat', chatRoutes);
-app.use('/api/notifications', notificationRoutes);
 app.use('/api/delivery', deliveryRoutes);
 app.use('/api/disputes', disputeRoutes);
+
+// Payments
 app.use('/api/payments', paymentRoutes);
+
+// Notifications
+app.use('/api/notifications', notificationRoutes);
+
+// Admin Panel
 app.use('/api/admin', adminRoutes);
-app.use('/api/api-keys', apiKeyRoutes);
-app.use('/api/verify-email', verifyRoutes);
+
+// Platform Settings
 app.use('/api/platform', platformSettingsRoutes);
 
-// MOUNT CONTACT ROUTES
+// API Keys Management
+app.use('/api/api-keys', apiKeyRoutes);
+
+// Contact & Support
 app.use('/api/contact', contactRoutes);
 
-// PUBLIC API ROUTES (v1) - for external integrators / SDKs
+// ✅ NEW: Business Features
+app.use('/api/business', businessRoutes);
+
+// ✅ NEW: Bank Account Management
+app.use('/api/bank', bankAccountRoutes);
+
+// Public API Routes (v1) - for external integrators / SDKs
 app.use('/api/v1', apiV1Routes);
 
 // ==================== ERROR HANDLING ====================
@@ -329,6 +356,10 @@ const server = app.listen(PORT, () => {
   console.log(`🔗 API URL: http://localhost:${PORT}/api`);
   console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
   console.log(`✅ Allowed Origins:`, allowedOrigins);
+  console.log(`⏰ Cron jobs: ACTIVE`);
+  console.log(`📦 New routes mounted:`);
+  console.log(`   - /api/business (Business features)`);
+  console.log(`   - /api/bank (Bank account management)`);
   console.log('='.repeat(60));
 });
 
