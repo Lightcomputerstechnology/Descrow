@@ -1,3 +1,4 @@
+// backend/routes/admin.routes.js - COMPLETE MERGED VERSION
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/admin.controller');
@@ -61,10 +62,17 @@ router.get(
 );
 
 router.put(
-  '/users/:userId/verify',
+  '/users/:userId/tier',
   protectAdmin,
   checkPermission('verifyUsers'),
-  adminController.verifyUser
+  adminController.changeUserTier
+);
+
+router.put(
+  '/users/:userId/kyc',
+  protectAdmin,
+  checkPermission('verifyUsers'),
+  adminController.reviewKYC
 );
 
 router.put(
@@ -74,12 +82,19 @@ router.put(
   adminController.toggleUserStatus
 );
 
-// ----------------- Analytics -----------------
+// ----------------- Analytics & Stats -----------------
 router.get(
   '/analytics',
   protectAdmin,
   checkPermission('viewAnalytics'),
   adminController.getAnalytics
+);
+
+router.get(
+  '/platform-stats',
+  protectAdmin,
+  checkPermission('viewAnalytics'),
+  adminController.getPlatformStats
 );
 
 // ======================================================
@@ -129,6 +144,75 @@ router.delete(
   protectAdmin,
   masterOnly,
   adminController.deleteSubAdmin
+);
+
+// ======================================================
+// =========== FEE MANAGEMENT (MASTER ONLY) =============
+// ======================================================
+
+// Get current fee settings
+router.get(
+  '/fees',
+  protectAdmin,
+  masterOnly,
+  adminController.getFeeSettings
+);
+
+// Update individual fee setting
+router.put(
+  '/fees/update',
+  protectAdmin,
+  masterOnly,
+  [
+    body('tier').isIn(['starter', 'growth', 'enterprise', 'api']).withMessage('Invalid tier'),
+    body('feeType').isIn(['fees', 'monthlyCost', 'setupFee', 'maxTransactionAmount', 'maxTransactionsPerMonth']).withMessage('Invalid fee type'),
+    body('value').notEmpty().withMessage('Value required')
+  ],
+  adminController.updateFeeSettings
+);
+
+// Bulk update tier fees
+router.put(
+  '/fees/bulk-update',
+  protectAdmin,
+  masterOnly,
+  [
+    body('tier').isIn(['starter', 'growth', 'enterprise', 'api']).withMessage('Invalid tier'),
+    body('updates').isObject().withMessage('Updates object required')
+  ],
+  adminController.bulkUpdateTierFees
+);
+
+// Update gateway costs
+router.put(
+  '/fees/gateway-costs',
+  protectAdmin,
+  masterOnly,
+  [
+    body('gateway').isIn(['paystack', 'flutterwave', 'crypto']).withMessage('Invalid gateway'),
+    body('field').notEmpty().withMessage('Field required'),
+    body('value').notEmpty().withMessage('Value required')
+  ],
+  adminController.updateGatewayCosts
+);
+
+// Get fee settings history
+router.get(
+  '/fees/history',
+  protectAdmin,
+  masterOnly,
+  adminController.getFeeSettingsHistory
+);
+
+// Reset fees to default
+router.post(
+  '/fees/reset',
+  protectAdmin,
+  masterOnly,
+  [
+    body('tier').isIn(['starter', 'growth', 'enterprise', 'api', 'all']).withMessage('Invalid tier')
+  ],
+  adminController.resetFeesToDefault
 );
 
 module.exports = router;
