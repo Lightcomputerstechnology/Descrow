@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import { X, Upload, Camera, MapPin } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+
+const API_URL = process.env.REACT_APP_API_URL || 'https://api.dealcross.net';
 
 const DeliveryProofUpload = ({ escrowId, onClose, onSuccess }) => {
   const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     method: 'courier',
     // Courier fields
@@ -47,23 +51,73 @@ const DeliveryProofUpload = ({ escrowId, onClose, onSuccess }) => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // API call to submit delivery proof
-    const proofData = {
-      method: formData.method,
-      courierName: formData.courierName,
-      trackingNumber: formData.trackingNumber,
-      vehicleType: formData.vehicleType,
-      plateNumber: formData.plateNumber,
-      driverName: formData.driverName,
-      estimatedDelivery: formData.estimatedDelivery,
-      photos: formData.packagePhotos.map(f => f.name),
-      gpsEnabled: formData.enableGPS
-    };
+    try {
+      setLoading(true);
 
-    onSuccess(proofData);
+      // Create FormData for file upload
+      const formDataObj = new FormData();
+      formDataObj.append('method', formData.method);
+      formDataObj.append('courierName', formData.courierName);
+      formDataObj.append('trackingNumber', formData.trackingNumber);
+      formDataObj.append('vehicleType', formData.vehicleType);
+      formDataObj.append('plateNumber', formData.plateNumber);
+      formDataObj.append('driverName', formData.driverName);
+      formDataObj.append('methodDescription', formData.methodDescription);
+      formDataObj.append('estimatedDelivery', formData.estimatedDelivery);
+      formDataObj.append('gpsEnabled', formData.enableGPS);
+      formDataObj.append('additionalNotes', formData.additionalNotes);
+
+      // Add package photos
+      formData.packagePhotos.forEach((file) => {
+        formDataObj.append('photos', file);
+      });
+      
+      // Add driver photo if exists
+      if (formData.driverPhoto) {
+        formDataObj.append('driverPhoto', formData.driverPhoto);
+      }
+      
+      // Add vehicle photo if exists
+      if (formData.vehiclePhoto) {
+        formDataObj.append('vehiclePhoto', formData.vehiclePhoto);
+      }
+
+      // Make API call
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/escrow/${escrowId}/upload-delivery-proof`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formDataObj
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast.success('Delivery proof uploaded successfully!');
+        onSuccess(result.data);
+      } else {
+        toast.error(result.message || 'Failed to upload delivery proof');
+      }
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload delivery proof');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const removePackagePhoto = (index) => {
+    const newPhotos = formData.packagePhotos.filter((_, i) => i !== index);
+    setFormData({
+      ...formData,
+      packagePhotos: newPhotos
+    });
   };
 
   const renderMethodFields = () => {
@@ -248,6 +302,7 @@ const DeliveryProofUpload = ({ escrowId, onClose, onSuccess }) => {
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition"
+            disabled={loading}
           >
             <X className="w-6 h-6" />
           </button>
@@ -261,7 +316,9 @@ const DeliveryProofUpload = ({ escrowId, onClose, onSuccess }) => {
                   Delivery Method * <span className="text-red-500">Required</span>
                 </label>
                 <div className="grid grid-cols-3 gap-3">
-                  <label className="border-2 border-gray-300 rounded-lg p-4 cursor-pointer hover:border-blue-500 transition">
+                  <label className={`border-2 rounded-lg p-4 cursor-pointer hover:border-blue-500 transition ${
+                    formData.method === 'courier' ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                  }`}>
                     <input
                       type="radio"
                       name="method"
@@ -277,7 +334,9 @@ const DeliveryProofUpload = ({ escrowId, onClose, onSuccess }) => {
                     </div>
                   </label>
 
-                  <label className="border-2 border-gray-300 rounded-lg p-4 cursor-pointer hover:border-blue-500 transition">
+                  <label className={`border-2 rounded-lg p-4 cursor-pointer hover:border-blue-500 transition ${
+                    formData.method === 'personal' ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                  }`}>
                     <input
                       type="radio"
                       name="method"
@@ -293,7 +352,9 @@ const DeliveryProofUpload = ({ escrowId, onClose, onSuccess }) => {
                     </div>
                   </label>
 
-                  <label className="border-2 border-gray-300 rounded-lg p-4 cursor-pointer hover:border-blue-500 transition">
+                  <label className={`border-2 rounded-lg p-4 cursor-pointer hover:border-blue-500 transition ${
+                    formData.method === 'other' ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                  }`}>
                     <input
                       type="radio"
                       name="method"
@@ -322,6 +383,7 @@ const DeliveryProofUpload = ({ escrowId, onClose, onSuccess }) => {
                   name="estimatedDelivery"
                   value={formData.estimatedDelivery}
                   onChange={handleChange}
+                  min={new Date().toISOString().split('T')[0]}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   required
                 />
@@ -331,14 +393,16 @@ const DeliveryProofUpload = ({ escrowId, onClose, onSuccess }) => {
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
+                  disabled={loading}
+                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+                  disabled={loading}
+                  className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50"
                 >
                   Next: Add Photos
                 </button>
@@ -373,7 +437,16 @@ const DeliveryProofUpload = ({ escrowId, onClose, onSuccess }) => {
                 {formData.packagePhotos.length > 0 && (
                   <div className="mt-3 space-y-2">
                     {formData.packagePhotos.map((file, index) => (
-                      <p key={index} className="text-sm text-green-600">✓ {file.name}</p>
+                      <div key={index} className="flex items-center justify-between bg-green-50 px-3 py-2 rounded">
+                        <p className="text-sm text-green-600">✓ {file.name}</p>
+                        <button
+                          type="button"
+                          onClick={() => removePackagePhoto(index)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -405,16 +478,17 @@ const DeliveryProofUpload = ({ escrowId, onClose, onSuccess }) => {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
+                  disabled={loading}
+                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition disabled:opacity-50"
                 >
                   Back
                 </button>
                 <button
                   type="submit"
-                  disabled={formData.packagePhotos.length === 0}
+                  disabled={formData.packagePhotos.length === 0 || loading}
                   className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  Submit & Mark as Shipped
+                  {loading ? 'Uploading...' : 'Submit & Mark as Shipped'}
                 </button>
               </div>
             </div>
