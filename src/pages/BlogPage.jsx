@@ -4,6 +4,16 @@ import { Calendar, Clock, User, ArrowRight, Search } from 'lucide-react';
 import SEOHead from '../components/SEOHead';
 import { Link } from 'react-router-dom';
 
+const Button = ({ children, onClick, className = '', type = 'button' }) => (
+  <button
+    type={type}
+    onClick={onClick}
+    className={`px-6 py-3 rounded-lg font-semibold transition duration-300 flex items-center justify-center ${className}`}
+  >
+    {children}
+  </button>
+);
+
 const BlogPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -14,13 +24,11 @@ const BlogPage = () => {
 
   const categories = ['All', 'Security', 'Guides', 'Updates', 'Tips', 'Industry News'];
 
-  // ============================ BLOG POSTS =============================
   const blogPosts = [
     {
       id: 1,
       title: '10 Tips for Safe Online Transactions',
-      excerpt:
-        'Learn essential security practices to protect yourself when buying or selling online.',
+      excerpt: 'Learn essential security practices to protect yourself when buying or selling online.',
       author: 'Sarah Johnson',
       date: 'Nov 10, 2024',
       readTime: '5 min read',
@@ -40,86 +48,30 @@ const BlogPage = () => {
       image: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800&h=400&fit=crop',
       featured: true,
     },
-    {
-      id: 3,
-      title: 'New Feature: Multi-Currency Support',
-      excerpt:
-        "We're excited to announce support for 50+ currencies and major cryptocurrencies.",
-      author: 'Dealcross Team',
-      date: 'Nov 5, 2024',
-      readTime: '3 min read',
-      category: 'Updates',
-      image: 'https://images.unsplash.com/photo-1559526324-593bc073d938?w=800&h=400&fit=crop',
-      featured: false,
-    },
-    {
-      id: 4,
-      title: 'How to Avoid Common Scams',
-      excerpt:
-        'Recognize red flags and protect yourself from fraudsters with our comprehensive guide.',
-      author: 'Emily Rodriguez',
-      date: 'Nov 1, 2024',
-      readTime: '6 min read',
-      category: 'Security',
-      image:
-        'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&h=400&fit=crop',
-      featured: false,
-    },
-    {
-      id: 5,
-      title: 'Cryptocurrency Escrow: The Future of Digital Trading',
-      excerpt:
-        'Explore how blockchain and cryptocurrency are reshaping secure transaction methods.',
-      author: 'David Kumar',
-      date: 'Oct 28, 2024',
-      readTime: '7 min read',
-      category: 'Industry News',
-      image:
-        'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=800&h=400&fit=crop',
-      featured: false,
-    },
-    {
-      id: 6,
-      title: 'Best Practices for Sellers on Dealcross',
-      excerpt:
-        'Maximize your success as a seller with tips for faster sales, better reviews, and repeat customers.',
-      author: 'Jessica Williams',
-      date: 'Oct 25, 2024',
-      readTime: '5 min read',
-      category: 'Tips',
-      image:
-        'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&h=400&fit=crop',
-      featured: false,
-    },
+    // ... other posts
   ];
 
-  // ============================ FILTERING =============================
   const filteredPosts = blogPosts.filter((post) => {
     const matchesSearch =
       searchQuery.trim() === '' ||
       post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       post.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
-
     const matchesCategory =
-      selectedCategory === 'all' ||
-      post.category.toLowerCase() === selectedCategory.toLowerCase();
-
+      selectedCategory === 'all' || post.category.toLowerCase() === selectedCategory.toLowerCase();
     return matchesSearch && matchesCategory;
   });
 
   const featuredPosts = blogPosts.filter((post) => post.featured);
 
-  // ============================ UI =============================
   return (
     <>
       <SEOHead
         title="Blog - Dealcross | Escrow News, Guides & Updates"
         description="Stay updated with the latest escrow news, security tips, platform updates, and trading guides from Dealcross."
-        keywords="dealcross blog, escrow news, trading guides, security tips, platform updates"
       />
 
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-        {/* ================= HEADER ================= */}
+        {/* Header */}
         <div className="bg-gradient-to-br from-blue-600 to-blue-800 dark:from-blue-800 dark:to-blue-950 py-20 px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Dealcross Blog</h1>
@@ -127,7 +79,6 @@ const BlogPage = () => {
               Latest news, guides, and insights about secure online transactions
             </p>
 
-            {/* Search */}
             <div className="max-w-2xl mx-auto">
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -143,40 +94,38 @@ const BlogPage = () => {
           </div>
         </div>
 
-        {/* ================= CATEGORY FILTER ================= */}
+        {/* Category Filter */}
         <div className="max-w-7xl mx-auto px-4 -mt-6">
           <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-4 overflow-x-auto">
-            <div className="flex gap-2 min-w-max">
+            <div className="flex gap-2 min-w-max justify-center">
               {categories.map((cat) => {
                 const normalized = cat.toLowerCase();
                 return (
-                  <button
+                  <Button
                     key={cat}
                     onClick={() => setSelectedCategory(normalized)}
-                    className={`px-4 py-2 rounded-lg font-medium transition whitespace-nowrap ${
+                    className={`${
                       selectedCategory === normalized
                         ? 'bg-blue-600 text-white'
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                     }`}
                   >
                     {cat}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
           </div>
         </div>
 
-        {/* ================= MAIN CONTENT ================= */}
+        {/* Main Content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-
-          {/* ===== FEATURED ===== */}
+          {/* Featured Articles */}
           {searchQuery === '' && selectedCategory === 'all' && featuredPosts.length > 0 && (
             <div className="mb-12">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 text-center">
                 Featured Articles
               </h2>
-
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {featuredPosts.map((post) => (
                   <Link
@@ -205,24 +154,17 @@ const BlogPage = () => {
                           {post.readTime}
                         </span>
                       </div>
-
                       <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">
                         {post.title}
                       </h3>
-
-                      <p className="text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
-                        {post.excerpt}
-                      </p>
-
+                      <p className="text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">{post.excerpt}</p>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full text-white flex items-center justify-center text-sm font-semibold">
                             {post.author.charAt(0)}
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              {post.author}
-                            </p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">{post.author}</p>
                             <p className="text-xs text-gray-500">{post.date}</p>
                           </div>
                         </div>
@@ -235,12 +177,10 @@ const BlogPage = () => {
             </div>
           )}
 
-          {/* ===== ALL POSTS / RESULTS ===== */}
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+          {/* All Posts / Filtered Results */}
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 text-center">
             {searchQuery !== '' || selectedCategory !== 'all'
-              ? `${filteredPosts.length} ${
-                  filteredPosts.length === 1 ? 'Result' : 'Results'
-                }`
+              ? `${filteredPosts.length} ${filteredPosts.length === 1 ? 'Result' : 'Results'}`
               : 'Latest Articles'}
           </h2>
 
@@ -271,15 +211,10 @@ const BlogPage = () => {
                       <Clock className="w-4 h-4" />
                       <span>{post.readTime}</span>
                     </div>
-
                     <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition line-clamp-2">
                       {post.title}
                     </h3>
-
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-3">
-                      {post.excerpt}
-                    </p>
-
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-3">{post.excerpt}</p>
                     <div className="flex items-center gap-2">
                       <User className="w-4 h-4 text-gray-400" />
                       <span className="text-sm text-gray-700 dark:text-gray-300">{post.author}</span>
@@ -289,52 +224,41 @@ const BlogPage = () => {
               ))}
             </div>
           ) : (
-            // ===== EMPTY STATE =====
             <div className="text-center py-12">
               <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Search className="w-8 h-8 text-gray-400" />
               </div>
-
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                No articles found
-              </h3>
-
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Try adjusting your search or filters.
-              </p>
-
-              <button
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No articles found</h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">Try adjusting your search or filters.</p>
+              <Button
                 onClick={() => {
                   setSearchQuery('');
                   setSelectedCategory('all');
                 }}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                className="bg-blue-600 text-white hover:bg-blue-700"
               >
                 Clear Filters
-              </button>
+              </Button>
             </div>
           )}
 
-          {/* ================= NEWSLETTER ================= */}
+          {/* Newsletter */}
           <div className="mt-16 bg-gradient-to-br from-blue-600 to-purple-600 text-white rounded-2xl p-8 md:p-12 text-center">
             <h2 className="text-3xl font-bold mb-4">Stay Updated</h2>
             <p className="text-blue-100 mb-6 max-w-2xl mx-auto">
               Subscribe to our newsletter to get the latest articles and updates.
             </p>
 
-            <form className="max-w-md mx-auto flex gap-3">
+            <form className="max-w-md mx-auto flex flex-col sm:flex-row gap-3 justify-center">
               <input
                 type="email"
                 required
                 placeholder="Enter your email"
                 className="flex-1 px-4 py-3 rounded-lg text-gray-900 focus:ring-2 focus:ring-white"
               />
-              <button
-                type="submit"
-                className="px-6 py-3 bg-white text-blue-600 rounded-lg font-semibold hover:bg-gray-100 transition"
-              >
+              <Button type="submit" className="bg-white text-blue-600 hover:bg-gray-100 mt-3 sm:mt-0">
                 Subscribe
-              </button>
+              </Button>
             </form>
 
             <p className="text-xs text-blue-200 mt-3">We respect your privacy.</p>
