@@ -3,6 +3,7 @@ const router = express.Router();
 
 const escrowController = require('../controllers/escrow.controller');
 const { authenticate } = require('../middleware/auth.middleware');
+const verificationMiddleware = require('../middleware/verification.middleware');
 const { createEscrowValidator } = require('../validators/escrow.validator');
 
 // ✅ PUBLIC ROUTES (No Authentication) - MUST COME FIRST BEFORE router.use(authenticate)
@@ -59,9 +60,14 @@ router.use(authenticate);
 /**
  * @route   POST /api/escrow/create
  * @desc    Create a new escrow transaction
- * @access  Private
+ * @access  Private (requires email verification)
  */
-router.post('/create', createEscrowValidator, escrowController.createEscrow);
+router.post(
+  '/create', 
+  verificationMiddleware,  // ✅ ADDED: Check verification before creating escrow
+  createEscrowValidator, 
+  escrowController.createEscrow
+);
 
 /**
  * @route   GET /api/escrow/my-escrows
