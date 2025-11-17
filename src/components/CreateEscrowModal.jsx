@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { X, Loader, AlertCircle, DollarSign } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import escrowService from '../services/escrowService';
+import VerificationBanner from './VerificationBanner';
 import toast from 'react-hot-toast';
 
 const CreateEscrowModal = ({ user, onClose, onSuccess }) => {
@@ -121,6 +122,17 @@ const CreateEscrowModal = ({ user, onClose, onSuccess }) => {
 
         {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
+          {/* Verification Banner */}
+          {user && (
+            <VerificationBanner
+              verificationStatus={{
+                email: user.isEmailVerified,
+                phone: user.isPhoneVerified,
+                kyc: user.isKYCVerified
+              }}
+            />
+          )}
+
           {/* Title */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Title *</label>
