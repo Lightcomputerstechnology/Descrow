@@ -1,3 +1,4 @@
+// backend/controllers/chat.controller.js
 const Chat = require('../models/Chat.model');
 const Escrow = require('../models/Escrow.model');
 const { createNotification } = require('../utils/notificationHelper');
@@ -30,7 +31,7 @@ exports.getMessages = async (req, res) => {
       });
     }
 
-    // Fetch messages
+    // Fetch messages with pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const [messages, total] = await Promise.all([
