@@ -30,11 +30,26 @@ body {
   overflow-x: hidden; /* Prevent horizontal scrolling */
   width: 100%;
   position: relative;
+  background-color: theme('colors.white'); /* default background */
+  color: theme('colors.gray.900'); /* default text */
 }
 
 html {
   overflow-x: hidden;
   scroll-behavior: smooth;
+}
+
+/* ============================================
+   DARK MODE CONFIGURATION
+   ============================================ */
+:root {
+  color-scheme: light dark;
+}
+
+.dark {
+  color-scheme: dark;
+  background-color: theme('colors.gray.950'); /* dark body bg */
+  color: theme('colors.gray.100'); /* dark text */
 }
 
 /* ============================================
@@ -51,7 +66,7 @@ select {
   font-size: 16px !important; /* Prevent zoom on input focus */
 }
 
-/* Prevent zoom on mobile (additional safety layer) */
+/* Additional safety for small screens */
 @media screen and (max-width: 768px) {
   input,
   textarea,
