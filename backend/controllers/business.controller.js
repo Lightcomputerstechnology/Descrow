@@ -178,5 +178,3 @@ exports.getBusinessDetails = async (req, res) => {
     });
   }
 };
-
-module.exports = exports;
