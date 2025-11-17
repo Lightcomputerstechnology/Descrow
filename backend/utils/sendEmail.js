@@ -20,7 +20,7 @@ const sendEmail = async (to, subject, html) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM || 'Dealcross <noreply@dealcross.com>',
+        from: process.env.EMAIL_FROM || 'Dealcross <noreply@dealcross.net>',
         to,
         subject,
         html,
