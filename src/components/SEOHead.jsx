@@ -6,8 +6,8 @@ const SEOHead = ({ title, description, keywords, image, url }) => {
   const defaultTitle = 'Dealcross - Secure Escrow & Trading Platform';
   const defaultDescription = 'Secure escrow payments for global trade. Buy and sell with confidence using our trusted platform.';
   const defaultKeywords = 'escrow, secure deals, trading, wallet, Dealcross, Bitcoin, USDT, online payments';
-  const defaultImage = 'https://dealcross.com/og-image.jpg';
-  const defaultUrl = 'https://dealcross.com';
+  const defaultImage = 'https://dealcross.net/og-image.jpg';
+  const defaultUrl = 'https://dealcross.net';
 
   return (
     <Helmet>
