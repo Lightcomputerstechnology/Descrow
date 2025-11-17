@@ -68,7 +68,7 @@ const APISection = () => {
             <pre className="text-sm text-green-400 overflow-x-auto">
 {`// Create an escrow transaction
 const response = await fetch(
-  'https://api.dealcross.com/v1/escrow',
+  'https://api.dealcross.net/v1/escrow',
   {
     method: 'POST',
     headers: {
