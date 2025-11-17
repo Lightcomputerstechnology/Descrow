@@ -5,6 +5,7 @@ const escrowController = require('../controllers/escrow.controller');
 const { authenticate } = require('../middleware/auth.middleware');
 const verificationMiddleware = require('../middleware/verification.middleware');
 const { createEscrowValidator } = require('../validators/escrow.validator');
+const { uploadMultiple } = require('../middleware/upload.middleware');
 
 // ✅ PUBLIC ROUTES (No Authentication) - MUST COME FIRST BEFORE router.use(authenticate)
 
@@ -64,7 +65,7 @@ router.use(authenticate);
  */
 router.post(
   '/create', 
-  verificationMiddleware,  // ✅ ADDED: Check verification before creating escrow
+  verificationMiddleware,
   createEscrowValidator, 
   escrowController.createEscrow
 );
@@ -98,6 +99,13 @@ router.get('/calculate-fees', escrowController.calculateFeePreview);
 router.get('/details/:id', escrowController.getEscrowById);
 
 /**
+ * @route   GET /api/escrow/track/:gpsTrackingId
+ * @desc    Get GPS tracking information for delivery
+ * @access  Private
+ */
+router.get('/track/:gpsTrackingId', escrowController.getGPSTracking);
+
+/**
  * @route   GET /api/escrow/:id
  * @desc    Get details of a single escrow by ID (escrowId or _id)
  * @access  Private
@@ -124,6 +132,27 @@ router.post('/:id/fund', escrowController.fundEscrow);
  * @access  Private (Seller only)
  */
 router.post('/:id/deliver', escrowController.markDelivered);
+
+/**
+ * @route   POST /api/escrow/:id/upload-delivery-proof
+ * @desc    Upload delivery proof with photos and tracking details
+ * @access  Private (Seller only)
+ */
+router.post(
+  '/:id/upload-delivery-proof',
+  uploadMultiple('photos', 10), // Allow up to 10 photos
+  (req, res) => {
+    // Map uploaded file URLs to body
+    req.body.packagePhotos = req.fileUrls || [];
+    if (req.files?.driverPhoto) {
+      req.body.driverPhoto = req.files.driverPhoto[0].url;
+    }
+    if (req.files?.vehiclePhoto) {
+      req.body.vehiclePhoto = req.files.vehiclePhoto[0].url;
+    }
+    escrowController.uploadDeliveryProof(req, res);
+  }
+);
 
 /**
  * @route   POST /api/escrow/:id/confirm
