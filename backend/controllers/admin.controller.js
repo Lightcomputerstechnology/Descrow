@@ -673,12 +673,21 @@ const deleteSubAdmin = async (req, res) => {
    FEE SETTINGS MANAGEMENT
 ========================================================= */
 
-// ✅ ADMIN: Get current fee settings
-const getFeeSettings = async (req, res) => {
+// ✅ ADMIN: Update gateway costs
+const updateGatewayCosts = async (req, res) => {
   try {
+    const { gateway, currency, field, value } = req.body;
+
+    const validGateways = ['paystack', 'flutterwave', 'crypto'];
+    if (!validGateways.includes(gateway)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid gateway'
+      });
+    }
+
     let feeSettings = await FeeSettings.findOne({ isActive: true });
 
-    // If no settings exist, create default
     if (!feeSettings) {
       feeSettings = await FeeSettings.create({
         lastUpdatedBy: req.admin._id,
@@ -686,16 +695,36 @@ const getFeeSettings = async (req, res) => {
       });
     }
 
+    // Update gateway cost
+    if (gateway === 'crypto') {
+      feeSettings.gatewayCosts[gateway][field] = parseFloat(value);
+    } else {
+      if (field === 'transferFee' && gateway === 'paystack') {
+        // Paystack has transfer fee tiers
+        const { tier, amount } = value;
+        feeSettings.gatewayCosts.paystack.transferFee[tier] = parseFloat(amount);
+      } else {
+        feeSettings.gatewayCosts[gateway][currency][field] = parseFloat(value);
+      }
+    }
+
+    feeSettings.lastUpdatedBy = req.admin._id;
+    feeSettings.version += 1;
+    await feeSettings.save();
+
+    console.log(`✅ Admin ${req.admin.email} updated ${gateway} gateway costs`);
+
     res.status(200).json({
       success: true,
-      data: feeSettings
+      message: 'Gateway costs updated successfully',
+      data: feeSettings.gatewayCosts
     });
 
   } catch (error) {
-    console.error('Get fee settings error:', error);
+    console.error('Update gateway costs error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch fee settings',
+      message: 'Failed to update gateway costs',
       error: error.message
     });
   }
