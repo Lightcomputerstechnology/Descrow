@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate } = require('../middleware/auth.middleware'); // ✅ Corrected import
+const { authenticate } = require('../middleware/auth.middleware');
 const userController = require('../controllers/user.controller');
 const { uploadMultiple } = require('../middleware/upload.middleware');
 const { body } = require('express-validator');
@@ -37,18 +37,48 @@ router.post(
 // ================== TIER UPGRADE ======================
 // ======================================================
 
+// Get tier information
+router.get('/tier-info', userController.getTierInfo);
+
+// Calculate upgrade benefits
+router.get('/tier-upgrade/benefits', userController.calculateUpgradeBenefits);
+
+// Initiate tier upgrade (payment)
 router.post(
-  '/upgrade-tier',
+  '/tier-upgrade/initiate',
   [
-    body('tier')
-      .isIn(['basic', 'pro', 'enterprise'])
-      .withMessage('Invalid tier'),
+    body('targetTier')
+      .isIn(['growth', 'enterprise', 'api'])
+      .withMessage('Invalid tier. Choose: growth, enterprise, or api'),
+    body('currency')
+      .optional()
+      .isIn(['USD', 'NGN'])
+      .withMessage('Currency must be USD or NGN'),
+    body('paymentMethod')
+      .optional()
+      .notEmpty()
+      .withMessage('Payment method required')
+  ],
+  userController.initiateTierUpgrade
+);
+
+// Complete tier upgrade (after payment verification)
+router.post(
+  '/tier-upgrade/complete',
+  [
     body('paymentReference')
       .notEmpty()
-      .withMessage('Payment reference required')
+      .withMessage('Payment reference required'),
+    body('targetTier')
+      .isIn(['growth', 'enterprise', 'api'])
+      .withMessage('Invalid tier')
   ],
-  userController.upgradeTier
+  userController.completeTierUpgrade
 );
+
+// Subscription management
+router.post('/subscription/cancel', userController.cancelSubscription);
+router.post('/subscription/renew', userController.renewSubscription);
 
 // ======================================================
 // ==================== STATISTICS ======================
