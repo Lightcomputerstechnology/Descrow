@@ -1,7 +1,9 @@
+// src/controllers/admin.controller.js - COMPLETE MERGED VERSION
 const Admin = require('../models/Admin.model');
 const User = require('../models/User.model');
 const Escrow = require('../models/Escrow.model');
 const Dispute = require('../models/Dispute.model');
+const FeeSettings = require('../models/FeeSettings.model');
 const feeConfig = require('../config/fee.config');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
@@ -220,7 +222,7 @@ const resolveDispute = async (req, res) => {
 };
 
 /* =========================================================
-   GET ALL USERS (MERGED VERSION)
+   GET ALL USERS
 ========================================================= */
 const getUsers = async (req, res) => {
   try {
@@ -318,59 +320,6 @@ const changeUserTier = async (req, res) => {
 };
 
 /* =========================================================
-   PLATFORM STATS (MERGED)
-========================================================= */
-const getPlatformStats = async (req, res) => {
-  try {
-    const usersByTier = await User.aggregate([
-      { $group: { _id: '$tier', count: { $sum: 1 } } }
-    ]);
-
-    const totalUsers = await User.countDocuments();
-    const activeUsers = await User.countDocuments({ status: 'active' });
-
-    const escrowStats = await Escrow.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-          totalValue: { $sum: { $toDouble: '$amount' } }
-        }
-      }
-    ]);
-
-    const subscriptionRevenue = await User.aggregate([
-      {
-        $match: {
-          tier: { $ne: 'starter' },
-          'subscription.status': 'active'
-        }
-      },
-      { $group: { _id: '$tier', count: { $sum: 1 } } }
-    ]);
-
-    const monthlyRevenue = subscriptionRevenue.reduce((acc, tier) => {
-      const tierInfo = feeConfig.getTierInfo(tier._id);
-      const cost = tierInfo.monthlyCost.NGN || tierInfo.monthlyCost.USD;
-      return acc + tier.count * cost;
-    }, 0);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        users: { total: totalUsers, active: activeUsers, byTier: usersByTier },
-        escrows: escrowStats,
-        revenue: { monthlySubscriptions: monthlyRevenue, currency: 'NGN' }
-      }
-    });
-
-  } catch (error) {
-    console.error('Get platform stats error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch platform statistics', error: error.message });
-  }
-};
-
-/* =========================================================
    TOGGLE USER STATUS
 ========================================================= */
 const toggleUserStatus = async (req, res) => {
@@ -457,6 +406,59 @@ const reviewKYC = async (req, res) => {
   } catch (error) {
     console.error('Review KYC error:', error);
     res.status(500).json({ success: false, message: 'Failed to review KYC', error: error.message });
+  }
+};
+
+/* =========================================================
+   PLATFORM STATS
+========================================================= */
+const getPlatformStats = async (req, res) => {
+  try {
+    const usersByTier = await User.aggregate([
+      { $group: { _id: '$tier', count: { $sum: 1 } } }
+    ]);
+
+    const totalUsers = await User.countDocuments();
+    const activeUsers = await User.countDocuments({ status: 'active' });
+
+    const escrowStats = await Escrow.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          totalValue: { $sum: { $toDouble: '$amount' } }
+        }
+      }
+    ]);
+
+    const subscriptionRevenue = await User.aggregate([
+      {
+        $match: {
+          tier: { $ne: 'starter' },
+          'subscription.status': 'active'
+        }
+      },
+      { $group: { _id: '$tier', count: { $sum: 1 } } }
+    ]);
+
+    const monthlyRevenue = subscriptionRevenue.reduce((acc, tier) => {
+      const tierInfo = feeConfig.getTierInfo(tier._id);
+      const cost = tierInfo.monthlyCost.NGN || tierInfo.monthlyCost.USD;
+      return acc + tier.count * cost;
+    }, 0);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        users: { total: totalUsers, active: activeUsers, byTier: usersByTier },
+        escrows: escrowStats,
+        revenue: { monthlySubscriptions: monthlyRevenue, currency: 'NGN' }
+      }
+    });
+
+  } catch (error) {
+    console.error('Get platform stats error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch platform statistics', error: error.message });
   }
 };
 
@@ -668,23 +670,388 @@ const deleteSubAdmin = async (req, res) => {
 };
 
 /* =========================================================
-   EXPORT MODULE
+   FEE SETTINGS MANAGEMENT
+========================================================= */
+
+// ✅ ADMIN: Get current fee settings
+const getFeeSettings = async (req, res) => {
+  try {
+    let feeSettings = await FeeSettings.findOne({ isActive: true });
+
+    // If no settings exist, create default
+    if (!feeSettings) {
+      feeSettings = await FeeSettings.create({
+        lastUpdatedBy: req.admin._id,
+        isActive: true
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: feeSettings
+    });
+
+  } catch (error) {
+    console.error('Get fee settings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch fee settings',
+      error: error.message
+    });
+  }
+};
+
+// ✅ ADMIN: Update fee settings
+const updateFeeSettings = async (req, res) => {
+  try {
+    const { tier, currency, feeType, field, value } = req.body;
+
+    // Validate inputs
+    const validTiers = ['starter', 'growth', 'enterprise', 'api'];
+    if (!validTiers.includes(tier)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid tier'
+      });
+    }
+
+    const validCurrencies = ['NGN', 'USD', 'crypto'];
+    if (feeType === 'fees' && !validCurrencies.includes(currency)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid currency'
+      });
+    }
+
+    const validFields = ['buyer', 'seller'];
+    if (feeType === 'fees' && !validFields.includes(field)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid field. Use: buyer or seller'
+      });
+    }
+
+    // Get current settings
+    let feeSettings = await FeeSettings.findOne({ isActive: true });
+
+    if (!feeSettings) {
+      feeSettings = await FeeSettings.create({
+        lastUpdatedBy: req.admin._id,
+        isActive: true
+      });
+    }
+
+    // Update the specific field
+    if (feeType === 'fees') {
+      feeSettings.tiers[tier].fees[currency][field] = parseFloat(value);
+    } else if (feeType === 'monthlyCost') {
+      feeSettings.tiers[tier].monthlyCost[currency] = parseFloat(value);
+    } else if (feeType === 'setupFee') {
+      if (!feeSettings.tiers[tier].setupFee) {
+        feeSettings.tiers[tier].setupFee = {};
+      }
+      feeSettings.tiers[tier].setupFee[currency] = parseFloat(value);
+    } else if (feeType === 'maxTransactionAmount') {
+      feeSettings.tiers[tier].maxTransactionAmount[currency] = parseFloat(value);
+    } else if (feeType === 'maxTransactionsPerMonth') {
+      feeSettings.tiers[tier].maxTransactionsPerMonth = parseInt(value);
+    }
+
+    feeSettings.lastUpdatedBy = req.admin._id;
+    feeSettings.version += 1;
+    await feeSettings.save();
+
+    console.log(`✅ Admin ${req.admin.email} updated ${tier} ${feeType} ${currency} ${field} to ${value}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Fee settings updated successfully',
+      data: feeSettings
+    });
+
+  } catch (error) {
+    console.error('Update fee settings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update fee settings',
+      error: error.message
+    });
+  }
+};
+
+// ✅ ADMIN: Bulk update tier fees
+const bulkUpdateTierFees = async (req, res) => {
+  try {
+    const { tier, updates } = req.body;
+
+    const validTiers = ['starter', 'growth', 'enterprise', 'api'];
+    if (!validTiers.includes(tier)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid tier'
+      });
+    }
+
+    let feeSettings = await FeeSettings.findOne({ isActive: true });
+
+    if (!feeSettings) {
+      feeSettings = await FeeSettings.create({
+        lastUpdatedBy: req.admin._id,
+        isActive: true
+      });
+    }
+
+    // Update all provided fields
+    if (updates.fees) {
+      Object.keys(updates.fees).forEach(currency => {
+        if (feeSettings.tiers[tier].fees[currency]) {
+          Object.keys(updates.fees[currency]).forEach(field => {
+            feeSettings.tiers[tier].fees[currency][field] = parseFloat(updates.fees[currency][field]);
+          });
+        }
+      });
+    }
+
+    if (updates.monthlyCost) {
+      Object.keys(updates.monthlyCost).forEach(currency => {
+        feeSettings.tiers[tier].monthlyCost[currency] = parseFloat(updates.monthlyCost[currency]);
+      });
+    }
+
+    if (updates.setupFee) {
+      if (!feeSettings.tiers[tier].setupFee) {
+        feeSettings.tiers[tier].setupFee = {};
+      }
+      Object.keys(updates.setupFee).forEach(currency => {
+        feeSettings.tiers[tier].setupFee[currency] = parseFloat(updates.setupFee[currency]);
+      });
+    }
+
+    if (updates.maxTransactionAmount) {
+      Object.keys(updates.maxTransactionAmount).forEach(currency => {
+        feeSettings.tiers[tier].maxTransactionAmount[currency] = parseFloat(updates.maxTransactionAmount[currency]);
+      });
+    }
+
+    if (updates.maxTransactionsPerMonth !== undefined) {
+      feeSettings.tiers[tier].maxTransactionsPerMonth = parseInt(updates.maxTransactionsPerMonth);
+    }
+
+    feeSettings.lastUpdatedBy = req.admin._id;
+    feeSettings.version += 1;
+    await feeSettings.save();
+
+    console.log(`✅ Admin ${req.admin.email} bulk updated ${tier} tier settings`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Tier fees updated successfully',
+      data: feeSettings.tiers[tier]
+    });
+
+  } catch (error) {
+    console.error('Bulk update tier fees error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update tier fees',
+      error: error.message
+    });
+  }
+};
+
+// ✅ ADMIN: Update gateway costs
+const updateGatewayCosts = async (req, res) => {
+  try {
+    const { gateway, currency, field, value } = req.body;
+
+    const validGateways = ['paystack', 'flutterwave', 'crypto'];
+    if (!validGateways.includes(gateway)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid gateway'
+      });
+    }
+
+    let feeSettings = await FeeSettings.findOne({ isActive: true });
+
+    if (!feeSettings) {
+      feeSettings = await FeeSettings.create({
+        lastUpdatedBy: req.admin._id,
+        isActive: true
+      });
+    }
+
+    // Update gateway cost
+    if (gateway === 'crypto') {
+      feeSettings.gate​​​​​​​​​​​​​​​​feeSettings.gatewayCosts[gateway][field] = parseFloat(value);
+    } else {
+      if (field === 'transferFee' && gateway === 'paystack') {
+        // Paystack has transfer fee tiers
+        const { tier, amount } = value;
+        feeSettings.gatewayCosts.paystack.transferFee[tier] = parseFloat(amount);
+      } else {
+        feeSettings.gatewayCosts[gateway][currency][field] = parseFloat(value);
+      }
+    }
+
+    feeSettings.lastUpdatedBy = req.admin._id;
+    feeSettings.version += 1;
+    await feeSettings.save();
+
+    console.log(`✅ Admin ${req.admin.email} updated ${gateway} gateway costs`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Gateway costs updated successfully',
+      data: feeSettings.gatewayCosts
+    });
+
+  } catch (error) {
+    console.error('Update gateway costs error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update gateway costs',
+      error: error.message
+    });
+  }
+};
+
+// ✅ ADMIN: Get fee settings history
+const getFeeSettingsHistory = async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [history, total] = await Promise.all([
+      FeeSettings.find()
+        .populate('lastUpdatedBy', 'name email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      FeeSettings.countDocuments()
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        history,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / parseInt(limit))
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Get fee settings history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch fee settings history',
+      error: error.message
+    });
+  }
+};
+
+// ✅ ADMIN: Reset fees to default
+const resetFeesToDefault = async (req, res) => {
+  try {
+    const { tier } = req.body;
+
+    const validTiers = ['starter', 'growth', 'enterprise', 'api', 'all'];
+    if (!validTiers.includes(tier)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid tier. Use: starter, growth, enterprise, api, or all'
+      });
+    }
+
+    // Create new default settings
+    const defaultSettings = new FeeSettings({
+      lastUpdatedBy: req.admin._id,
+      isActive: true
+    });
+
+    if (tier !== 'all') {
+      // Only reset specific tier
+      let currentSettings = await FeeSettings.findOne({ isActive: true });
+      if (currentSettings) {
+        const defaultTier = new FeeSettings().tiers[tier];
+        currentSettings.tiers[tier] = defaultTier;
+        currentSettings.lastUpdatedBy = req.admin._id;
+        currentSettings.version += 1;
+        await currentSettings.save();
+
+        res.status(200).json({
+          success: true,
+          message: `${tier} tier reset to default values`,
+          data: currentSettings.tiers[tier]
+        });
+      }
+    } else {
+      // Reset all tiers
+      await defaultSettings.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'All fees reset to default values',
+        data: defaultSettings
+      });
+    }
+
+    console.log(`✅ Admin ${req.admin.email} reset ${tier} fees to default`);
+
+  } catch (error) {
+    console.error('Reset fees error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset fees',
+      error: error.message
+    });
+  }
+};
+
+/* =========================================================
+   EXPORT ALL FUNCTIONS
 ========================================================= */
 module.exports = {
+  // Authentication
   login,
+  
+  // Dashboard
   getDashboardStats,
+  
+  // Transactions
   getTransactions,
+  
+  // Disputes
   getDisputes,
   resolveDispute,
+  
+  // Users
   getUsers,
   changeUserTier,
-  reviewKYC,
   toggleUserStatus,
+  reviewKYC,
+  
+  // Analytics & Stats
   getPlatformStats,
   getAnalytics,
+  
+  // Admin Management
   getAdmins,
   createSubAdmin,
   updateSubAdminPermissions,
   toggleAdminStatus,
-  deleteSubAdmin
+  deleteSubAdmin,
+  
+  // Fee Settings Management
+  getFeeSettings,
+  updateFeeSettings,
+  bulkUpdateTierFees,
+  updateGatewayCosts,
+  getFeeSettingsHistory,
+  resetFeesToDefault
 };
