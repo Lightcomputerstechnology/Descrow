@@ -1,247 +1,316 @@
-// backend/config/fee.config.js - PRODUCTION READY TIER-BASED FEE SYSTEM
+// backend/config/fee.config.js - COMPLETE MERGED VERSION WITH DATABASE SUPPORT
+
+const FeeSettings = require('../models/FeeSettings.model');
+
+// ======================================================
+//           DATABASE INTEGRATION FUNCTIONS
+// ======================================================
+
+/**
+ * Get active fee settings from database
+ * Falls back to hardcoded defaults if database fails
+ */
+async function getActiveFeeSettings() {
+  try {
+    let settings = await FeeSettings.findOne({ isActive: true });
+    
+    if (!settings) {
+      // Create default if none exist
+      settings = await FeeSettings.create({ isActive: true });
+    }
+    
+    return settings;
+  } catch (error) {
+    console.error('Error fetching fee settings from database:', error);
+    // Return null to trigger fallback to hardcoded values
+    return null;
+  }
+}
+
+// ======================================================
+//                HARDCODED FALLBACK TIERS
+// ======================================================
+
+const FALLBACK_TIERS = {
+  starter: {
+    name: 'Starter',
+    monthlyCost: { NGN: 0, USD: 0 },
+    setupFee: { NGN: 0, USD: 0 },
+    maxTransactionAmount: { NGN: 50000, USD: 500 },
+    maxTransactionsPerMonth: 10,
+
+    fees: {
+      NGN: { buyer: 0.03, seller: 0.03 },
+      USD: { buyer: 0.035, seller: 0.035 },
+      EUR: { buyer: 0.035, seller: 0.035 },
+      GBP: { buyer: 0.035, seller: 0.035 },
+      crypto: { buyer: 0.0175, seller: 0.0175 }
+    },
+
+    features: [
+      'Standard processing',
+      'Basic support',
+      '10 transactions per month',
+      'Max ₦50,000 / $500 per transaction'
+    ]
+  },
+
+  growth: {
+    name: 'Growth',
+    monthlyCost: { NGN: 5000, USD: 10 },
+    setupFee: { NGN: 0, USD: 0 },
+    maxTransactionAmount: { NGN: 500000, USD: 5000 },
+    maxTransactionsPerMonth: 50,
+
+    fees: {
+      NGN: { buyer: 0.025, seller: 0.025 },
+      USD: { buyer: 0.03, seller: 0.03 },
+      EUR: { buyer: 0.03, seller: 0.03 },
+      GBP: { buyer: 0.03, seller: 0.03 },
+      crypto: { buyer: 0.0125, seller: 0.0125 }
+    },
+
+    features: [
+      'Fast processing',
+      'Priority support',
+      '50 transactions per month',
+      'Max ₦500,000 / $5,000 per transaction',
+      'Lower fees than Starter'
+    ]
+  },
+
+  enterprise: {
+    name: 'Enterprise',
+    monthlyCost: { NGN: 15000, USD: 30 },
+    setupFee: { NGN: 0, USD: 0 },
+    maxTransactionAmount: { NGN: -1, USD: -1 },
+    maxTransactionsPerMonth: -1,
+
+    fees: {
+      NGN: { buyer: 0.0225, seller: 0.0225 },
+      USD: { buyer: 0.0275, seller: 0.0275 },
+      EUR: { buyer: 0.0275, seller: 0.0275 },
+      GBP: { buyer: 0.0275, seller: 0.0275 },
+      crypto: { buyer: 0.009, seller: 0.009 }
+    },
+
+    features: [
+      'Instant processing',
+      'Premium support',
+      'Unlimited transactions',
+      'Unlimited transaction amounts',
+      'Dedicated account manager',
+      'Lowest fees'
+    ]
+  },
+
+  api: {
+    name: 'API Tier',
+    monthlyCost: { NGN: 50000, USD: 100 },
+    setupFee: { NGN: 100000, USD: 200 },
+    maxTransactionAmount: { NGN: -1, USD: -1 },
+    maxTransactionsPerMonth: -1,
+
+    fees: {
+      NGN: { buyer: 0.02, seller: 0.02 },
+      USD: { buyer: 0.025, seller: 0.025 },
+      EUR: { buyer: 0.025, seller: 0.025 },
+      GBP: { buyer: 0.025, seller: 0.025 },
+      crypto: { buyer: 0.0075, seller: 0.0075 }
+    },
+
+    features: [
+      'Full API access',
+      'Webhook support',
+      'White-label option',
+      'Custom integration support',
+      'Dedicated account manager',
+      'Priority processing',
+      'Bulk transaction support',
+      'Developer documentation'
+    ]
+  }
+};
+
+// ======================================================
+//           HARDCODED FALLBACK GATEWAY COSTS
+// ======================================================
+
+const FALLBACK_GATEWAY_COSTS = {
+  paystack: {
+    NGN: { percentage: 0.015, flatFee: 100, cap: 2000 },
+    USD: { percentage: 0.039, flatFee: 100 },
+    transferFee: {
+      small: 10,
+      medium: 25,
+      large: 50
+    }
+  },
+
+  flutterwave: {
+    NGN: { percentage: 0.014, flatFee: 0 },
+    USD: { percentage: 0.038, flatFee: 0 },
+    transferFee: 0
+  },
+
+  crypto: {
+    percentage: 0.005,
+    flatFee: 0,
+    transferFee: 0
+  }
+};
+
+// ======================================================
+//                    MAIN EXPORTS
+// ======================================================
 
 module.exports = {
+  // Expose fallback tiers (for reference/backwards compatibility)
+  tiers: FALLBACK_TIERS,
+  gatewayCosts: FALLBACK_GATEWAY_COSTS,
+
   // ======================================================
-  //                     TIER DEFINITIONS
+  //           GET TIER INFO (DATABASE-FIRST)
   // ======================================================
-  tiers: {
-    starter: {
-      name: 'Starter',
-      monthlyCost: { NGN: 0, USD: 0 },
-      setupFee: { NGN: 0, USD: 0 },
-      maxTransactionAmount: { NGN: 50000, USD: 500 },
-      maxTransactionsPerMonth: 10,
-
-      fees: {
-        NGN: { buyer: 0.03, seller: 0.03 },
-        USD: { buyer: 0.035, seller: 0.035 },
-        EUR: { buyer: 0.035, seller: 0.035 },
-        GBP: { buyer: 0.035, seller: 0.035 },
-        crypto: { buyer: 0.0175, seller: 0.0175 }
-      },
-
-      features: [
-        'Standard processing',
-        'Basic support',
-        '10 transactions per month',
-        'Max ₦50,000 / $500 per transaction'
-      ]
-    },
-
-    growth: {
-      name: 'Growth',
-      monthlyCost: { NGN: 5000, USD: 10 },
-      setupFee: { NGN: 0, USD: 0 },
-      maxTransactionAmount: { NGN: 500000, USD: 5000 },
-      maxTransactionsPerMonth: 50,
-
-      fees: {
-        NGN: { buyer: 0.025, seller: 0.025 },
-        USD: { buyer: 0.03, seller: 0.03 },
-        EUR: { buyer: 0.03, seller: 0.03 },
-        GBP: { buyer: 0.03, seller: 0.03 },
-        crypto: { buyer: 0.0125, seller: 0.0125 }
-      },
-
-      features: [
-        'Fast processing',
-        'Priority support',
-        '50 transactions per month',
-        'Max ₦500,000 / $5,000 per transaction',
-        'Lower fees than Starter'
-      ]
-    },
-
-    enterprise: {
-      name: 'Enterprise',
-      monthlyCost: { NGN: 15000, USD: 30 },
-      setupFee: { NGN: 0, USD: 0 },
-      maxTransactionAmount: { NGN: -1, USD: -1 },
-      maxTransactionsPerMonth: -1,
-
-      fees: {
-        NGN: { buyer: 0.0225, seller: 0.0225 },
-        USD: { buyer: 0.0275, seller: 0.0275 },
-        EUR: { buyer: 0.0275, seller: 0.0275 },
-        GBP: { buyer: 0.0275, seller: 0.0275 },
-        crypto: { buyer: 0.009, seller: 0.009 }
-      },
-
-      features: [
-        'Instant processing',
-        'Premium support',
-        'Unlimited transactions',
-        'Unlimited transaction amounts',
-        'Dedicated account manager',
-        'Lowest fees'
-      ]
-    },
-
-    api: {
-      name: 'API Tier',
-      monthlyCost: { NGN: 50000, USD: 100 },
-      setupFee: { NGN: 100000, USD: 200 },
-      maxTransactionAmount: { NGN: -1, USD: -1 },
-      maxTransactionsPerMonth: -1,
-
-      fees: {
-        NGN: { buyer: 0.02, seller: 0.02 },
-        USD: { buyer: 0.025, seller: 0.025 },
-        EUR: { buyer: 0.025, seller: 0.025 },
-        GBP: { buyer: 0.025, seller: 0.025 },
-        crypto: { buyer: 0.0075, seller: 0.0075 }
-      },
-
-      features: [
-        'Full API access',
-        'Webhook support',
-        'White-label option',
-        'Custom integration support',
-        'Dedicated account manager',
-        'Priority processing',
-        'Bulk transaction support',
-        'Developer documentation'
-      ]
+  getTierInfo: async function(tierName) {
+    const settings = await getActiveFeeSettings();
+    
+    if (settings && settings.tiers[tierName]) {
+      return settings.tiers[tierName];
     }
+    
+    // Fallback to hardcoded
+    return FALLBACK_TIERS[tierName] || FALLBACK_TIERS.starter;
   },
 
   // ======================================================
-  //                     GATEWAY COSTS
+  //           GET ALL TIERS (DATABASE-FIRST)
   // ======================================================
-  gatewayCosts: {
-    paystack: {
-      NGN: { percentage: 0.015, flatFee: 100, cap: 2000 },
-      USD: { percentage: 0.039, flatFee: 100 },
-      transferFee: {
-        small: 10,
-        medium: 25,
-        large: 50
-      }
-    },
-
-    flutterwave: {
-      NGN: { percentage: 0.014, flatFee: 0 },
-      USD: { percentage: 0.038, flatFee: 0 },
-      transferFee: 0
-    },
-
-    crypto: {
-      percentage: 0.005,
-      flatFee: 0,
-      transferFee: 0
+  getAllTiers: async function() {
+    const settings = await getActiveFeeSettings();
+    
+    if (settings) {
+      return Object.keys(settings.tiers).map(key => ({
+        id: key,
+        ...settings.tiers[key].toObject()
+      }));
     }
+    
+    // Fallback to hardcoded
+    return Object.keys(FALLBACK_TIERS).map(key => ({
+      id: key,
+      ...FALLBACK_TIERS[key]
+    }));
   },
 
   // ======================================================
-  //               CALCULATE FEES FOR TRANSACTION
+  //        CALCULATE FEES (DATABASE-FIRST, ASYNC)
   // ======================================================
-  calculateFees(amount, currency, userTier, paymentMethod = 'flutterwave') {
-    const tier = this.tiers[userTier] || this.tiers.starter;
-    const fees = tier.fees[currency] || tier.fees.USD;
-
+  calculateFees: async function(amount, currency, userTier, paymentMethod = 'flutterwave') {
+    const settings = await getActiveFeeSettings();
+    
+    // Get tier data from database or fallback
+    const tierData = settings ? settings.tiers[userTier] : FALLBACK_TIERS[userTier] || FALLBACK_TIERS.starter;
+    const gatewayCostData = settings ? settings.gatewayCosts : FALLBACK_GATEWAY_COSTS;
+    
+    const fees = tierData.fees[currency] || tierData.fees.USD;
+    
     const baseAmount = parseFloat(amount);
-
-    // User-facing fees
+    
+    // Calculate buyer and seller fees
     const buyerFee = baseAmount * fees.buyer;
     const sellerFee = baseAmount * fees.seller;
-
     const buyerPays = baseAmount + buyerFee;
     const sellerReceives = baseAmount - sellerFee;
-
     const totalPlatformFee = buyerFee + sellerFee;
-
-    // Gateway cost calculations
+    
+    // Calculate gateway costs
+    let gatewayCost = 0;
     let gatewayIncoming = 0;
     let gatewayOutgoing = 0;
-
+    
     if (paymentMethod === 'paystack') {
-      const costs = this.gatewayCosts.paystack[currency] || this.gatewayCosts.paystack.NGN;
+      const costs = gatewayCostData.paystack[currency] || gatewayCostData.paystack.NGN;
       gatewayIncoming = (buyerPays * costs.percentage) + costs.flatFee;
-
+      
       if (currency === 'NGN' && costs.cap) {
         gatewayIncoming = Math.min(gatewayIncoming, costs.cap);
       }
-
-      if (sellerReceives <= 5000) gatewayOutgoing = this.gatewayCosts.paystack.transferFee.small;
-      else if (sellerReceives <= 50000) gatewayOutgoing = this.gatewayCosts.paystack.transferFee.medium;
-      else gatewayOutgoing = this.gatewayCosts.paystack.transferFee.large;
-
+      
+      if (sellerReceives <= 5000) {
+        gatewayOutgoing = gatewayCostData.paystack.transferFee.small;
+      } else if (sellerReceives <= 50000) {
+        gatewayOutgoing = gatewayCostData.paystack.transferFee.medium;
+      } else {
+        gatewayOutgoing = gatewayCostData.paystack.transferFee.large;
+      }
+      
+      gatewayCost = gatewayIncoming + gatewayOutgoing;
+      
     } else if (paymentMethod === 'flutterwave') {
-      const costs = this.gatewayCosts.flutterwave[currency] || this.gatewayCosts.flutterwave.USD;
+      const costs = gatewayCostData.flutterwave[currency] || gatewayCostData.flutterwave.USD;
       gatewayIncoming = buyerPays * costs.percentage;
-      gatewayOutgoing = this.gatewayCosts.flutterwave.transferFee;
-
+      gatewayOutgoing = gatewayCostData.flutterwave.transferFee;
+      gatewayCost = gatewayIncoming + gatewayOutgoing;
+      
     } else if (paymentMethod === 'crypto') {
-      gatewayIncoming = buyerPays * this.gatewayCosts.crypto.percentage;
+      gatewayIncoming = buyerPays * gatewayCostData.crypto.percentage;
       gatewayOutgoing = 0;
+      gatewayCost = gatewayIncoming;
     }
-
-    const gatewayCost = gatewayIncoming + gatewayOutgoing;
-
-    // Platform profit
+    
     const platformProfit = totalPlatformFee - gatewayCost;
     const profitPercentage = (platformProfit / baseAmount) * 100;
-
+    
     return {
       tier: userTier,
       amount: parseFloat(baseAmount.toFixed(2)),
       currency,
       paymentMethod,
-
+      
       buyerFee: parseFloat(buyerFee.toFixed(2)),
       sellerFee: parseFloat(sellerFee.toFixed(2)),
       buyerPays: parseFloat(buyerPays.toFixed(2)),
       sellerReceives: parseFloat(sellerReceives.toFixed(2)),
       totalPlatformFee: parseFloat(totalPlatformFee.toFixed(2)),
-
+      
       buyerFeePercentage: fees.buyer * 100,
       sellerFeePercentage: fees.seller * 100,
       totalFeePercentage: (fees.buyer + fees.seller) * 100,
-
+      
       gatewayIncoming: parseFloat(gatewayIncoming.toFixed(2)),
       gatewayOutgoing: parseFloat(gatewayOutgoing.toFixed(2)),
       totalGatewayCost: parseFloat(gatewayCost.toFixed(2)),
-
+      
       platformProfit: parseFloat(platformProfit.toFixed(2)),
       profitPercentage: parseFloat(profitPercentage.toFixed(2)),
-
+      
       breakdown: {
         buyerFeeDescription: `${(fees.buyer * 100).toFixed(2)}% escrow protection fee`,
         sellerFeeDescription: `${(fees.seller * 100).toFixed(2)}% platform service fee`,
-        totalFeeDescription: `${((fees.buyer + fees.seller) * 100).toFixed(2)}% combined fee`,
-        note: 'Both buyer and seller are equally protected. No hidden fees.'
+        totalFeeDescription: `${((fees.buyer + fees.seller) * 100).toFixed(2)}% combined fee covers ALL costs`,
+        note: 'Both buyer and seller equally protected. No hidden fees.'
       }
     };
   },
 
   // ======================================================
-  //                TIER INFO HELPERS
+  //          AMOUNT WITHIN LIMIT (DATABASE-FIRST)
   // ======================================================
-  getTierInfo(tierName) {
-    return this.tiers[tierName] || this.tiers.starter;
-  },
-
-  getAllTiers() {
-    return Object.keys(this.tiers).map(key => ({
-      id: key,
-      ...this.tiers[key]
-    }));
-  },
-
-  isAmountWithinLimit(amount, currency, tierName) {
-    const tier = this.getTierInfo(tierName);
-    const limit = tier.maxTransactionAmount[currency];
-
+  isAmountWithinLimit: async function(amount, currency, tierName) {
+    const tierInfo = await this.getTierInfo(tierName);
+    const limit = tierInfo.maxTransactionAmount[currency];
+    
     if (limit === -1) return true;
     return amount <= limit;
   },
 
   // ======================================================
-  //                UPGRADE BENEFITS
+  //               UPGRADE BENEFITS
   // ======================================================
-  getUpgradeBenefits(currentTier, targetTier) {
-    const current = this.tiers[currentTier];
-    const target = this.tiers[targetTier];
+  getUpgradeBenefits: async function(currentTier, targetTier) {
+    const current = await this.getTierInfo(currentTier);
+    const target = await this.getTierInfo(targetTier);
 
     if (!current || !target) return null;
 
@@ -284,19 +353,18 @@ module.exports = {
   },
 
   // ======================================================
-  //                MONTHLY SAVINGS
+  //              MONTHLY SAVINGS CALCULATOR
   // ======================================================
-  calculateMonthlySavings(monthlyVolume, currency, currentTier, targetTier) {
-    const currentFees = this.calculateFees(monthlyVolume, currency, currentTier);
-    const targetFees = this.calculateFees(monthlyVolume, currency, targetTier);
+  calculateMonthlySavings: async function(monthlyVolume, currency, currentTier, targetTier) {
+    const currentFees = await this.calculateFees(monthlyVolume, currency, currentTier);
+    const targetFees = await this.calculateFees(monthlyVolume, currency, targetTier);
 
     const currentTotal = currentFees.totalPlatformFee;
     const targetTotal = targetFees.totalPlatformFee;
     const savings = currentTotal - targetTotal;
 
-    const targetMonthlyCost =
-      this.tiers[targetTier].monthlyCost[currency] ||
-      this.tiers[targetTier].monthlyCost.USD;
+    const targetTierInfo = await this.getTierInfo(targetTier);
+    const targetMonthlyCost = targetTierInfo.monthlyCost[currency] || targetTierInfo.monthlyCost.USD;
 
     const netSavings = savings - targetMonthlyCost;
 
@@ -315,10 +383,10 @@ module.exports = {
   },
 
   // ======================================================
-  //                FEE EXPLANATION
+  //               FEE EXPLANATION
   // ======================================================
-  getFeeExplanation(currency, tierName) {
-    const tier = this.getTierInfo(tierName);
+  getFeeExplanation: async function(currency, tierName) {
+    const tier = await this.getTierInfo(tierName);
     const fees = tier.fees[currency] || tier.fees.USD;
 
     const buyerPercent = (fees.buyer * 100).toFixed(2);
