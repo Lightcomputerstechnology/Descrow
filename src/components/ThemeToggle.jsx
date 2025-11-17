@@ -15,7 +15,7 @@ const ThemeToggle = () => {
 
   useEffect(() => {
     const root = window.document.documentElement;
-    
+
     if (darkMode) {
       root.classList.add('dark');
       localStorage.setItem('theme', 'dark');
@@ -41,7 +41,9 @@ const ThemeToggle = () => {
   return (
     <button
       onClick={() => setDarkMode(!darkMode)}
-      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-300
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+                 dark:focus:ring-offset-gray-900"
       aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
       title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
     >
