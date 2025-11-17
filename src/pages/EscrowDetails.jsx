@@ -1,10 +1,10 @@
-// src/pages/EscrowDetails.jsx - COMPLETE PRODUCTION VERSION
+// src/pages/EscrowDetailsPage.jsx - COMPLETE PRODUCTION VERSION
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  User, 
-  Mail, 
+import {
+  ArrowLeft,
+  User,
+  Mail,
   Phone,
   Package,
   DollarSign,
@@ -31,7 +31,8 @@ import {
   Eye,
   Send,
   MoreVertical,
-  Flag
+  Flag,
+  MapPin
 } from 'lucide-react';
 import StatusStepper from '../components/Escrow/StatusStepper';
 import ActionButtons from '../components/Escrow/ActionButtons';
@@ -43,10 +44,10 @@ import { authService } from '../services/authService';
 import { getStatusInfo, formatCurrency, formatDate } from '../utils/escrowHelpers';
 import toast from 'react-hot-toast';
 
-const EscrowDetails = () => {
+const EscrowDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  
+
   // State Management
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,7 +84,6 @@ const EscrowDetails = () => {
       } else {
         throw new Error(response.message || 'Escrow not found');
       }
-
     } catch (error) {
       console.error('Failed to fetch escrow:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to load escrow details';
@@ -240,7 +240,7 @@ const EscrowDetails = () => {
 
   const shouldShowPaymentBanner = () => {
     if (!escrow || !currentUser || !userRole) return false;
-    
+
     return (
       userRole === 'buyer' && 
       ['pending', 'accepted'].includes(escrow.status) &&
@@ -274,7 +274,7 @@ const EscrowDetails = () => {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
         <div className="text-center">
           <Loader className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400 font-medium">Loading escrow details...</p>
+          <p className="text-gray-600 dark:text-gray-400 font-medium">Loading escrow details…</p>
           <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">Please wait</p>
         </div>
       </div>
@@ -571,8 +571,138 @@ const EscrowDetails = () => {
                   </div>
                 </div>
 
-                {/* Delivery Information */}
-                {escrow.delivery?.deliveredAt && (
+                {/* NEW: Enhanced Delivery Information Section */}
+                {escrow.delivery?.proof && (
+                  <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                      Delivery Information
+                    </h3>
+
+                    <div className="space-y-4">
+                      {/* Delivery Method */}
+                      <div>
+                        <label className="text-sm text-gray-600 dark:text-gray-400">Method</label>
+                        <p className="font-semibold text-gray-900 dark:text-white capitalize">
+                          {escrow.delivery.proof.method}
+                        </p>
+                      </div>
+
+                      {/* Courier Info */}
+                      {escrow.delivery.proof.method === 'courier' && (
+                        <>
+                          <div>
+                            <label className="text-sm text-gray-600 dark:text-gray-400">Courier</label>
+                            <p className="font-semibold text-gray-900 dark:text-white">
+                              {escrow.delivery.proof.courierName}
+                            </p>
+                          </div>
+                          <div>
+                            <label className="text-sm text-gray-600 dark:text-gray-400">Tracking Number</label>
+                            <p className="font-mono font-semibold text-blue-600">
+                              {escrow.delivery.proof.trackingNumber}
+                            </p>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Personal Delivery Info */}
+                      {escrow.delivery.proof.method === 'personal' && (
+                        <>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-sm text-gray-600 dark:text-gray-400">Vehicle</label>
+                              <p className="font-semibold text-gray-900 dark:text-white capitalize">
+                                {escrow.delivery.proof.vehicleType}
+                              </p>
+                            </div>
+                            <div>
+                              <label className="text-sm text-gray-600 dark:text-gray-400">Plate Number</label>
+                              <p className="font-mono font-semibold text-gray-900 dark:text-white">
+                                {escrow.delivery.proof.plateNumber}
+                              </p>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-sm text-gray-600 dark:text-gray-400">Driver</label>
+                            <p className="font-semibold text-gray-900 dark:text-white">
+                              {escrow.delivery.proof.driverName}
+                            </p>
+                          </div​​​​​​​​​​​​​​​​>
+
+                          {/* GPS Tracking */}
+                          {escrow.delivery.proof.gpsEnabled && escrow.delivery.proof.gpsTrackingId && (
+                            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <MapPin className="w-5 h-5 text-blue-600" />
+                                <p className="font-semibold text-blue-900 dark:text-blue-100">
+                                  Live GPS Tracking Available
+                                </p>
+                              </div>
+                              <a
+                                href={`/track/${escrow.delivery.proof.gpsTrackingId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-600 hover:text-blue-700 underline"
+                              >
+                                Track delivery in real-time →
+                              </a>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Expected Delivery */}
+                      <div>
+                        <label className="text-sm text-gray-600 dark:text-gray-400">Expected Delivery</label>
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          {new Date(escrow.delivery.proof.estimatedDelivery).toLocaleDateString()}
+                        </p>
+                      </div>
+
+                      {/* Package Photos */}
+                      {escrow.delivery.proof.packagePhotos?.length > 0 && (
+                        <div>
+                          <label className="text-sm text-gray-600 dark:text-gray-400 block mb-2">
+                            Package Photos
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {escrow.delivery.proof.packagePhotos.map((photo, index) => (
+                              <img
+                                key={index}
+                                src={photo}
+                                alt={`Package ${index + 1}`}
+                                className="w-full h-24 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Notes */}
+                      {escrow.delivery.proof.additionalNotes && (
+                        <div>
+                          <label className="text-sm text-gray-600 dark:text-gray-400">Notes</label>
+                          <p className="text-gray-900 dark:text-white">
+                            {escrow.delivery.proof.additionalNotes}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Auto-release Warning */}
+                      {escrow.delivery.autoReleaseAt && (
+                        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                            ⏰ <strong>Auto-release:</strong> Payment will be automatically released to seller on{' '}
+                            {new Date(escrow.delivery.autoReleaseAt).toLocaleDateString()} if no action is taken.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Legacy Delivery Information (if exists without proof) */}
+                {escrow.delivery?.deliveredAt && !escrow.delivery?.proof && (
                   <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-2 border-green-200 dark:border-green-800 rounded-xl p-6 shadow-sm">
                     <div className="flex items-center gap-2 mb-4">
                       <div className="p-2 bg-green-100 dark:bg-green-900/40 rounded-lg">
@@ -1125,4 +1255,4 @@ const EscrowDetails = () => {
   );
 };
 
-export default EscrowDetails;
+export default EscrowDetailsPage; 
