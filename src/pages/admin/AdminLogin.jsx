@@ -74,7 +74,7 @@ const AdminLogin = ({ setAdmin }) => {
                   value={formData.email}
                   onChange={handleChange}
                   className="w-full pl-10 pr-4 py-3 bg-gray-900 border border-gray-700 rounded-lg focus:ring-2 focus:ring-red-500 text-white"
-                  placeholder="admin@dealcross.com"
+                  placeholder="admin@dealcross.net"
                   required
                 />
               </div>
