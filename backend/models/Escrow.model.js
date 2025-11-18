@@ -28,8 +28,25 @@ const escrowSchema = new mongoose.Schema({
   currency: {
     type: String,
     default: 'USD',
-    enum: ['USD', 'EUR', 'GBP', 'NGN', 'KES', 'GHS', 'ZAR', 'CAD', 'AUD']
+    enum: ['USD', 'EUR', 'GBP', 'NGN', 'KES', 'GHS', 'ZAR', 'CAD', 'AUD', 'XOF', 'XAF']
   },
+
+  // ✅ NEW: File Attachments Support
+  attachments: [{
+    filename: String,
+    originalName: String,
+    url: String,
+    mimetype: String,
+    size: Number,
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    },
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  }],
 
   // Participants
   buyer: {
@@ -255,6 +272,19 @@ const escrowSchema = new mongoose.Schema({
   chatUnlocked: {
     type: Boolean,
     default: false
+  },
+
+  // ✅ NEW: Activity tracking
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+
+  // ✅ NEW: Visibility for public deals
+  visibility: {
+    type: String,
+    enum: ['private', 'public'],
+    default: 'private'
   }
 
 }, {
@@ -275,17 +305,36 @@ const escrowSchema = new mongoose.Schema({
       if (ret.payout && ret.payout.amount) {
         ret.payout.amount = parseFloat(ret.payout.amount.toString());
       }
+      
+      // Convert attachment file sizes to readable format
+      if (ret.attachments) {
+        ret.attachments = ret.attachments.map(attachment => ({
+          ...attachment,
+          sizeReadable: formatFileSize(attachment.size)
+        }));
+      }
+      
       return ret;
     }
   },
   toObject: { virtuals: true }
 });
 
+// Helper function to format file sizes
+function formatFileSize(bytes) {
+  if (!bytes) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
 // INDEXES
 escrowSchema.index({ buyer: 1, status: 1 });
 escrowSchema.index({ seller: 1, status: 1 });
 escrowSchema.index({ createdAt: -1 });
 escrowSchema.index({ 'payment.reference': 1 }, { sparse: true });
+escrowSchema.index({ visibility: 1, status: 1 }); // ✅ NEW: For public deals
 
 // Generate unique Escrow ID
 escrowSchema.pre('save', function(next) {
@@ -332,5 +381,30 @@ escrowSchema.virtual('canBeFunded').get(function() {
 escrowSchema.virtual('canBeDelivered').get(function() {
   return this.status === 'funded';
 });
+
+// ✅ NEW: Virtual for attachment count
+escrowSchema.virtual('attachmentsCount').get(function() {
+  return this.attachments ? this.attachments.length : 0;
+});
+
+// ✅ NEW: Method to add attachment
+escrowSchema.methods.addAttachment = function(fileData, uploadedBy) {
+  this.attachments.push({
+    filename: fileData.filename,
+    originalName: fileData.originalname,
+    url: fileData.path || fileData.location,
+    mimetype: fileData.mimetype,
+    size: fileData.size,
+    uploadedBy: uploadedBy,
+    uploadedAt: new Date()
+  });
+  return this.save();
+};
+
+// ✅ NEW: Method to remove attachment
+escrowSchema.methods.removeAttachment = function(attachmentId) {
+  this.attachments = this.attachments.filter(att => att._id.toString() !== attachmentId);
+  return this.save();
+};
 
 module.exports = mongoose.model('Escrow', escrowSchema);
