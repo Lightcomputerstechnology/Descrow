@@ -227,18 +227,16 @@ exports.calculateFeePreview = async (req, res) => {
     const userTier = user.tier || 'starter';
 
     // Calculate fees based on user's tier and currency
-    const feeBreakdown = feeConfig.calculateFees(
+    const feeBreakdown = await feeConfig.calculateSimpleFees(
       parseFloat(amount),
-      currency,
-      userTier,
-      'flutterwave'
+      currency
     );
 
     // Get tier info
-    const tierInfo = feeConfig.getTierInfo(userTier);
+    const tierInfo = await feeConfig.getTierInfo(userTier);
 
     // Check if amount within limits
-    const withinLimit = feeConfig.isAmountWithinLimit(
+    const withinLimit = await feeConfig.isAmountWithinLimit(
       parseFloat(amount),
       currency,
       userTier
@@ -266,7 +264,7 @@ exports.calculateFeePreview = async (req, res) => {
 };
 
 /**
- * Get user's escrows with filtering and pagination
+ * Get user's escrows with filtering and pagination - FIXED
  */
 exports.getMyEscrows = async (req, res) => {
   try {
@@ -282,17 +280,33 @@ exports.getMyEscrows = async (req, res) => {
     }
 
     const escrows = await Escrow.find(query)
-      .populate('buyer', 'name email profilePicture')
-      .populate('seller', 'name email profilePicture')
+      .populate('buyer', 'firstName lastName email profilePicture')
+      .populate('seller', 'firstName lastName email profilePicture')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .skip((page - 1) * limit)
+      .lean(); // Convert to plain objects
+
+    // Format the data properly
+    const formattedEscrows = escrows.map(escrow => ({
+      ...escrow,
+      amount: escrow.amount ? parseFloat(escrow.amount.toString()) : 0,
+      payment: escrow.payment ? {
+        ...escrow.payment,
+        amount: escrow.payment.amount ? parseFloat(escrow.payment.amount.toString()) : 0,
+        buyerFee: escrow.payment.buyerFee ? parseFloat(escrow.payment.buyerFee.toString()) : 0,
+        sellerFee: escrow.payment.sellerFee ? parseFloat(escrow.payment.sellerFee.toString()) : 0,
+        platformFee: escrow.payment.platformFee ? parseFloat(escrow.payment.platformFee.toString()) : 0,
+        buyerPays: escrow.payment.buyerPays ? parseFloat(escrow.payment.buyerPays.toString()) : 0,
+        sellerReceives: escrow.payment.sellerReceives ? parseFloat(escrow.payment.sellerReceives.toString()) : 0
+      } : null
+    }));
 
     const total = await Escrow.countDocuments(query);
 
     res.json({
       success: true,
-      data: escrows,
+      data: formattedEscrows,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -311,16 +325,20 @@ exports.getMyEscrows = async (req, res) => {
 };
 
 /**
- * Get dashboard statistics for user
+ * Get dashboard statistics for user - FIXED
  */
 exports.getDashboardStats = async (req, res) => {
   try {
     const userId = req.user.id;
 
+    // Get stats by status
     const stats = await Escrow.aggregate([
       {
         $match: {
-          $or: [{ buyer: new mongoose.Types.ObjectId(userId) }, { seller: new mongoose.Types.ObjectId(userId) }]
+          $or: [
+            { buyer: new mongoose.Types.ObjectId(userId) }, 
+            { seller: new mongoose.Types.ObjectId(userId) }
+          ]
         }
       },
       {
@@ -332,6 +350,7 @@ exports.getDashboardStats = async (req, res) => {
       }
     ]);
 
+    // Get total counts
     const totalEscrows = await Escrow.countDocuments({
       $or: [{ buyer: userId }, { seller: userId }]
     });
@@ -341,14 +360,21 @@ exports.getDashboardStats = async (req, res) => {
       status: { $in: ['pending', 'accepted', 'funded', 'delivered'] }
     });
 
+    // Format the response properly
+    const formattedStats = {
+      byStatus: stats.map(stat => ({
+        status: stat._id,
+        count: stat.count,
+        totalAmount: stat.totalAmount ? parseFloat(stat.totalAmount.toString()) : 0
+      })),
+      totalEscrows,
+      activeEscrows,
+      completedEscrows: totalEscrows - activeEscrows
+    };
+
     res.json({
       success: true,
-      data: {
-        byStatus: stats,
-        totalEscrows,
-        activeEscrows,
-        completedEscrows: totalEscrows - activeEscrows
-      }
+      data: formattedStats
     });
 
   } catch (error) {
@@ -361,7 +387,7 @@ exports.getDashboardStats = async (req, res) => {
 };
 
 /**
- * Get escrow by ID
+ * Get escrow by ID - FIXED
  */
 exports.getEscrowById = async (req, res) => {
   try {
@@ -373,16 +399,16 @@ exports.getEscrowById = async (req, res) => {
     // Try by MongoDB _id first, then by escrowId
     if (mongoose.Types.ObjectId.isValid(id)) {
       escrow = await Escrow.findById(id)
-        .populate('buyer', 'name email profilePicture phone')
-        .populate('seller', 'name email profilePicture phone')
-        .populate('attachments.uploadedBy', 'name email')
-        .populate('timeline.actor', 'name email');
+        .populate('buyer', 'firstName lastName email profilePicture phone')
+        .populate('seller', 'firstName lastName email profilePicture phone')
+        .populate('attachments.uploadedBy', 'firstName lastName email')
+        .populate('timeline.actor', 'firstName lastName email');
     } else {
       escrow = await Escrow.findOne({ escrowId: id })
-        .populate('buyer', 'name email profilePicture phone')
-        .populate('seller', 'name email profilePicture phone')
-        .populate('attachments.uploadedBy', 'name email')
-        .populate('timeline.actor', 'name email');
+        .populate('buyer', 'firstName lastName email profilePicture phone')
+        .populate('seller', 'firstName lastName email profilePicture phone')
+        .populate('attachments.uploadedBy', 'firstName lastName email')
+        .populate('timeline.actor', 'firstName lastName email');
     }
 
     if (!escrow) {
@@ -393,8 +419,8 @@ exports.getEscrowById = async (req, res) => {
     }
 
     // Check if user has access to this escrow
-    const isBuyer = escrow.buyer._id.toString() === userId;
-    const isSeller = escrow.seller._id.toString() === userId;
+    const isBuyer = escrow.buyer && escrow.buyer._id.toString() === userId;
+    const isSeller = escrow.seller && escrow.seller._id.toString() === userId;
     
     if (!isBuyer && !isSeller && req.user.role !== 'admin') {
       return res.status(403).json({
@@ -403,9 +429,24 @@ exports.getEscrowById = async (req, res) => {
       });
     }
 
+    // Format the escrow data properly
+    const formattedEscrow = {
+      ...escrow.toObject(),
+      amount: escrow.amount ? parseFloat(escrow.amount.toString()) : 0,
+      payment: escrow.payment ? {
+        ...escrow.payment,
+        amount: escrow.payment.amount ? parseFloat(escrow.payment.amount.toString()) : 0,
+        buyerFee: escrow.payment.buyerFee ? parseFloat(escrow.payment.buyerFee.toString()) : 0,
+        sellerFee: escrow.payment.sellerFee ? parseFloat(escrow.payment.sellerFee.toString()) : 0,
+        platformFee: escrow.payment.platformFee ? parseFloat(escrow.payment.platformFee.toString()) : 0,
+        buyerPays: escrow.payment.buyerPays ? parseFloat(escrow.payment.buyerPays.toString()) : 0,
+        sellerReceives: escrow.payment.sellerReceives ? parseFloat(escrow.payment.sellerReceives.toString()) : 0
+      } : null
+    };
+
     res.json({
       success: true,
-      data: escrow,
+      data: formattedEscrow,
       userRole: isBuyer ? 'buyer' : isSeller ? 'seller' : 'admin'
     });
 
@@ -419,7 +460,7 @@ exports.getEscrowById = async (req, res) => {
 };
 
 /**
- * Get GPS tracking information
+ * Get GPS tracking information - FIXED
  */
 exports.getGPSTracking = async (req, res) => {
   try {
@@ -439,29 +480,13 @@ exports.getGPSTracking = async (req, res) => {
       });
     }
 
-    // Mock GPS data - replace with actual GPS service integration
+    // Return basic tracking info
     const trackingData = {
       trackingId: gpsTrackingId,
-      status: 'in_transit',
+      status: 'active',
       lastUpdate: new Date(),
-      estimatedDelivery: escrow.delivery.proof.estimatedDelivery,
-      currentLocation: {
-        lat: 6.5244, // Mock coordinates
-        lng: 3.3792,
-        address: 'Lagos, Nigeria'
-      },
-      history: [
-        {
-          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-          location: 'Dispatch Center',
-          status: 'dispatched'
-        },
-        {
-          timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
-          location: 'In Transit',
-          status: 'in_transit'
-        }
-      ]
+      escrowTitle: escrow.title,
+      estimatedDelivery: escrow.delivery?.proof?.estimatedDelivery || null
     };
 
     res.json({
@@ -479,7 +504,7 @@ exports.getGPSTracking = async (req, res) => {
 };
 
 /**
- * Upload delivery proof
+ * Upload delivery proof - FIXED
  */
 exports.uploadDeliveryProof = async (req, res) => {
   try {
@@ -555,19 +580,8 @@ exports.uploadDeliveryProof = async (req, res) => {
 
     await escrow.save();
 
-    // Notify buyer
-    await createNotification(
-      escrow.buyer,
-      'delivery_proof_uploaded',
-      'Delivery Proof Uploaded',
-      `Seller has uploaded delivery proof for your escrow: "${escrow.title}"`,
-      `/escrow/${escrow._id}`,
-      { 
-        escrowId: escrow._id,
-        trackingNumber: trackingNumber,
-        otherParty: req.user.name 
-      }
-    );
+    // Populate before sending response
+    await escrow.populate('buyer seller', 'firstName lastName email');
 
     res.json({
       success: true,
@@ -585,7 +599,7 @@ exports.uploadDeliveryProof = async (req, res) => {
 };
 
 /**
- * Accept escrow (seller)
+ * Accept escrow (seller) - FIXED
  */
 exports.acceptEscrow = async (req, res) => {
   try {
@@ -631,20 +645,8 @@ exports.acceptEscrow = async (req, res) => {
 
     await escrow.save();
 
-    // Notify buyer
-    await createNotification(
-      escrow.buyer,
-      'escrow_accepted',
-      'Escrow Accepted',
-      `Seller has accepted your escrow request: "${escrow.title}"`,
-      `/escrow/${escrow._id}`,
-      { 
-        escrowId: escrow._id,
-        amount: escrow.amount,
-        currency: escrow.currency,
-        otherParty: req.user.name 
-      }
-    );
+    // Populate before sending response
+    await escrow.populate('buyer seller', 'firstName lastName email');
 
     res.json({
       success: true,
@@ -662,7 +664,7 @@ exports.acceptEscrow = async (req, res) => {
 };
 
 /**
- * Fund escrow (buyer payment)
+ * Fund escrow (buyer payment) - FIXED
  */
 exports.fundEscrow = async (req, res) => {
   try {
@@ -707,20 +709,8 @@ exports.fundEscrow = async (req, res) => {
 
     await escrow.save();
 
-    // Notify seller
-    await createNotification(
-      escrow.seller,
-      'escrow_funded',
-      'Escrow Funded',
-      `Buyer has funded the escrow: "${escrow.title}" - You can now proceed with delivery`,
-      `/escrow/${escrow._id}`,
-      { 
-        escrowId: escrow._id,
-        amount: escrow.amount,
-        currency: escrow.currency,
-        otherParty: req.user.name 
-      }
-    );
+    // Populate before sending response
+    await escrow.populate('buyer seller', 'firstName lastName email');
 
     res.json({
       success: true,
@@ -738,7 +728,7 @@ exports.fundEscrow = async (req, res) => {
 };
 
 /**
- * Mark escrow as delivered (seller)
+ * Mark escrow as delivered (seller) - FIXED
  */
 exports.markDelivered = async (req, res) => {
   try {
@@ -784,18 +774,8 @@ exports.markDelivered = async (req, res) => {
 
     await escrow.save();
 
-    // Notify buyer
-    await createNotification(
-      escrow.buyer,
-      'item_delivered',
-      'Item Delivered',
-      `Seller has marked the item as delivered for: "${escrow.title}" - Please confirm receipt`,
-      `/escrow/${escrow._id}`,
-      { 
-        escrowId: escrow._id,
-        otherParty: req.user.name 
-      }
-    );
+    // Populate before sending response
+    await escrow.populate('buyer seller', 'firstName lastName email');
 
     res.json({
       success: true,
@@ -813,7 +793,7 @@ exports.markDelivered = async (req, res) => {
 };
 
 /**
- * Confirm delivery (buyer)
+ * Confirm delivery (buyer) - FIXED
  */
 exports.confirmDelivery = async (req, res) => {
   try {
@@ -859,20 +839,8 @@ exports.confirmDelivery = async (req, res) => {
 
     await escrow.save();
 
-    // Notify seller
-    await createNotification(
-      escrow.seller,
-      'delivery_confirmed',
-      'Delivery Confirmed',
-      `Buyer has confirmed delivery for: "${escrow.title}" - Funds will be released`,
-      `/escrow/${escrow._id}`,
-      { 
-        escrowId: escrow._id,
-        amount: escrow.amount,
-        currency: escrow.currency,
-        otherParty: req.user.name 
-      }
-    );
+    // Populate before sending response
+    await escrow.populate('buyer seller', 'firstName lastName email');
 
     res.json({
       success: true,
@@ -890,7 +858,7 @@ exports.confirmDelivery = async (req, res) => {
 };
 
 /**
- * Raise dispute for escrow
+ * Raise dispute for escrow - FIXED
  */
 exports.raiseDispute = async (req, res) => {
   try {
@@ -949,20 +917,8 @@ exports.raiseDispute = async (req, res) => {
 
     await escrow.save();
 
-    // Notify other party
-    const otherPartyId = isBuyer ? escrow.seller : escrow.buyer;
-    await createNotification(
-      otherPartyId,
-      'dispute_raised',
-      'Dispute Raised',
-      `A dispute has been raised for escrow: "${escrow.title}"`,
-      `/escrow/${escrow._id}`,
-      { 
-        escrowId: escrow._id,
-        reason: reason,
-        otherParty: req.user.name 
-      }
-    );
+    // Populate before sending response
+    await escrow.populate('buyer seller', 'firstName lastName email');
 
     res.json({
       success: true,
@@ -980,7 +936,7 @@ exports.raiseDispute = async (req, res) => {
 };
 
 /**
- * Cancel escrow
+ * Cancel escrow - FIXED
  */
 exports.cancelEscrow = async (req, res) => {
   try {
@@ -1029,20 +985,8 @@ exports.cancelEscrow = async (req, res) => {
 
     await escrow.save();
 
-    // Notify other party
-    const otherPartyId = isBuyer ? escrow.seller : escrow.buyer;
-    await createNotification(
-      otherPartyId,
-      'escrow_cancelled',
-      'Escrow Cancelled',
-      `Escrow has been cancelled: "${escrow.title}"`,
-      `/escrow/${escrow._id}`,
-      { 
-        escrowId: escrow._id,
-        reason: reason,
-        otherParty: req.user.name 
-      }
-    );
+    // Populate before sending response
+    await escrow.populate('buyer seller', 'firstName lastName email');
 
     res.json({
       success: true,
