@@ -89,11 +89,9 @@ exports.createEscrow = async (req, res) => {
     }
 
     // Calculate tier-based fees
-    const feeBreakdown = feeConfig.calculateFees(
+    const feeBreakdown = await feeConfig.calculateSimpleFees(
       parsedAmount,
-      currency,
-      buyer.tier,
-      'flutterwave'
+      currency
     );
 
     // Handle file attachments
@@ -153,18 +151,18 @@ exports.createEscrow = async (req, res) => {
       seller._id,
       'escrow_created',
       'New Escrow Request',
-      `${buyer.name} wants to create a ${currency} ${parsedAmount} escrow deal with you: "${title}"`,
+      `${buyer.firstName} wants to create a ${currency} ${parsedAmount} escrow deal with you: "${title}"`,
       `/escrow/${escrow._id}`,
       { 
         escrowId: escrow._id, 
         amount: parsedAmount, 
         currency: currency,
-        otherParty: buyer.name 
+        otherParty: buyer.firstName 
       }
     );
 
     // Populate and return
-    await escrow.populate('buyer seller', 'name email profilePicture tier');
+    await escrow.populate('buyer seller', 'firstName lastName email profilePicture tier');
 
     res.status(201).json({
       success: true,
@@ -264,20 +262,43 @@ exports.calculateFeePreview = async (req, res) => {
 };
 
 /**
- * Get user's escrows with filtering and pagination - FIXED
+ * Get user's escrows with filtering and pagination - FIXED FOR FRONTEND
  */
 exports.getMyEscrows = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { status, page = 1, limit = 10 } = req.query;
+    const { status, page = 1, limit = 20, role = 'all', search = '' } = req.query;
 
-    const query = {
-      $or: [{ buyer: userId }, { seller: userId }]
-    };
+    console.log('Fetching escrows for user:', userId, 'role:', role, 'status:', status);
 
+    // Build query based on role (buyer, seller, or all)
+    let query = {};
+    
+    if (role === 'buyer') {
+      query.buyer = userId;
+    } else if (role === 'seller') {
+      query.seller = userId;
+    } else {
+      // 'all' or default - show both buying and selling
+      query.$or = [{ buyer: userId }, { seller: userId }];
+    }
+
+    // Add status filter if provided
     if (status && status !== 'all') {
       query.status = status;
     }
+
+    // Add search filter if provided
+    if (search) {
+      query.$or = [
+        ...(query.$or || []),
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { escrowId: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    console.log('Final query:', JSON.stringify(query));
 
     const escrows = await Escrow.find(query)
       .populate('buyer', 'firstName lastName email profilePicture')
@@ -285,33 +306,98 @@ exports.getMyEscrows = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit)
-      .lean(); // Convert to plain objects
+      .lean();
 
-    // Format the data properly
-    const formattedEscrows = escrows.map(escrow => ({
-      ...escrow,
-      amount: escrow.amount ? parseFloat(escrow.amount.toString()) : 0,
-      payment: escrow.payment ? {
-        ...escrow.payment,
-        amount: escrow.payment.amount ? parseFloat(escrow.payment.amount.toString()) : 0,
-        buyerFee: escrow.payment.buyerFee ? parseFloat(escrow.payment.buyerFee.toString()) : 0,
-        sellerFee: escrow.payment.sellerFee ? parseFloat(escrow.payment.sellerFee.toString()) : 0,
-        platformFee: escrow.payment.platformFee ? parseFloat(escrow.payment.platformFee.toString()) : 0,
-        buyerPays: escrow.payment.buyerPays ? parseFloat(escrow.payment.buyerPays.toString()) : 0,
-        sellerReceives: escrow.payment.sellerReceives ? parseFloat(escrow.payment.sellerReceives.toString()) : 0
-      } : null
-    }));
+    console.log('Found escrows:', escrows.length);
+
+    // Format the data properly for frontend
+    const formattedEscrows = escrows.map(escrow => {
+      // Determine user role
+      const isBuyer = escrow.buyer && escrow.buyer._id.toString() === userId;
+      const userRole = isBuyer ? 'buyer' : 'seller';
+      
+      // Determine other party
+      const otherParty = isBuyer ? escrow.seller : escrow.buyer;
+
+      return {
+        _id: escrow._id,
+        escrowId: escrow.escrowId,
+        title: escrow.title,
+        description: escrow.description,
+        amount: escrow.amount ? parseFloat(escrow.amount.toString()) : 0,
+        currency: escrow.currency || 'USD',
+        status: escrow.status,
+        category: escrow.category,
+        deliveryMethod: escrow.delivery?.method,
+        
+        // User info
+        userRole: userRole,
+        
+        // Party info
+        buyer: escrow.buyer ? {
+          _id: escrow.buyer._id,
+          firstName: escrow.buyer.firstName,
+          lastName: escrow.buyer.lastName,
+          email: escrow.buyer.email,
+          profilePicture: escrow.buyer.profilePicture
+        } : null,
+        
+        seller: escrow.seller ? {
+          _id: escrow.seller._id,
+          firstName: escrow.seller.firstName,
+          lastName: escrow.seller.lastName,
+          email: escrow.seller.email,
+          profilePicture: escrow.seller.profilePicture
+        } : null,
+        
+        // Other party (for easy access)
+        otherParty: otherParty ? {
+          _id: otherParty._id,
+          firstName: otherParty.firstName,
+          lastName: otherParty.lastName,
+          email: otherParty.email,
+          profilePicture: otherParty.profilePicture
+        } : null,
+
+        // Payment info - MATCH FRONTEND EXPECTATIONS
+        payment: escrow.payment ? {
+          buyerPays: escrow.payment.buyerPays ? parseFloat(escrow.payment.buyerPays.toString()) : 0,
+          sellerReceives: escrow.payment.sellerReceives ? parseFloat(escrow.payment.sellerReceives.toString()) : 0,
+          buyerFee: escrow.payment.buyerFee ? parseFloat(escrow.payment.buyerFee.toString()) : 0,
+          sellerFee: escrow.payment.sellerFee ? parseFloat(escrow.payment.sellerFee.toString()) : 0
+        } : {
+          buyerPays: 0,
+          sellerReceives: 0,
+          buyerFee: 0,
+          sellerFee: 0
+        },
+
+        // Dates
+        createdAt: escrow.createdAt,
+        updatedAt: escrow.updatedAt,
+
+        // Additional info
+        attachmentsCount: escrow.attachments ? escrow.attachments.length : 0,
+        timeline: escrow.timeline || [],
+        chatUnlocked: escrow.chatUnlocked || false
+      };
+    });
 
     const total = await Escrow.countDocuments(query);
 
+    console.log('Sending response with', formattedEscrows.length, 'escrows');
+
+    // RETURN EXACT STRUCTURE FRONTEND EXPECTS
     res.json({
       success: true,
-      data: formattedEscrows,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit)
+      data: {
+        escrows: formattedEscrows, // Frontend expects "escrows" array
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        }
       }
     });
 
@@ -319,69 +405,85 @@ exports.getMyEscrows = async (req, res) => {
     console.error('Get my escrows error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch escrows'
+      message: 'Failed to fetch escrows',
+      error: error.message
     });
   }
 };
 
 /**
- * Get dashboard statistics for user - FIXED
+ * Get dashboard statistics for user - FIXED FOR FRONTEND
  */
 exports.getDashboardStats = async (req, res) => {
   try {
     const userId = req.user.id;
+    
+    console.log('Fetching dashboard stats for user:', userId);
 
-    // Get stats by status
-    const stats = await Escrow.aggregate([
-      {
-        $match: {
-          $or: [
-            { buyer: new mongoose.Types.ObjectId(userId) }, 
-            { seller: new mongoose.Types.ObjectId(userId) }
-          ]
-        }
-      },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-          totalAmount: { $sum: '$amount' }
-        }
-      }
+    // Get counts for different statuses for buying
+    const buyingStats = await Escrow.aggregate([
+      { $match: { buyer: new mongoose.Types.ObjectId(userId) } },
+      { $group: { _id: '$status', count: { $sum: 1 } } }
     ]);
 
-    // Get total counts
-    const totalEscrows = await Escrow.countDocuments({
-      $or: [{ buyer: userId }, { seller: userId }]
-    });
+    // Get counts for different statuses for selling
+    const sellingStats = await Escrow.aggregate([
+      { $match: { seller: new mongoose.Types.ObjectId(userId) } },
+      { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]);
 
-    const activeEscrows = await Escrow.countDocuments({
-      $or: [{ buyer: userId }, { seller: userId }],
-      status: { $in: ['pending', 'accepted', 'funded', 'delivered'] }
-    });
+    // Convert to object format that frontend expects
+    const buyingStatsObj = buyingStats.reduce((acc, stat) => {
+      acc[stat._id] = stat.count;
+      return acc;
+    }, {});
 
-    // Format the response properly
-    const formattedStats = {
-      byStatus: stats.map(stat => ({
-        status: stat._id,
-        count: stat.count,
-        totalAmount: stat.totalAmount ? parseFloat(stat.totalAmount.toString()) : 0
-      })),
-      totalEscrows,
-      activeEscrows,
-      completedEscrows: totalEscrows - activeEscrows
+    const sellingStatsObj = sellingStats.reduce((acc, stat) => {
+      acc[stat._id] = stat.count;
+      return acc;
+    }, {});
+
+    // Calculate totals
+    const totalBuying = await Escrow.countDocuments({ buyer: userId });
+    const totalSelling = await Escrow.countDocuments({ seller: userId });
+
+    // RETURN EXACT STRUCTURE FRONTEND EXPECTS
+    const stats = {
+      buying: {
+        total: totalBuying,
+        pending: buyingStatsObj.pending || 0,
+        accepted: buyingStatsObj.accepted || 0,
+        funded: buyingStatsObj.funded || 0,
+        delivered: buyingStatsObj.delivered || 0,
+        completed: buyingStatsObj.completed || 0,
+        cancelled: buyingStatsObj.cancelled || 0,
+        disputed: buyingStatsObj.disputed || 0
+      },
+      selling: {
+        total: totalSelling,
+        pending: sellingStatsObj.pending || 0,
+        accepted: sellingStatsObj.accepted || 0,
+        funded: sellingStatsObj.funded || 0,
+        delivered: sellingStatsObj.delivered || 0,
+        completed: sellingStatsObj.completed || 0,
+        cancelled: sellingStatsObj.cancelled || 0,
+        disputed: sellingStatsObj.disputed || 0
+      }
     };
+
+    console.log('Dashboard stats:', stats);
 
     res.json({
       success: true,
-      data: formattedStats
+      data: stats // Frontend expects data.buying and data.selling
     });
 
   } catch (error) {
     console.error('Get dashboard stats error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch dashboard statistics'
+      message: 'Failed to fetch dashboard statistics',
+      error: error.message
     });
   }
 };
