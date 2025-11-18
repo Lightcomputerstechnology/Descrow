@@ -31,7 +31,7 @@ const escrowSchema = new mongoose.Schema({
     enum: ['USD', 'EUR', 'GBP', 'NGN', 'KES', 'GHS', 'ZAR', 'CAD', 'AUD', 'XOF', 'XAF']
   },
 
-  // ✅ NEW: File Attachments Support
+  // ✅ File Attachments Support
   attachments: [{
     filename: String,
     originalName: String,
@@ -274,13 +274,13 @@ const escrowSchema = new mongoose.Schema({
     default: false
   },
 
-  // ✅ NEW: Activity tracking
-  isActive: {
-    type: Boolean,
-    default: true
-  },
+  // ✅ FIXED: Removed real isActive field to avoid conflict
+  // isActive: {
+  //   type: Boolean,
+  //   default: true
+  // },
 
-  // ✅ NEW: Visibility for public deals
+  // ✅ Visibility for public deals
   visibility: {
     type: String,
     enum: ['private', 'public'],
@@ -334,7 +334,7 @@ escrowSchema.index({ buyer: 1, status: 1 });
 escrowSchema.index({ seller: 1, status: 1 });
 escrowSchema.index({ createdAt: -1 });
 escrowSchema.index({ 'payment.reference': 1 }, { sparse: true });
-escrowSchema.index({ visibility: 1, status: 1 }); // ✅ NEW: For public deals
+escrowSchema.index({ visibility: 1, status: 1 });
 
 // Generate unique Escrow ID
 escrowSchema.pre('save', function(next) {
@@ -365,12 +365,13 @@ escrowSchema.pre('save', function(next) {
   next();
 });
 
-// Virtuals
+// ✅ FIXED: Virtuals - REMOVED conflicting isActive virtual
 escrowSchema.virtual('isCompleted').get(function() {
   return ['completed', 'paid_out'].includes(this.status);
 });
 
-escrowSchema.virtual('isActive').get(function() {
+// ✅ FIXED: Renamed to avoid conflict
+escrowSchema.virtual('isActiveDeal').get(function() {
   return !['cancelled', 'disputed', 'paid_out', 'completed'].includes(this.status);
 });
 
@@ -382,12 +383,12 @@ escrowSchema.virtual('canBeDelivered').get(function() {
   return this.status === 'funded';
 });
 
-// ✅ NEW: Virtual for attachment count
+// ✅ Virtual for attachment count
 escrowSchema.virtual('attachmentsCount').get(function() {
   return this.attachments ? this.attachments.length : 0;
 });
 
-// ✅ NEW: Method to add attachment
+// ✅ Method to add attachment
 escrowSchema.methods.addAttachment = function(fileData, uploadedBy) {
   this.attachments.push({
     filename: fileData.filename,
@@ -401,9 +402,27 @@ escrowSchema.methods.addAttachment = function(fileData, uploadedBy) {
   return this.save();
 };
 
-// ✅ NEW: Method to remove attachment
+// ✅ Method to remove attachment
 escrowSchema.methods.removeAttachment = function(attachmentId) {
   this.attachments = this.attachments.filter(att => att._id.toString() !== attachmentId);
+  return this.save();
+};
+
+// ✅ NEW: Method to check if user can access escrow
+escrowSchema.methods.canUserAccess = function(userId) {
+  return this.buyer.toString() === userId.toString() || 
+         this.seller.toString() === userId.toString();
+};
+
+// ✅ NEW: Method to update status with timeline
+escrowSchema.methods.updateStatus = function(newStatus, actorId, note = '') {
+  this.status = newStatus;
+  this.timeline.push({
+    status: newStatus,
+    actor: actorId,
+    note: note,
+    timestamp: new Date()
+  });
   return this.save();
 };
 
