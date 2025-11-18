@@ -1,4 +1,4 @@
-// backend/config/fee.config.js - COMPLETE MERGED VERSION WITH DATABASE SUPPORT
+// backend/config/fee.config.js - UPDATED FOR FRONTEND COMPATIBILITY
 
 const FeeSettings = require('../models/FeeSettings.model');
 
@@ -6,29 +6,21 @@ const FeeSettings = require('../models/FeeSettings.model');
 //           DATABASE INTEGRATION FUNCTIONS
 // ======================================================
 
-/**
- * Get active fee settings from database
- * Falls back to hardcoded defaults if database fails
- */
 async function getActiveFeeSettings() {
   try {
     let settings = await FeeSettings.findOne({ isActive: true });
-    
     if (!settings) {
-      // Create default if none exist
       settings = await FeeSettings.create({ isActive: true });
     }
-    
     return settings;
   } catch (error) {
     console.error('Error fetching fee settings from database:', error);
-    // Return null to trigger fallback to hardcoded values
     return null;
   }
 }
 
 // ======================================================
-//                HARDCODED FALLBACK TIERS
+//                UPDATED FEE TIERS WITH ALL CURRENCIES
 // ======================================================
 
 const FALLBACK_TIERS = {
@@ -44,6 +36,13 @@ const FALLBACK_TIERS = {
       USD: { buyer: 0.035, seller: 0.035 },
       EUR: { buyer: 0.035, seller: 0.035 },
       GBP: { buyer: 0.035, seller: 0.035 },
+      CAD: { buyer: 0.035, seller: 0.035 },
+      AUD: { buyer: 0.035, seller: 0.035 },
+      KES: { buyer: 0.04, seller: 0.04 },
+      GHS: { buyer: 0.04, seller: 0.04 },
+      ZAR: { buyer: 0.04, seller: 0.04 },
+      XOF: { buyer: 0.045, seller: 0.045 },
+      XAF: { buyer: 0.045, seller: 0.045 },
       crypto: { buyer: 0.0175, seller: 0.0175 }
     },
 
@@ -67,6 +66,13 @@ const FALLBACK_TIERS = {
       USD: { buyer: 0.03, seller: 0.03 },
       EUR: { buyer: 0.03, seller: 0.03 },
       GBP: { buyer: 0.03, seller: 0.03 },
+      CAD: { buyer: 0.03, seller: 0.03 },
+      AUD: { buyer: 0.03, seller: 0.03 },
+      KES: { buyer: 0.035, seller: 0.035 },
+      GHS: { buyer: 0.035, seller: 0.035 },
+      ZAR: { buyer: 0.035, seller: 0.035 },
+      XOF: { buyer: 0.04, seller: 0.04 },
+      XAF: { buyer: 0.04, seller: 0.04 },
       crypto: { buyer: 0.0125, seller: 0.0125 }
     },
 
@@ -91,6 +97,13 @@ const FALLBACK_TIERS = {
       USD: { buyer: 0.0275, seller: 0.0275 },
       EUR: { buyer: 0.0275, seller: 0.0275 },
       GBP: { buyer: 0.0275, seller: 0.0275 },
+      CAD: { buyer: 0.0275, seller: 0.0275 },
+      AUD: { buyer: 0.0275, seller: 0.0275 },
+      KES: { buyer: 0.0325, seller: 0.0325 },
+      GHS: { buyer: 0.0325, seller: 0.0325 },
+      ZAR: { buyer: 0.0325, seller: 0.0325 },
+      XOF: { buyer: 0.0375, seller: 0.0375 },
+      XAF: { buyer: 0.0375, seller: 0.0375 },
       crypto: { buyer: 0.009, seller: 0.009 }
     },
 
@@ -116,6 +129,13 @@ const FALLBACK_TIERS = {
       USD: { buyer: 0.025, seller: 0.025 },
       EUR: { buyer: 0.025, seller: 0.025 },
       GBP: { buyer: 0.025, seller: 0.025 },
+      CAD: { buyer: 0.025, seller: 0.025 },
+      AUD: { buyer: 0.025, seller: 0.025 },
+      KES: { buyer: 0.03, seller: 0.03 },
+      GHS: { buyer: 0.03, seller: 0.03 },
+      ZAR: { buyer: 0.03, seller: 0.03 },
+      XOF: { buyer: 0.035, seller: 0.035 },
+      XAF: { buyer: 0.035, seller: 0.035 },
       crypto: { buyer: 0.0075, seller: 0.0075 }
     },
 
@@ -133,13 +153,22 @@ const FALLBACK_TIERS = {
 };
 
 // ======================================================
-//           HARDCODED FALLBACK GATEWAY COSTS
+//           UPDATED GATEWAY COSTS WITH ALL CURRENCIES
 // ======================================================
 
 const FALLBACK_GATEWAY_COSTS = {
   paystack: {
     NGN: { percentage: 0.015, flatFee: 100, cap: 2000 },
     USD: { percentage: 0.039, flatFee: 100 },
+    EUR: { percentage: 0.039, flatFee: 100 },
+    GBP: { percentage: 0.039, flatFee: 100 },
+    CAD: { percentage: 0.039, flatFee: 100 },
+    AUD: { percentage: 0.039, flatFee: 100 },
+    KES: { percentage: 0.035, flatFee: 50 },
+    GHS: { percentage: 0.035, flatFee: 50 },
+    ZAR: { percentage: 0.035, flatFee: 50 },
+    XOF: { percentage: 0.04, flatFee: 100 },
+    XAF: { percentage: 0.04, flatFee: 100 },
     transferFee: {
       small: 10,
       medium: 25,
@@ -150,6 +179,15 @@ const FALLBACK_GATEWAY_COSTS = {
   flutterwave: {
     NGN: { percentage: 0.014, flatFee: 0 },
     USD: { percentage: 0.038, flatFee: 0 },
+    EUR: { percentage: 0.038, flatFee: 0 },
+    GBP: { percentage: 0.038, flatFee: 0 },
+    CAD: { percentage: 0.038, flatFee: 0 },
+    AUD: { percentage: 0.038, flatFee: 0 },
+    KES: { percentage: 0.032, flatFee: 0 },
+    GHS: { percentage: 0.032, flatFee: 0 },
+    ZAR: { percentage: 0.032, flatFee: 0 },
+    XOF: { percentage: 0.036, flatFee: 0 },
+    XAF: { percentage: 0.036, flatFee: 0 },
     transferFee: 0
   },
 
@@ -165,54 +203,20 @@ const FALLBACK_GATEWAY_COSTS = {
 // ======================================================
 
 module.exports = {
-  // Expose fallback tiers (for reference/backwards compatibility)
   tiers: FALLBACK_TIERS,
   gatewayCosts: FALLBACK_GATEWAY_COSTS,
 
   // ======================================================
-  //           GET TIER INFO (DATABASE-FIRST)
+  //        CALCULATE FEES - FRONTEND COMPATIBLE VERSION
   // ======================================================
-  getTierInfo: async function(tierName) {
-    const settings = await getActiveFeeSettings();
-    
-    if (settings && settings.tiers[tierName]) {
-      return settings.tiers[tierName];
-    }
-    
-    // Fallback to hardcoded
-    return FALLBACK_TIERS[tierName] || FALLBACK_TIERS.starter;
-  },
-
-  // ======================================================
-  //           GET ALL TIERS (DATABASE-FIRST)
-  // ======================================================
-  getAllTiers: async function() {
-    const settings = await getActiveFeeSettings();
-    
-    if (settings) {
-      return Object.keys(settings.tiers).map(key => ({
-        id: key,
-        ...settings.tiers[key].toObject()
-      }));
-    }
-    
-    // Fallback to hardcoded
-    return Object.keys(FALLBACK_TIERS).map(key => ({
-      id: key,
-      ...FALLBACK_TIERS[key]
-    }));
-  },
-
-  // ======================================================
-  //        CALCULATE FEES (DATABASE-FIRST, ASYNC)
-  // ======================================================
-  calculateFees: async function(amount, currency, userTier, paymentMethod = 'flutterwave') {
+  calculateFees: async function(amount, currency, userTier = 'starter', paymentMethod = 'flutterwave') {
     const settings = await getActiveFeeSettings();
     
     // Get tier data from database or fallback
     const tierData = settings ? settings.tiers[userTier] : FALLBACK_TIERS[userTier] || FALLBACK_TIERS.starter;
     const gatewayCostData = settings ? settings.gatewayCosts : FALLBACK_GATEWAY_COSTS;
     
+    // Use USD as fallback for any currency not explicitly defined
     const fees = tierData.fees[currency] || tierData.fees.USD;
     
     const baseAmount = parseFloat(amount);
@@ -230,7 +234,7 @@ module.exports = {
     let gatewayOutgoing = 0;
     
     if (paymentMethod === 'paystack') {
-      const costs = gatewayCostData.paystack[currency] || gatewayCostData.paystack.NGN;
+      const costs = gatewayCostData.paystack[currency] || gatewayCostData.paystack.USD;
       gatewayIncoming = (buyerPays * costs.percentage) + costs.flatFee;
       
       if (currency === 'NGN' && costs.cap) {
@@ -262,26 +266,26 @@ module.exports = {
     const platformProfit = totalPlatformFee - gatewayCost;
     const profitPercentage = (platformProfit / baseAmount) * 100;
     
+    // Return frontend-compatible response
     return {
-      tier: userTier,
+      // Core fields needed by frontend
       amount: parseFloat(baseAmount.toFixed(2)),
-      currency,
-      paymentMethod,
-      
       buyerFee: parseFloat(buyerFee.toFixed(2)),
       sellerFee: parseFloat(sellerFee.toFixed(2)),
       buyerPays: parseFloat(buyerPays.toFixed(2)),
       sellerReceives: parseFloat(sellerReceives.toFixed(2)),
+      buyerFeePercentage: parseFloat((fees.buyer * 100).toFixed(2)),
+      sellerFeePercentage: parseFloat((fees.seller * 100).toFixed(2)),
+      
+      // Additional backend fields
+      tier: userTier,
+      currency,
+      paymentMethod,
       totalPlatformFee: parseFloat(totalPlatformFee.toFixed(2)),
-      
-      buyerFeePercentage: fees.buyer * 100,
-      sellerFeePercentage: fees.seller * 100,
-      totalFeePercentage: (fees.buyer + fees.seller) * 100,
-      
+      totalFeePercentage: parseFloat(((fees.buyer + fees.seller) * 100).toFixed(2)),
       gatewayIncoming: parseFloat(gatewayIncoming.toFixed(2)),
       gatewayOutgoing: parseFloat(gatewayOutgoing.toFixed(2)),
       totalGatewayCost: parseFloat(gatewayCost.toFixed(2)),
-      
       platformProfit: parseFloat(platformProfit.toFixed(2)),
       profitPercentage: parseFloat(profitPercentage.toFixed(2)),
       
@@ -295,12 +299,47 @@ module.exports = {
   },
 
   // ======================================================
+  //           SIMPLIFIED CALCULATION FOR FRONTEND
+  // ======================================================
+  calculateSimpleFees: async function(amount, currency) {
+    // Default to starter tier for frontend compatibility
+    return await this.calculateFees(amount, currency, 'starter', 'flutterwave');
+  },
+
+  // ======================================================
+  //           GET TIER INFO (DATABASE-FIRST)
+  // ======================================================
+  getTierInfo: async function(tierName) {
+    const settings = await getActiveFeeSettings();
+    if (settings && settings.tiers[tierName]) {
+      return settings.tiers[tierName];
+    }
+    return FALLBACK_TIERS[tierName] || FALLBACK_TIERS.starter;
+  },
+
+  // ======================================================
+  //           GET ALL TIERS (DATABASE-FIRST)
+  // ======================================================
+  getAllTiers: async function() {
+    const settings = await getActiveFeeSettings();
+    if (settings) {
+      return Object.keys(settings.tiers).map(key => ({
+        id: key,
+        ...settings.tiers[key].toObject()
+      }));
+    }
+    return Object.keys(FALLBACK_TIERS).map(key => ({
+      id: key,
+      ...FALLBACK_TIERS[key]
+    }));
+  },
+
+  // ======================================================
   //          AMOUNT WITHIN LIMIT (DATABASE-FIRST)
   // ======================================================
   isAmountWithinLimit: async function(amount, currency, tierName) {
     const tierInfo = await this.getTierInfo(tierName);
-    const limit = tierInfo.maxTransactionAmount[currency];
-    
+    const limit = tierInfo.maxTransactionAmount[currency] || tierInfo.maxTransactionAmount.USD;
     if (limit === -1) return true;
     return amount <= limit;
   },
@@ -317,12 +356,10 @@ module.exports = {
     return {
       currentTier,
       targetTier,
-
       monthlyCostDifference: {
         NGN: target.monthlyCost.NGN - current.monthlyCost.NGN,
         USD: target.monthlyCost.USD - current.monthlyCost.USD
       },
-
       feeReduction: {
         NGN: {
           buyer: `${((current.fees.NGN.buyer - target.fees.NGN.buyer) * 100).toFixed(2)}%`,
@@ -333,9 +370,7 @@ module.exports = {
           seller: `${((current.fees.USD.seller - target.fees.USD.seller) * 100).toFixed(2)}%`
         }
       },
-
       newFeatures: target.features.filter(f => !current.features.includes(f)),
-
       transactionLimitIncrease: {
         amount: {
           NGN: target.maxTransactionAmount.NGN === -1
@@ -385,7 +420,7 @@ module.exports = {
   // ======================================================
   //               FEE EXPLANATION
   // ======================================================
-  getFeeExplanation: async function(currency, tierName) {
+  getFeeExplanation: async function(currency, tierName = 'starter') {
     const tier = await this.getTierInfo(tierName);
     const fees = tier.fees[currency] || tier.fees.USD;
 
@@ -415,28 +450,22 @@ module.exports = {
 
     return {
       tier: tier.name,
-
       buyer: {
         percentage: `${buyerPercent}%`,
         description: 'Escrow Protection Fee',
-        details:
-          'Your payment is held securely until you confirm delivery. Includes buyer fraud protection and dispute resolution.',
+        details: 'Your payment is held securely until you confirm delivery. Includes buyer fraud protection and dispute resolution.',
         example: `For a ${symbol}${example.amount} item, you pay ${symbol}${example.buyerFee} extra (${symbol}${example.buyerPays} total)`
       },
-
       seller: {
         percentage: `${sellerPercent}%`,
         description: 'Platform Service Fee',
-        details:
-          'Covers secure processing, instant payouts, fraud prevention, and dispute protection.',
+        details: 'Covers secure processing, instant payouts, fraud prevention, and dispute protection.',
         example: `For a ${symbol}${example.amount} sale, you receive ${symbol}${example.sellerReceives}`
       },
-
       combined: {
         total: `${totalPercent}%`,
         description: 'Fair & Transparent Pricing',
-        details:
-          'Covers gateway fees, escrow operations, fraud protection, infrastructure & support. No hidden fees.'
+        details: 'Covers gateway fees, escrow operations, fraud protection, infrastructure & support. No hidden fees.'
       }
     };
   }
