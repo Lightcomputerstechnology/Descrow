@@ -489,12 +489,14 @@ exports.getDashboardStats = async (req, res) => {
 };
 
 /**
- * Get escrow by ID - FIXED
+ * Get escrow by ID - FIXED FOR FRONTEND (ENHANCED VERSION)
  */
 exports.getEscrowById = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user.id;
+
+    console.log('Fetching escrow details for ID:', id, 'User ID:', userId);
 
     let escrow;
     
@@ -504,13 +506,19 @@ exports.getEscrowById = async (req, res) => {
         .populate('buyer', 'firstName lastName email profilePicture phone')
         .populate('seller', 'firstName lastName email profilePicture phone')
         .populate('attachments.uploadedBy', 'firstName lastName email')
-        .populate('timeline.actor', 'firstName lastName email');
+        .populate('timeline.actor', 'firstName lastName email')
+        .populate('delivery.proof.submittedBy', 'firstName lastName email')
+        .populate('dispute.raisedBy', 'firstName lastName email')
+        .populate('dispute.resolvedBy', 'firstName lastName email');
     } else {
       escrow = await Escrow.findOne({ escrowId: id })
         .populate('buyer', 'firstName lastName email profilePicture phone')
         .populate('seller', 'firstName lastName email profilePicture phone')
         .populate('attachments.uploadedBy', 'firstName lastName email')
-        .populate('timeline.actor', 'firstName lastName email');
+        .populate('timeline.actor', 'firstName lastName email')
+        .populate('delivery.proof.submittedBy', 'firstName lastName email')
+        .populate('dispute.raisedBy', 'firstName lastName email')
+        .populate('dispute.resolvedBy', 'firstName lastName email');
     }
 
     if (!escrow) {
@@ -531,24 +539,159 @@ exports.getEscrowById = async (req, res) => {
       });
     }
 
-    // Format the escrow data properly
+    // Format the escrow data properly for frontend
     const formattedEscrow = {
-      ...escrow.toObject(),
+      _id: escrow._id,
+      escrowId: escrow.escrowId,
+      title: escrow.title,
+      description: escrow.description,
       amount: escrow.amount ? parseFloat(escrow.amount.toString()) : 0,
+      currency: escrow.currency || 'USD',
+      status: escrow.status,
+      category: escrow.category,
+      buyerTier: escrow.buyerTier,
+      sellerTier: escrow.sellerTier,
+      chatUnlocked: escrow.chatUnlocked || false,
+      visibility: escrow.visibility || 'private',
+      
+      // Parties information
+      buyer: escrow.buyer ? {
+        _id: escrow.buyer._id,
+        firstName: escrow.buyer.firstName,
+        lastName: escrow.buyer.lastName,
+        email: escrow.buyer.email,
+        profilePicture: escrow.buyer.profilePicture,
+        phone: escrow.buyer.phone
+      } : null,
+      
+      seller: escrow.seller ? {
+        _id: escrow.seller._id,
+        firstName: escrow.seller.firstName,
+        lastName: escrow.seller.lastName,
+        email: escrow.seller.email,
+        profilePicture: escrow.seller.profilePicture,
+        phone: escrow.seller.phone
+      } : null,
+
+      // Payment information - ensure all fields are present
       payment: escrow.payment ? {
-        ...escrow.payment,
+        method: escrow.payment.method,
+        reference: escrow.payment.reference,
+        transactionId: escrow.payment.transactionId,
+        paymentId: escrow.payment.paymentId,
         amount: escrow.payment.amount ? parseFloat(escrow.payment.amount.toString()) : 0,
         buyerFee: escrow.payment.buyerFee ? parseFloat(escrow.payment.buyerFee.toString()) : 0,
         sellerFee: escrow.payment.sellerFee ? parseFloat(escrow.payment.sellerFee.toString()) : 0,
         platformFee: escrow.payment.platformFee ? parseFloat(escrow.payment.platformFee.toString()) : 0,
         buyerPays: escrow.payment.buyerPays ? parseFloat(escrow.payment.buyerPays.toString()) : 0,
-        sellerReceives: escrow.payment.sellerReceives ? parseFloat(escrow.payment.sellerReceives.toString()) : 0
-      } : null
+        sellerReceives: escrow.payment.sellerReceives ? parseFloat(escrow.payment.sellerReceives.toString()) : 0,
+        buyerFeePercentage: escrow.payment.buyerFeePercentage || 0,
+        sellerFeePercentage: escrow.payment.sellerFeePercentage || 0,
+        paidAt: escrow.payment.paidAt,
+        verifiedAt: escrow.payment.verifiedAt,
+        paidOutAt: escrow.payment.paidOutAt,
+        gatewayResponse: escrow.payment.gatewayResponse
+      } : {
+        method: null,
+        reference: null,
+        amount: 0,
+        buyerFee: 0,
+        sellerFee: 0,
+        platformFee: 0,
+        buyerPays: 0,
+        sellerReceives: 0,
+        buyerFeePercentage: 0,
+        sellerFeePercentage: 0
+      },
+
+      // Delivery information
+      delivery: {
+        method: escrow.delivery?.method || 'physical',
+        trackingNumber: escrow.delivery?.trackingNumber,
+        deliveredAt: escrow.delivery?.deliveredAt,
+        confirmedAt: escrow.delivery?.confirmedAt,
+        autoReleaseAt: escrow.delivery?.autoReleaseAt,
+        notes: escrow.delivery?.notes,
+        proof: escrow.delivery?.proof ? {
+          method: escrow.delivery.proof.method,
+          courierName: escrow.delivery.proof.courierName,
+          trackingNumber: escrow.delivery.proof.trackingNumber,
+          vehicleType: escrow.delivery.proof.vehicleType,
+          plateNumber: escrow.delivery.proof.plateNumber,
+          driverName: escrow.delivery.proof.driverName,
+          driverPhoto: escrow.delivery.proof.driverPhoto,
+          vehiclePhoto: escrow.delivery.proof.vehiclePhoto,
+          gpsEnabled: escrow.delivery.proof.gpsEnabled || false,
+          gpsTrackingId: escrow.delivery.proof.gpsTrackingId,
+          methodDescription: escrow.delivery.proof.methodDescription,
+          estimatedDelivery: escrow.delivery.proof.estimatedDelivery,
+          packagePhotos: escrow.delivery.proof.packagePhotos || [],
+          additionalNotes: escrow.delivery.proof.additionalNotes,
+          submittedAt: escrow.delivery.proof.submittedAt,
+          submittedBy: escrow.delivery.proof.submittedBy
+        } : null,
+        evidence: escrow.delivery?.evidence || []
+      },
+
+      // Dispute information
+      dispute: escrow.dispute ? {
+        isDisputed: escrow.dispute.isDisputed || false,
+        raisedBy: escrow.dispute.raisedBy,
+        raisedAt: escrow.dispute.raisedAt,
+        reason: escrow.dispute.reason,
+        description: escrow.dispute.description,
+        evidence: escrow.dispute.evidence || [],
+        status: escrow.dispute.status || 'pending',
+        resolution: escrow.dispute.resolution,
+        resolvedAt: escrow.dispute.resolvedAt,
+        resolvedBy: escrow.dispute.resolvedBy
+      } : {
+        isDisputed: false,
+        status: 'pending',
+        evidence: []
+      },
+
+      // Attachments
+      attachments: escrow.attachments ? escrow.attachments.map(att => ({
+        _id: att._id,
+        filename: att.filename,
+        originalName: att.originalName,
+        url: att.url,
+        mimetype: att.mimetype,
+        size: att.size,
+        uploadedAt: att.uploadedAt,
+        uploadedBy: att.uploadedBy
+      })) : [],
+
+      // Timeline
+      timeline: escrow.timeline ? escrow.timeline.map(event => ({
+        _id: event._id,
+        status: event.status,
+        timestamp: event.timestamp,
+        actor: event.actor,
+        note: event.note
+      })) : [],
+
+      // Chat
+      chat: escrow.chat || [],
+
+      // Ratings
+      rating: escrow.rating || {
+        buyerRating: null,
+        sellerRating: null
+      },
+
+      // Dates
+      createdAt: escrow.createdAt,
+      updatedAt: escrow.updatedAt,
+      expiresAt: escrow.expiresAt
     };
+
+    console.log('Sending formatted escrow data for:', formattedEscrow.title);
 
     res.json({
       success: true,
-      data: formattedEscrow,
+      data: formattedEscrow, // Frontend expects data to be the escrow object directly
       userRole: isBuyer ? 'buyer' : isSeller ? 'seller' : 'admin'
     });
 
@@ -556,7 +699,8 @@ exports.getEscrowById = async (req, res) => {
     console.error('Get escrow by ID error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch escrow details'
+      message: 'Failed to fetch escrow details',
+      error: error.message
     });
   }
 };
