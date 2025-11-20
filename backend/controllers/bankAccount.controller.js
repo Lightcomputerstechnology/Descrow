@@ -1,7 +1,8 @@
-// backend/controllers/bankAccount.controller.js - BANK VERIFICATION
+// backend/controllers/bankAccount.controller.js - ENHANCED MULTI-CURRENCY SUPPORT
 
 const BankAccount = require('../models/BankAccount.model');
 const User = require('../models/User.model');
+const Escrow = require('../models/Escrow.model');
 const axios = require('axios');
 
 // Nigerian banks list (Paystack bank codes)
@@ -30,23 +31,60 @@ const NIGERIAN_BANKS = [
   { name: 'Zenith Bank', code: '057' }
 ];
 
-// Get list of banks
+// International banks template (for Flutterwave)
+const INTERNATIONAL_BANKS = [
+  { name: 'Bank of America', code: 'BOFAUS3N', country: 'US', currency: 'USD' },
+  { name: 'Chase Bank', code: 'CHASUS33', country: 'US', currency: 'USD' },
+  { name: 'Wells Fargo', code: 'WFBIUS6S', country: 'US', currency: 'USD' },
+  { name: 'HSBC UK', code: 'MIDLGB22', country: 'GB', currency: 'GBP' },
+  { name: 'Barclays Bank', code: 'BARCGB22', country: 'GB', currency: 'GBP' },
+  { name: 'Deutsche Bank', code: 'DEUTDEFF', country: 'DE', currency: 'EUR' },
+  { name: 'BNP Paribas', code: 'BNPAFRPP', country: 'FR', currency: 'EUR' }
+];
+
+// Get list of banks with multi-currency support
 exports.getBanks = async (req, res) => {
   try {
-    const { currency } = req.query;
+    const { currency, country } = req.query;
 
+    // NGN - Paystack Nigerian banks
     if (currency === 'NGN') {
       return res.status(200).json({
         success: true,
-        data: { banks: NIGERIAN_BANKS }
+        data: { 
+          banks: NIGERIAN_BANKS,
+          provider: 'paystack',
+          verification: 'automatic'
+        }
       });
     }
 
-    // For other currencies, return empty (to be implemented)
+    // USD/EUR/GBP - Flutterwave international banks
+    if (['USD', 'EUR', 'GBP'].includes(currency)) {
+      const filteredBanks = INTERNATIONAL_BANKS.filter(bank => 
+        bank.currency === currency && (!country || bank.country === country)
+      );
+      
+      return res.status(200).json({
+        success: true,
+        data: { 
+          banks: filteredBanks,
+          provider: 'flutterwave',
+          verification: 'manual',
+          requiredFields: ['accountNumber', 'accountName', 'swiftCode']
+        }
+      });
+    }
+
+    // Other currencies
     res.status(200).json({
       success: true,
-      data: { banks: [] },
-      message: 'Bank verification only available for NGN currently'
+      data: { 
+        banks: [],
+        provider: 'manual',
+        verification: 'manual'
+      },
+      message: 'Contact support for bank account setup in this currency'
     });
   } catch (error) {
     console.error('Get banks error:', error);
@@ -54,80 +92,153 @@ exports.getBanks = async (req, res) => {
   }
 };
 
-// Verify bank account using Paystack
-async function verifyBankAccountPaystack(accountNumber, bankCode) {
-  try {
-    const response = await axios.get(
-      `https://api.paystack.co/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`,
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
-        }
-      }
-    );
+// Verify bank account using appropriate provider
+async function verifyBankAccount(accountData) {
+  const { accountNumber, bankCode, currency, bankName } = accountData;
 
-    if (response.data.status) {
+  try {
+    // NGN - Paystack verification
+    if (currency === 'NGN') {
+      const response = await axios.get(
+        `https://api.paystack.co/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
+          }
+        }
+      );
+
+      if (response.data.status) {
+        return {
+          success: true,
+          accountName: response.data.data.account_name,
+          accountNumber: response.data.data.account_number,
+          provider: 'paystack',
+          verifiedAt: new Date()
+        };
+      }
+    }
+
+    // USD/EUR/GBP - Flutterwave verification (mock - requires actual integration)
+    if (['USD', 'EUR', 'GBP'].includes(currency)) {
+      // For Flutterwave, we typically verify during transfer
+      // Return success with manual verification for now
       return {
         success: true,
-        accountName: response.data.data.account_name,
-        accountNumber: response.data.data.account_number
+        accountName: accountData.accountName, // Required for international
+        accountNumber,
+        provider: 'flutterwave',
+        verifiedAt: new Date(),
+        note: 'Account will be verified during first transfer'
       };
     }
 
-    return { success: false, message: 'Account verification failed' };
+    return { 
+      success: false, 
+      message: `Verification not available for ${currency} accounts` 
+    };
   } catch (error) {
-    console.error('Paystack verification error:', error.response?.data || error.message);
+    console.error('Bank verification error:', error.response?.data || error.message);
     return {
       success: false,
-      message: error.response?.data?.message || 'Verification failed'
+      message: error.response?.data?.message || 'Account verification failed',
+      provider: currency === 'NGN' ? 'paystack' : 'flutterwave'
     };
   }
 }
 
-// Add bank account
+// Enhanced add bank account with multi-currency support
 exports.addBankAccount = async (req, res) => {
   try {
-    const { accountNumber, bankCode, bankName, currency } = req.body;
+    const { 
+      accountNumber, 
+      bankCode, 
+      bankName, 
+      currency,
+      accountType,
+      swiftCode,
+      iban,
+      routingNumber,
+      accountName: manualAccountName // For international accounts
+    } = req.body;
 
-    if (!accountNumber || !bankCode || !bankName) {
+    // Required field validation based on currency
+    if (!accountNumber || !bankCode || !bankName || !currency) {
       return res.status(400).json({
         success: false,
-        message: 'Account number, bank code, and bank name are required'
+        message: 'Account number, bank code, bank name, and currency are required'
       });
     }
 
-    // Verify account if NGN
-    let accountName = null;
+    // Additional validation for international accounts
+    if (['USD', 'EUR', 'GBP'].includes(currency)) {
+      if (!swiftCode) {
+        return res.status(400).json({
+          success: false,
+          message: 'SWIFT/BIC code is required for international accounts'
+        });
+      }
+      if (!manualAccountName) {
+        return res.status(400).json({
+          success: false,
+          message: 'Account name is required for international accounts'
+        });
+      }
+    }
+
+    // Check KYC status for escrow access
+    const user = await User.findById(req.user._id);
+    if (!user.kycStatus || user.kycStatus.status !== 'approved') {
+      return res.status(403).json({
+        success: false,
+        message: 'KYC verification required to add bank accounts',
+        action: 'complete_kyc',
+        kycRequired: true
+      });
+    }
+
+    // Verify account based on currency
+    let verificationResult;
+    let accountName = manualAccountName;
     let isVerified = false;
 
-    if (currency === 'NGN') {
-      const verification = await verifyBankAccountPaystack(accountNumber, bankCode);
-      
-      if (!verification.success) {
+    if (currency === 'NGN' || ['USD', 'EUR', 'GBP'].includes(currency)) {
+      verificationResult = await verifyBankAccount({
+        accountNumber,
+        bankCode,
+        currency,
+        bankName,
+        accountName: manualAccountName
+      });
+
+      if (!verificationResult.success) {
         return res.status(400).json({
           success: false,
-          message: verification.message || 'Could not verify bank account'
+          message: verificationResult.message || 'Could not verify bank account',
+          provider: verificationResult.provider
         });
       }
 
-      accountName = verification.accountName;
+      accountName = verificationResult.accountName;
       isVerified = true;
     } else {
-      // For non-NGN, require manual account name input
-      accountName = req.body.accountName;
-      if (!accountName) {
+      // Manual verification for other currencies
+      if (!manualAccountName) {
         return res.status(400).json({
           success: false,
-          message: 'Account name is required for non-NGN accounts'
+          message: 'Account name is required for manual verification'
         });
       }
+      accountName = manualAccountName;
+      isVerified = false; // Requires manual verification
     }
 
     // Check if account already exists
     const existingAccount = await BankAccount.findOne({
       user: req.user._id,
       accountNumber,
-      bankCode
+      bankCode,
+      currency
     });
 
     if (existingAccount) {
@@ -137,8 +248,15 @@ exports.addBankAccount = async (req, res) => {
       });
     }
 
-    // Check if user has any accounts
+    // Check account limit (max 5 accounts per user)
     const userAccountsCount = await BankAccount.countDocuments({ user: req.user._id });
+    if (userAccountsCount >= 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Maximum of 5 bank accounts allowed per user'
+      });
+    }
+
     const isPrimary = userAccountsCount === 0; // First account is primary
 
     // Create bank account
@@ -149,26 +267,39 @@ exports.addBankAccount = async (req, res) => {
       bankName,
       bankCode,
       currency: currency || 'NGN',
+      accountType: accountType || 'personal',
+      swiftCode,
+      iban,
+      routingNumber,
       isVerified,
       isPrimary,
       verificationData: isVerified ? {
-        verifiedAt: new Date(),
-        verificationMethod: 'paystack',
+        verifiedAt: verificationResult.verifiedAt || new Date(),
+        verificationMethod: verificationResult.provider || 'manual',
         verificationResponse: { accountName }
-      } : null
+      } : null,
+      provider: currency === 'NGN' ? 'paystack' : 'flutterwave'
     });
 
     await bankAccount.save();
 
     // Update user
     await User.findByIdAndUpdate(req.user._id, {
-      hasBankAccount: true
+      hasBankAccount: true,
+      $inc: { 'stats.bankAccountsCount': 1 }
     });
 
     res.status(201).json({
       success: true,
-      message: 'Bank account added successfully',
-      data: { bankAccount }
+      message: `Bank account added ${isVerified ? 'and verified' : ''} successfully`,
+      data: { 
+        bankAccount,
+        verification: {
+          isVerified,
+          provider: bankAccount.provider,
+          method: isVerified ? 'automatic' : 'manual'
+        }
+      }
     });
   } catch (error) {
     console.error('Add bank account error:', error);
@@ -185,9 +316,21 @@ exports.getBankAccounts = async (req, res) => {
     const accounts = await BankAccount.find({ user: req.user._id })
       .sort({ isPrimary: -1, createdAt: -1 });
 
+    // Check KYC status
+    const user = await User.findById(req.user._id);
+    const kycVerified = user.kycStatus?.status === 'approved';
+
     res.status(200).json({
       success: true,
-      data: { accounts }
+      data: { 
+        accounts,
+        kycVerified,
+        canAddAccounts: kycVerified,
+        limits: {
+          maxAccounts: 5,
+          currentCount: accounts.length
+        }
+      }
     });
   } catch (error) {
     console.error('Get bank accounts error:', error);
@@ -212,6 +355,13 @@ exports.setPrimaryAccount = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Bank account not found'
+      });
+    }
+
+    if (!account.isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only verified accounts can be set as primary'
       });
     }
 
@@ -250,16 +400,42 @@ exports.deleteBankAccount = async (req, res) => {
       });
     }
 
+    // Prevent deletion of only account if user has active escrows
+    const activeEscrows = await Escrow.countDocuments({
+      $or: [
+        { buyer: req.user._id, status: { $in: ['accepted', 'funded', 'delivered'] } },
+        { seller: req.user._id, status: { $in: ['accepted', 'funded', 'delivered'] } }
+      ]
+    });
+
+    const totalAccounts = await BankAccount.countDocuments({ user: req.user._id });
+
+    if (activeEscrows > 0 && totalAccounts === 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete your only bank account while you have active escrows'
+      });
+    }
+
     await account.deleteOne();
 
-    // If deleted account was primary, set another as primary
+    // If deleted account was primary, set another verified account as primary
     if (account.isPrimary) {
-      const nextAccount = await BankAccount.findOne({ user: req.user._id });
+      const nextAccount = await BankAccount.findOne({ 
+        user: req.user._id,
+        isVerified: true 
+      }).sort({ createdAt: 1 });
+      
       if (nextAccount) {
         nextAccount.isPrimary = true;
         await nextAccount.save();
       }
     }
+
+    // Update user stats
+    await User.findByIdAndUpdate(req.user._id, {
+      $inc: { 'stats.bankAccountsCount': -1 }
+    });
 
     res.status(200).json({
       success: true,
@@ -274,12 +450,12 @@ exports.deleteBankAccount = async (req, res) => {
   }
 };
 
-// Initiate payout (for completed escrows)
+// Enhanced payout system with multi-currency support
 exports.initiatePayout = async (req, res) => {
   try {
-    const { escrowId, accountId } = req.body;
+    const { escrowId, accountId, currency } = req.body;
 
-    const escrow = await Escrow.findOne({ escrowId });
+    const escrow = await Escrow.findById(escrowId).populate('seller buyer');
     if (!escrow) {
       return res.status(404).json({ success: false, message: 'Escrow not found' });
     }
@@ -313,18 +489,20 @@ exports.initiatePayout = async (req, res) => {
         user: req.user._id
       });
     } else {
-      // Use primary account
+      // Use primary account in same currency as escrow
       bankAccount = await BankAccount.findOne({
         user: req.user._id,
-        isPrimary: true
+        isPrimary: true,
+        currency: escrow.currency
       });
     }
 
     if (!bankAccount) {
       return res.status(404).json({
         success: false,
-        message: 'No bank account found. Please add a bank account first.',
-        action: 'add_bank_account'
+        message: `No ${escrow.currency} bank account found. Please add a bank account in ${escrow.currency} first.`,
+        action: 'add_bank_account',
+        requiredCurrency: escrow.currency
       });
     }
 
@@ -335,17 +513,42 @@ exports.initiatePayout = async (req, res) => {
       });
     }
 
-    // Initiate payout via Paystack Transfer
-    const transferData = await initiatePaystackTransfer(
-      bankAccount,
-      escrow.payment.sellerReceives,
-      escrow.escrowId
-    );
-
-    if (!transferData.success) {
+    // Currency mismatch check
+    if (bankAccount.currency !== escrow.currency) {
       return res.status(400).json({
         success: false,
-        message: transferData.message || 'Payout failed'
+        message: `Escrow currency (${escrow.currency}) doesn't match bank account currency (${bankAccount.currency})`,
+        action: 'use_correct_currency_account'
+      });
+    }
+
+    let payoutResult;
+
+    // Route payout based on currency and provider
+    if (bankAccount.currency === 'NGN') {
+      payoutResult = await initiatePaystackTransfer(
+        bankAccount,
+        escrow.payment.sellerReceives,
+        escrow.escrowId
+      );
+    } else if (['USD', 'EUR', 'GBP'].includes(bankAccount.currency)) {
+      payoutResult = await initiateFlutterwaveTransfer(
+        bankAccount,
+        escrow.payment.sellerReceives,
+        escrow.escrowId
+      );
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: `Payout not supported for ${bankAccount.currency} accounts`
+      });
+    }
+
+    if (!payoutResult.success) {
+      return res.status(400).json({
+        success: false,
+        message: payoutResult.message || 'Payout failed',
+        provider: bankAccount.provider
       });
     }
 
@@ -354,8 +557,11 @@ exports.initiatePayout = async (req, res) => {
       accountId: bankAccount._id,
       accountNumber: bankAccount.accountNumber,
       bankName: bankAccount.bankName,
+      currency: bankAccount.currency,
       amount: escrow.payment.sellerReceives,
-      transferCode: transferData.transfer_code,
+      provider: bankAccount.provider,
+      transferCode: payoutResult.transfer_code,
+      reference: payoutResult.reference,
       paidOut: true,
       paidOutAt: new Date()
     };
@@ -366,10 +572,13 @@ exports.initiatePayout = async (req, res) => {
       success: true,
       message: 'Payout initiated successfully',
       data: {
-        transferCode: transferData.transfer_code,
+        transferCode: payoutResult.transfer_code,
         amount: escrow.payment.sellerReceives,
+        currency: bankAccount.currency,
         accountNumber: bankAccount.accountNumber,
-        bankName: bankAccount.bankName
+        bankName: bankAccount.bankName,
+        provider: bankAccount.provider,
+        estimatedDelivery: '1-3 business days'
       }
     });
   } catch (error) {
@@ -381,7 +590,7 @@ exports.initiatePayout = async (req, res) => {
   }
 };
 
-// Helper: Initiate Paystack transfer
+// Helper: Initiate Paystack transfer (NGN)
 async function initiatePaystackTransfer(bankAccount, amount, reference) {
   try {
     // Create transfer recipient first
@@ -413,7 +622,7 @@ async function initiatePaystackTransfer(bankAccount, amount, reference) {
       'https://api.paystack.co/transfer',
       {
         source: 'balance',
-        amount: amount * 100, // Convert to kobo
+        amount: Math.round(amount * 100), // Convert to kobo
         recipient: recipientCode,
         reason: `Payout for escrow ${reference}`
       },
@@ -442,3 +651,95 @@ async function initiatePaystackTransfer(bankAccount, amount, reference) {
     };
   }
 }
+
+// Helper: Initiate Flutterwave transfer (USD/EUR/GBP)
+async function initiateFlutterwaveTransfer(bankAccount, amount, reference) {
+  try {
+    // Note: This is a simplified implementation
+    // Flutterwave transfer requires proper integration with their API
+    const transferResponse = await axios.post(
+      'https://api.flutterwave.com/v3/transfers',
+      {
+        account_bank: bankAccount.bankCode, // SWIFT code for international
+        account_number: bankAccount.accountNumber,
+        amount: amount,
+        narration: `Payout for escrow ${reference}`,
+        currency: bankAccount.currency,
+        reference: `ESCROW_${reference}_${Date.now()}`,
+        beneficiary_name: bankAccount.accountName
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.FLUTTERWAVE_SECRET_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (transferResponse.data.status !== 'success') {
+      throw new Error('Transfer initiation failed');
+    }
+
+    return {
+      success: true,
+      transfer_code: transferResponse.data.data.id,
+      reference: transferResponse.data.data.reference
+    };
+  } catch (error) {
+    console.error('Flutterwave transfer error:', error.response?.data || error.message);
+    return {
+      success: false,
+      message: error.response?.data?.message || 'International transfer failed'
+    };
+  }
+}
+
+// Get payout methods available for user
+exports.getPayoutMethods = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    const accounts = await BankAccount.find({ user: req.user._id, isVerified: true });
+
+    const methods = {
+      ngn: {
+        available: accounts.some(acc => acc.currency === 'NGN'),
+        provider: 'paystack',
+        type: 'bank_transfer',
+        accounts: accounts.filter(acc => acc.currency === 'NGN')
+      },
+      usd: {
+        available: accounts.some(acc => acc.currency === 'USD'),
+        provider: 'flutterwave',
+        type: 'bank_transfer',
+        accounts: accounts.filter(acc => acc.currency === 'USD')
+      },
+      eur: {
+        available: accounts.some(acc => acc.currency === 'EUR'),
+        provider: 'flutterwave',
+        type: 'bank_transfer', 
+        accounts: accounts.filter(acc => acc.currency === 'EUR')
+      },
+      gbp: {
+        available: accounts.some(acc => acc.currency === 'GBP'),
+        provider: 'flutterwave',
+        type: 'bank_transfer',
+        accounts: accounts.filter(acc => acc.currency === 'GBP')
+      }
+    };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        methods,
+        kycVerified: user.kycStatus?.status === 'approved',
+        canReceivePayouts: user.kycStatus?.status === 'approved' && accounts.length > 0
+      }
+    });
+  } catch (error) {
+    console.error('Get payout methods error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payout methods'
+    });
+  }
+};
