@@ -86,7 +86,7 @@ const PaymentPage = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        `${API_URL}/payment/initialize`,
+        `${API_URL}/payments/initialize`,
         {
           escrowId: escrow.escrowId,
           paymentMethod: selectedGateway
