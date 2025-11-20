@@ -51,7 +51,7 @@ const PaymentPage = () => {
       });
       
       if (response.data.success) {
-        const escrowData = response.data.data;
+        const escrowData = response.data.data.escrow;
         setEscrow(escrowData);
         
         // Check if already paid
@@ -86,7 +86,7 @@ const PaymentPage = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        `${API_URL}/payments/initialize`,
+        `${API_URL}/payment/initialize`,
         {
           escrowId: escrow.escrowId,
           paymentMethod: selectedGateway
