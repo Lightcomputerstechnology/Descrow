@@ -1,4 +1,4 @@
-// File: src/pages/Profile/ProfilePage.jsx - UPDATED VERSION
+// File: src/pages/Profile/ProfilePage.jsx - FIXED IMPORT VERSION
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
@@ -15,7 +15,7 @@ import ProfileTab from './ProfileTab';
 import KYCTab from './KYCTab';
 import SecurityTab from './SecurityTab';
 import SettingsTab from './SettingsTab';
-import BankAccountTab from './BankAccountTab'; // New integrated component
+import BankAccountTab from '../../components/Profile/BankAccountTab'; // ✅ FIXED IMPORT PATH
 import profileService from 'services/profileService';
 import { authService } from 'services/authService';
 import toast from 'react-hot-toast';
