@@ -1,3 +1,4 @@
+// File: src/pages/Profile/ProfilePage.jsx - UPDATED VERSION
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
@@ -5,22 +6,27 @@ import {
   Shield, 
   Settings, 
   FileCheck, 
+  CreditCard, // Added for bank accounts
   ArrowLeft,
-  Loader
+  Loader,
+  AlertTriangle // Added for KYC warning
 } from 'lucide-react';
 import ProfileTab from './ProfileTab';
 import KYCTab from './KYCTab';
 import SecurityTab from './SecurityTab';
 import SettingsTab from './SettingsTab';
+import BankAccountTab from './BankAccountTab'; // New integrated component
 import profileService from 'services/profileService';
 import { authService } from 'services/authService';
 import toast from 'react-hot-toast';
+
 const ProfilePage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const [kycStatus, setKycStatus] = useState(null);
 
   useEffect(() => {
     const currentUser = authService.getCurrentUser();
@@ -31,11 +37,12 @@ const ProfilePage = () => {
 
     // Check URL params for tab
     const tab = searchParams.get('tab');
-    if (tab && ['profile', 'kyc', 'security', 'settings'].includes(tab)) {
+    if (tab && ['profile', 'kyc', 'bank-accounts', 'security', 'settings'].includes(tab)) {
       setActiveTab(tab);
     }
 
     fetchProfile();
+    fetchKYCStatus();
   }, []);
 
   const fetchProfile = async () => {
@@ -45,7 +52,6 @@ const ProfilePage = () => {
       
       if (response.success) {
         setUser(response.data);
-        // Update localStorage
         localStorage.setItem('user', JSON.stringify(response.data));
       }
     } catch (error) {
@@ -56,13 +62,31 @@ const ProfilePage = () => {
     }
   };
 
+  const fetchKYCStatus = async () => {
+    try {
+      const response = await profileService.getKYCStatus();
+      if (response.success) {
+        setKycStatus(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch KYC status:', error);
+    }
+  };
+
   const handleTabChange = (tab) => {
+    // Prevent access to escrow-related features if KYC not verified
+    if ((tab === 'bank-accounts' || tab === 'kyc') && kycStatus?.status !== 'approved') {
+      toast.error('Complete KYC verification to access this feature');
+      return;
+    }
+    
     setActiveTab(tab);
     setSearchParams({ tab });
   };
 
   const handleProfileUpdate = () => {
     fetchProfile();
+    fetchKYCStatus();
   };
 
   if (loading) {
@@ -80,9 +104,13 @@ const ProfilePage = () => {
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'kyc', label: 'Verification', icon: FileCheck },
+    { id: 'bank-accounts', label: 'Bank Accounts', icon: CreditCard },
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'settings', label: 'Settings', icon: Settings }
   ];
+
+  // Check if user can access escrow features
+  const canAccessEscrowFeatures = kycStatus?.status === 'approved';
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
@@ -128,9 +156,37 @@ const ProfilePage = () => {
                     ✓ Verified Email
                   </span>
                 )}
+                {kycStatus?.status === 'approved' && (
+                  <span className="px-3 py-1 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300 text-xs font-medium rounded-full">
+                    ✓ KYC Verified
+                  </span>
+                )}
               </div>
             </div>
           </div>
+
+          {/* KYC Warning Banner */}
+          {!canAccessEscrowFeatures && (
+            <div className="mt-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                    Complete KYC Verification
+                  </p>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                    You need to verify your identity to create escrows and add bank accounts for payouts.
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleTabChange('kyc')}
+                  className="ml-auto px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition"
+                >
+                  Verify Now
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -143,23 +199,49 @@ const ProfilePage = () => {
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
+                const isDisabled = (tab.id === 'bank-accounts' || tab.id === 'kyc') && 
+                                 !canAccessEscrowFeatures && kycStatus?.status !== 'pending';
 
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => handleTabChange(tab.id)}
+                    onClick={() => !isDisabled && handleTabChange(tab.id)}
+                    disabled={isDisabled}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-left transition ${
                       isActive
                         ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                        : isDisabled
+                        ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
                         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                     }`}
+                    title={isDisabled ? 'Complete KYC verification to access' : ''}
                   >
                     <Icon className="w-5 h-5" />
                     {tab.label}
+                    {isDisabled && (
+                      <span className="ml-auto text-xs text-gray-400">🔒</span>
+                    )}
                   </button>
                 );
               })}
             </div>
+
+            {/* Payout Information */}
+            {canAccessEscrowFeatures && (
+              <div className="mt-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+                <h4 className="font-semibold text-blue-900 dark:text-blue-200 text-sm mb-2">
+                  💰 Automatic Payouts
+                </h4>
+                <div className="text-xs text-blue-800 dark:text-blue-300 space-y-1">
+                  <p><strong>NGN:</strong> Paystack → Bank Transfer</p>
+                  <p><strong>USD/Foreign:</strong> Flutterwave → Bank/Crypto</p>
+                  <p><strong>Crypto:</strong> NowPayments → Wallet</p>
+                </div>
+                <p className="text-xs text-blue-700 dark:text-blue-400 mt-2">
+                  Funds auto-transfer within 24h of escrow completion
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Content */}
@@ -169,6 +251,13 @@ const ProfilePage = () => {
             )}
             {activeTab === 'kyc' && (
               <KYCTab user={user} onUpdate={handleProfileUpdate} />
+            )}
+            {activeTab === 'bank-accounts' && (
+              <BankAccountTab 
+                user={user} 
+                onUpdate={handleProfileUpdate}
+                kycVerified={canAccessEscrowFeatures}
+              />
             )}
             {activeTab === 'security' && (
               <SecurityTab user={user} onUpdate={handleProfileUpdate} />
