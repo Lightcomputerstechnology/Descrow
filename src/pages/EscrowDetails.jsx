@@ -79,8 +79,8 @@ const EscrowDetailsPage = () => {
       const response = await escrowService.getEscrowById(id);
 
       if (response.success) {
-        setEscrow(response.data.escrow);
-        setUserRole(response.data.userRole);
+        setEscrow(response.data);
+        setUserRole(response.userRole);
       } else {
         throw new Error(response.message || 'Escrow not found');
       }
