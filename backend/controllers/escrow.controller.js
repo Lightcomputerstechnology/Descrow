@@ -164,15 +164,18 @@ exports.createEscrow = async (req, res) => {
     // Populate and return
     await escrow.populate('buyer seller', 'firstName lastName email profilePicture tier');
 
+    // FORMAT RESPONSE FOR FRONTEND setEscrow(response.data.escrow)
     res.status(201).json({
       success: true,
       message: 'Escrow created successfully. Waiting for seller acceptance.',
       data: {
-        escrow,
-        feeBreakdown,
-        buyerTier: buyer.tier,
-        tierLimits: buyer.getTierLimits(),
-        attachmentsCount: attachments.length
+        escrow: { // ✅ ADDED: Wrap escrow in escrow property for frontend
+          ...escrow.toObject(),
+          feeBreakdown,
+          buyerTier: buyer.tier,
+          tierLimits: buyer.getTierLimits(),
+          attachmentsCount: attachments.length
+        }
       }
     });
 
@@ -689,10 +692,13 @@ exports.getEscrowById = async (req, res) => {
 
     console.log('Sending formatted escrow data for:', formattedEscrow.title);
 
+    // ✅ FIXED: Return escrow in data.escrow for frontend setEscrow(response.data.escrow)
     res.json({
       success: true,
-      data: formattedEscrow, // Frontend expects data to be the escrow object directly
-      userRole: isBuyer ? 'buyer' : isSeller ? 'seller' : 'admin'
+      data: {
+        escrow: formattedEscrow, // ✅ WRAPPED: Now frontend can use response.data.escrow
+        userRole: isBuyer ? 'buyer' : isSeller ? 'seller' : 'admin'
+      }
     });
 
   } catch (error) {
@@ -829,10 +835,13 @@ exports.uploadDeliveryProof = async (req, res) => {
     // Populate before sending response
     await escrow.populate('buyer seller', 'firstName lastName email');
 
+    // ✅ FIXED: Return escrow in data.escrow
     res.json({
       success: true,
       message: 'Delivery proof uploaded successfully',
-      data: escrow.delivery.proof
+      data: {
+        escrow: escrow.toObject() // ✅ WRAPPED
+      }
     });
 
   } catch (error) {
@@ -894,10 +903,13 @@ exports.acceptEscrow = async (req, res) => {
     // Populate before sending response
     await escrow.populate('buyer seller', 'firstName lastName email');
 
+    // ✅ FIXED: Return escrow in data.escrow
     res.json({
       success: true,
       message: 'Escrow accepted successfully',
-      data: escrow
+      data: {
+        escrow: escrow.toObject() // ✅ WRAPPED
+      }
     });
 
   } catch (error) {
@@ -958,10 +970,13 @@ exports.fundEscrow = async (req, res) => {
     // Populate before sending response
     await escrow.populate('buyer seller', 'firstName lastName email');
 
+    // ✅ FIXED: Return escrow in data.escrow
     res.json({
       success: true,
       message: 'Escrow funded successfully',
-      data: escrow
+      data: {
+        escrow: escrow.toObject() // ✅ WRAPPED
+      }
     });
 
   } catch (error) {
@@ -1023,10 +1038,13 @@ exports.markDelivered = async (req, res) => {
     // Populate before sending response
     await escrow.populate('buyer seller', 'firstName lastName email');
 
+    // ✅ FIXED: Return escrow in data.escrow
     res.json({
       success: true,
       message: 'Item marked as delivered successfully',
-      data: escrow
+      data: {
+        escrow: escrow.toObject() // ✅ WRAPPED
+      }
     });
 
   } catch (error) {
@@ -1088,10 +1106,13 @@ exports.confirmDelivery = async (req, res) => {
     // Populate before sending response
     await escrow.populate('buyer seller', 'firstName lastName email');
 
+    // ✅ FIXED: Return escrow in data.escrow
     res.json({
       success: true,
       message: 'Delivery confirmed successfully',
-      data: escrow
+      data: {
+        escrow: escrow.toObject() // ✅ WRAPPED
+      }
     });
 
   } catch (error) {
@@ -1166,10 +1187,13 @@ exports.raiseDispute = async (req, res) => {
     // Populate before sending response
     await escrow.populate('buyer seller', 'firstName lastName email');
 
+    // ✅ FIXED: Return escrow in data.escrow
     res.json({
       success: true,
       message: 'Dispute raised successfully',
-      data: escrow.dispute
+      data: {
+        escrow: escrow.toObject() // ✅ WRAPPED
+      }
     });
 
   } catch (error) {
@@ -1234,10 +1258,13 @@ exports.cancelEscrow = async (req, res) => {
     // Populate before sending response
     await escrow.populate('buyer seller', 'firstName lastName email');
 
+    // ✅ FIXED: Return escrow in data.escrow
     res.json({
       success: true,
       message: 'Escrow cancelled successfully',
-      data: escrow
+      data: {
+        escrow: escrow.toObject() // ✅ WRAPPED
+      }
     });
 
   } catch (error) {
