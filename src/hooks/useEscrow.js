@@ -23,7 +23,7 @@ export const useEscrow = (escrowId) => {
       const response = await escrowService.getEscrowById(escrowId);
       
       if (response.success) {
-        setEscrow(response.data.escrow);
+        setEscrow(response.data););
       } else {
         setError(response.message || 'Failed to fetch escrow');
       }
