@@ -238,6 +238,7 @@ app.use('/api/disputes', disputeRoutes);
 
 // Payments
 app.use('/api/payments', paymentRoutes);
+app.use('/api/payment', paymentRoutes);
 
 // Notifications
 app.use('/api/notifications', notificationRoutes);
