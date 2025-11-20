@@ -51,7 +51,7 @@ const PaymentPage = () => {
       });
       
       if (response.data.success) {
-        const escrowData = response.data.data.escrow;
+        const escrowData = response.data.data;
         setEscrow(escrowData);
         
         // Check if already paid
