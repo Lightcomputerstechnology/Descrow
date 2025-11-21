@@ -1,4 +1,4 @@
-// backend/server.js - COMPLETE MERGED VERSION WITH ALL NEW ROUTES
+// backend/server.js - COMPLETE MERGED VERSION WITH ALL NEW ROUTES + KYC MIGRATION
 require('dotenv').config();
 const path = require('path');
 const express = require('express');
@@ -34,6 +34,9 @@ const apiV1Routes = require('./routes/api.v1.routes');
 // ✅ NEW ROUTES
 const businessRoutes = require('./routes/business.routes');
 const bankAccountRoutes = require('./routes/bankAccount.routes');
+
+// ✅ IMPORT USER MODEL FOR MIGRATION
+const User = require('./models/User.model');
 
 const app = express();
 
@@ -93,111 +96,6 @@ app.use(cors({
 }));
 
 app.options('*', cors());
-
-
-// TEMPORARY MIGRATION ROUTE - Add this to your server.js or routes
-// Remove after running once!
-
-const mongoose = require('mongoose');
-const User = require('./models/User.model');
-
-// Add this route temporarily to fix KYC data
-app.get('/api/admin/fix-kyc-data', async (req, res) => {
-  try {
-    // Simple security check (you can remove this or add proper admin auth)
-    const { secret } = req.query;
-    if (secret !== 'fix-kyc-2024') {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Unauthorized' 
-      });
-    }
-
-    console.log('Starting KYC data migration...');
-    const users = await User.find({});
-    let fixedCount = 0;
-    let errorCount = 0;
-
-    for (const user of users) {
-      try {
-        let needsSave = false;
-
-        // Fix string kycStatus
-        if (typeof user.kycStatus === 'string') {
-          console.log(`Fixing KYC data for user: ${user.email}`);
-          user.kycStatus = {
-            status: user.kycStatus,
-            tier: 'basic',
-            submittedAt: null,
-            reviewedAt: null,
-            rejectionReason: null,
-            resubmissionAllowed: true,
-            verificationId: null,
-            documents: [],
-            personalInfo: {
-              dateOfBirth: null,
-              nationality: null,
-              idNumber: null,
-              idType: null,
-              address: {
-                street: null,
-                city: null,
-                state: null,
-                country: null,
-                postalCode: null
-              }
-            },
-            businessInfo: {
-              companyName: null,
-              registrationNumber: null,
-              taxId: null,
-              businessType: null,
-              website: null
-            }
-          };
-          needsSave = true;
-          fixedCount++;
-        }
-
-        // Fix missing documents array
-        if (user.kycStatus && !Array.isArray(user.kycStatus.documents)) {
-          user.kycStatus.documents = [];
-          needsSave = true;
-        }
-
-        if (needsSave) {
-          await user.save();
-          console.log(`✅ Fixed user: ${user.email}`);
-        }
-      } catch (userError) {
-        console.error(`❌ Error fixing user ${user.email}:`, userError.message);
-        errorCount++;
-      }
-    }
-
-    res.json({
-      success: true,
-      message: `KYC data migration completed!`,
-      results: {
-        totalUsers: users.length,
-        fixedUsers: fixedCount,
-        errors: errorCount,
-        timestamp: new Date().toISOString()
-      }
-    });
-
-    console.log(`✅ Migration completed! Fixed ${fixedCount} users, ${errorCount} errors.`);
-
-  } catch (error) {
-    console.error('Migration error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Migration failed',
-      error: error.message
-    });
-  }
-});
-
 
 // ==================== BODY PARSERS ====================
 app.use(express.json({
@@ -324,6 +222,104 @@ app.get('/api/health', async (req, res) => {
   };
 
   res.json(healthCheck);
+});
+
+// ==================== TEMPORARY KYC MIGRATION ROUTE ====================
+// ⚠️ REMOVE THIS AFTER RUNNING ONCE!
+app.get('/api/admin/fix-kyc-data', async (req, res) => {
+  try {
+    // Security check
+    const { secret } = req.query;
+    if (secret !== 'fix-kyc-2024') {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Unauthorized' 
+      });
+    }
+
+    console.log('🚀 Starting KYC data migration...');
+    const users = await User.find({});
+    let fixedCount = 0;
+    let errorCount = 0;
+
+    for (const user of users) {
+      try {
+        let needsSave = false;
+
+        // Fix string kycStatus
+        if (typeof user.kycStatus === 'string') {
+          console.log(`🛠️ Fixing KYC data for user: ${user.email}`);
+          user.kycStatus = {
+            status: user.kycStatus,
+            tier: 'basic',
+            submittedAt: null,
+            reviewedAt: null,
+            rejectionReason: null,
+            resubmissionAllowed: true,
+            verificationId: null,
+            documents: [],
+            personalInfo: {
+              dateOfBirth: null,
+              nationality: null,
+              idNumber: null,
+              idType: null,
+              address: {
+                street: null,
+                city: null,
+                state: null,
+                country: null,
+                postalCode: null
+              }
+            },
+            businessInfo: {
+              companyName: null,
+              registrationNumber: null,
+              taxId: null,
+              businessType: null,
+              website: null
+            }
+          };
+          needsSave = true;
+          fixedCount++;
+        }
+
+        // Fix missing documents array
+        if (user.kycStatus && !Array.isArray(user.kycStatus.documents)) {
+          user.kycStatus.documents = [];
+          needsSave = true;
+        }
+
+        if (needsSave) {
+          await user.save();
+          console.log(`✅ Fixed user: ${user.email}`);
+        }
+      } catch (userError) {
+        console.error(`❌ Error fixing user ${user.email}:`, userError.message);
+        errorCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `🎉 KYC data migration completed!`,
+      results: {
+        totalUsers: users.length,
+        fixedUsers: fixedCount,
+        errors: errorCount,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    console.log(`✅ Migration completed! Fixed ${fixedCount} users, ${errorCount} errors.`);
+
+  } catch (error) {
+    console.error('❌ Migration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Migration failed',
+      error: error.message
+    });
+  }
 });
 
 // ==================== API ROUTES ====================
@@ -463,6 +459,7 @@ const server = app.listen(PORT, () => {
   console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
   console.log(`✅ Allowed Origins:`, allowedOrigins);
   console.log(`⏰ Cron jobs: ACTIVE`);
+  console.log(`🛠️  KYC Migration Route: ACTIVE (Remove after use!)`);
   console.log(`📦 New routes mounted:`);
   console.log(`   - /api/business (Business features)`);
   console.log(`   - /api/bank (Bank account management)`);
