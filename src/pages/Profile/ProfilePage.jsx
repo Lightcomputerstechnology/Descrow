@@ -15,7 +15,7 @@ import ProfileTab from './ProfileTab';
 import KYCTab from './KYCTab';
 import SecurityTab from './SecurityTab';
 import SettingsTab from './SettingsTab';
-import BankAccountTab from 'src/components/Profile/BankAccountTab';
+import BankAccountTab from '../../components/Profile/BankAccountTab';
 import profileService from 'services/profileService';
 import { authService } from 'services/authService';
 import toast from 'react-hot-toast';
