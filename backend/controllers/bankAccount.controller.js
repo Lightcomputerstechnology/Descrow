@@ -933,6 +933,28 @@ exports.getPayoutHistory = async (req, res) => {
   }
 };
 
+// Add these methods to your controller if needed:
+
+exports.adminVerifyBankAccount = async (req, res) => {
+  try {
+    // Implementation for manual admin verification
+    res.status(501).json({ success: false, message: 'Not implemented' });
+  } catch (error) {
+    console.error('Admin verify account error:', error);
+    res.status(500).json({ success: false, message: 'Failed to verify account' });
+  }
+};
+
+exports.adminUpdateAccountStatus = async (req, res) => {
+  try {
+    // Implementation for admin status updates
+    res.status(501).json({ success: false, message: 'Not implemented' });
+  } catch (error) {
+    console.error('Admin update status error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update status' });
+  }
+};
+
 // Get payout details
 exports.getPayoutDetails = async (req, res) => {
   try {
