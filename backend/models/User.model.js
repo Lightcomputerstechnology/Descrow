@@ -27,14 +27,12 @@ const userSchema = new mongoose.Schema({
     default: 'dual'
   },
   
-  // ✅ FIXED: Updated tier system to include 'free'
   tier: {
     type: String,
     enum: ['free', 'starter', 'growth', 'enterprise', 'api'],
     default: 'free'
   },
   
-  // ✅ NEW: API Access fields
   apiAccess: {
     enabled: {
       type: Boolean,
@@ -63,7 +61,6 @@ const userSchema = new mongoose.Schema({
     }]
   },
   
-  // ✅ NEW: Subscription tracking
   subscription: {
     status: {
       type: String,
@@ -80,7 +77,6 @@ const userSchema = new mongoose.Schema({
     paymentMethod: String
   },
   
-  // ✅ NEW: Transaction limits tracking
   monthlyUsage: {
     transactionCount: {
       type: Number,
@@ -97,7 +93,6 @@ const userSchema = new mongoose.Schema({
     default: false
   },
   
-  // ✅ NEW: Enhanced verification fields
   isEmailVerified: {
     type: Boolean,
     default: false
@@ -111,7 +106,7 @@ const userSchema = new mongoose.Schema({
     default: false
   },
   
-  // ✅ UPDATED: Enhanced KYC Status with proper integration
+  // ✅ FIXED: Enhanced KYC Status with proper defaults and validation
   kycStatus: {
     status: {
       type: String,
@@ -123,57 +118,111 @@ const userSchema = new mongoose.Schema({
       enum: ['basic', 'advanced', 'premium'],
       default: 'basic'
     },
-    submittedAt: Date,
-    reviewedAt: Date,
-    rejectionReason: String,
+    submittedAt: {
+      type: Date,
+      default: null
+    },
+    reviewedAt: {
+      type: Date,
+      default: null
+    },
+    rejectionReason: {
+      type: String,
+      default: null
+    },
     resubmissionAllowed: {
       type: Boolean,
       default: true
     },
     verificationId: {
       type: String,
-      sparse: true
+      sparse: true,
+      default: null
     },
-    documents: [{
-      type: {
-        type: String,
-        enum: ['id_front', 'id_back', 'proof_of_address', 'selfie', 'business_registration', 'tax_certificate']
-      },
-      url: String,
-      uploadedAt: Date,
-      verified: {
-        type: Boolean,
-        default: false
-      }
-    }],
+    documents: {
+      type: [{
+        type: {
+          type: String,
+          enum: ['id_front', 'id_back', 'proof_of_address', 'selfie', 'business_registration', 'tax_certificate']
+        },
+        url: String,
+        uploadedAt: {
+          type: Date,
+          default: Date.now
+        },
+        verified: {
+          type: Boolean,
+          default: false
+        }
+      }],
+      default: []
+    },
     personalInfo: {
-      dateOfBirth: Date,
-      nationality: String,
-      idNumber: String,
+      dateOfBirth: {
+        type: Date,
+        default: null
+      },
+      nationality: {
+        type: String,
+        default: null
+      },
+      idNumber: {
+        type: String,
+        default: null
+      },
       idType: {
         type: String,
-        enum: ['passport', 'drivers_license', 'national_id']
+        enum: ['passport', 'drivers_license', 'national_id', null],
+        default: null
       },
       address: {
-        street: String,
-        city: String,
-        state: String,
-        country: String,
-        postalCode: String
+        street: {
+          type: String,
+          default: null
+        },
+        city: {
+          type: String,
+          default: null
+        },
+        state: {
+          type: String,
+          default: null
+        },
+        country: {
+          type: String,
+          default: null
+        },
+        postalCode: {
+          type: String,
+          default: null
+        }
       }
     },
     businessInfo: {
-      companyName: String,
-      registrationNumber: String,
-      taxId: String,
-      businessType: String,
-      website: String
+      companyName: {
+        type: String,
+        default: null
+      },
+      registrationNumber: {
+        type: String,
+        default: null
+      },
+      taxId: {
+        type: String,
+        default: null
+      },
+      businessType: {
+        type: String,
+        default: null
+      },
+      website: {
+        type: String,
+        default: null
+      }
     }
   },
   
-  // ✅ NEW: Comprehensive stats tracking
   stats: {
-    // Transaction Stats
     totalTransactions: {
       type: Number,
       default: 0
@@ -195,7 +244,6 @@ const userSchema = new mongoose.Schema({
       default: 0
     },
     
-    // Bank Account Stats
     bankAccountsCount: {
       type: Number,
       default: 0
@@ -212,9 +260,11 @@ const userSchema = new mongoose.Schema({
       type: Number,
       default: 0
     },
-    lastPayoutAt: Date,
+    lastPayoutAt: {
+      type: Date,
+      default: null
+    },
     
-    // Platform Engagement
     totalLogins: {
       type: Number,
       default: 0
@@ -228,7 +278,7 @@ const userSchema = new mongoose.Schema({
       default: 0
     },
     averageCompletionTime: {
-      type: Number, // in hours
+      type: Number,
       default: 0
     }
   },
@@ -312,20 +362,17 @@ const userSchema = new mongoose.Schema({
   deletedAt: Date,
   deletionReason: String,
   
-  // ✅ UPDATED: Bank account linked flag with enhanced tracking
   hasBankAccount: {
     type: Boolean,
     default: false
   },
   
-  // ✅ NEW: Primary bank account reference
   primaryBankAccount: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'BankAccount',
     sparse: true
   },
   
-  // ✅ NEW: Escrow access control
   escrowAccess: {
     canCreateEscrow: {
       type: Boolean,
@@ -366,7 +413,6 @@ const userSchema = new mongoose.Schema({
     }
   },
   
-  // ✅ NEW: Security and preferences
   preferences: {
     language: {
       type: String,
@@ -387,7 +433,6 @@ const userSchema = new mongoose.Schema({
     }
   },
   
-  // ✅ NEW: Audit trail
   auditLog: [{
     action: String,
     description: String,
@@ -403,25 +448,59 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Hash password before saving
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
-  }
-});
-
-// ✅ UPDATED: Reset monthly transaction count and update account age
+// ✅ FIXED: Pre-save middleware to handle corrupted KYC data
 userSchema.pre('save', function(next) {
+  // Fix corrupted kycStatus data
+  if (this.kycStatus && typeof this.kycStatus === 'string') {
+    console.warn(`Fixing corrupted KYC data for user ${this.email}`);
+    this.kycStatus = {
+      status: this.kycStatus,
+      tier: 'basic',
+      submittedAt: null,
+      reviewedAt: null,
+      rejectionReason: null,
+      resubmissionAllowed: true,
+      verificationId: null,
+      documents: [],
+      personalInfo: {
+        dateOfBirth: null,
+        nationality: null,
+        idNumber: null,
+        idType: null,
+        address: {
+          street: null,
+          city: null,
+          state: null,
+          country: null,
+          postalCode: null
+        }
+      },
+      businessInfo: {
+        companyName: null,
+        registrationNumber: null,
+        taxId: null,
+        businessType: null,
+        website: null
+      }
+    };
+  }
+
+  // Ensure kycStatus.documents is an array
+  if (this.kycStatus && !Array.isArray(this.kycStatus.documents)) {
+    this.kycStatus.documents = [];
+  }
+
+  // Sync isKYCVerified with kycStatus.status
+  if (this.kycStatus && this.kycStatus.status === 'approved') {
+    this.isKYCVerified = true;
+  } else {
+    this.isKYCVerified = false;
+  }
+
+  // Reset monthly transaction count if it's a new month
   const now = new Date();
-  const lastReset = this.monthlyUsage.lastResetDate;
+  const lastReset = this.monthlyUsage?.lastResetDate;
   
-  // Reset if it's a new month
   if (lastReset && now.getMonth() !== lastReset.getMonth()) {
     this.monthlyUsage.transactionCount = 0;
     this.monthlyUsage.lastResetDate = now;
@@ -436,16 +515,17 @@ userSchema.pre('save', function(next) {
   next();
 });
 
-// ✅ NEW: Update KYC verification status automatically
-userSchema.pre('save', function(next) {
-  // Sync isKYCVerified with kycStatus.status
-  if (this.kycStatus && this.kycStatus.status === 'approved') {
-    this.isKYCVerified = true;
-  } else {
-    this.isKYCVerified = false;
-  }
+// Hash password before saving
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
   
-  next();
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Compare passwords
@@ -453,7 +533,7 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// ✅ NEW: Check if user can access escrow features
+// Check if user can access escrow features
 userSchema.methods.canAccessEscrow = function() {
   // Check KYC verification
   if (!this.isKYCVerified) {
@@ -486,7 +566,7 @@ userSchema.methods.canAccessEscrow = function() {
   return { allowed: true };
 };
 
-// ✅ NEW: Check if user can receive payouts
+// Check if user can receive payouts
 userSchema.methods.canReceivePayouts = function() {
   const escrowAccess = this.canAccessEscrow();
   if (!escrowAccess.allowed) {
@@ -506,7 +586,7 @@ userSchema.methods.canReceivePayouts = function() {
   return { allowed: true };
 };
 
-// ✅ UPDATED: Get tier limits with new structure including 'free' tier
+// Get tier limits
 userSchema.methods.getTierLimits = function() {
   const limits = {
     free: {
@@ -526,24 +606,24 @@ userSchema.methods.getTierLimits = function() {
       },
       fees: {
         NGN: {
-          buyer: 0.03,    // 3%
-          seller: 0.03    // 3%
+          buyer: 0.03,
+          seller: 0.03
         },
         USD: {
-          buyer: 0.035,   // 3.5%
-          seller: 0.035   // 3.5%
+          buyer: 0.035,
+          seller: 0.035
         },
         EUR: {
-          buyer: 0.035,   // 3.5%
-          seller: 0.035   // 3.5%
+          buyer: 0.035,
+          seller: 0.035
         },
         GBP: {
-          buyer: 0.035,   // 3.5%
-          seller: 0.035   // 3.5%
+          buyer: 0.035,
+          seller: 0.035
         },
         crypto: {
-          buyer: 0.0175,  // 1.75%
-          seller: 0.0175  // 1.75%
+          buyer: 0.0175,
+          seller: 0.0175
         }
       },
       features: ['Basic processing', 'Email support', '5 transactions/month', 'KYC required for escrow']
@@ -566,24 +646,24 @@ userSchema.methods.getTierLimits = function() {
       },
       fees: {
         NGN: {
-          buyer: 0.03,    // 3%
-          seller: 0.03    // 3%
+          buyer: 0.03,
+          seller: 0.03
         },
         USD: {
-          buyer: 0.035,   // 3.5%
-          seller: 0.035   // 3.5%
+          buyer: 0.035,
+          seller: 0.035
         },
         EUR: {
-          buyer: 0.035,   // 3.5%
-          seller: 0.035   // 3.5%
+          buyer: 0.035,
+          seller: 0.035
         },
         GBP: {
-          buyer: 0.035,   // 3.5%
-          seller: 0.035   // 3.5%
+          buyer: 0.035,
+          seller: 0.035
         },
         crypto: {
-          buyer: 0.0175,  // 1.75%
-          seller: 0.0175  // 1.75%
+          buyer: 0.0175,
+          seller: 0.0175
         }
       },
       features: ['Standard processing', 'Basic support', '10 transactions/month', 'Multi-currency support']
@@ -606,24 +686,24 @@ userSchema.methods.getTierLimits = function() {
       },
       fees: {
         NGN: {
-          buyer: 0.025,   // 2.5%
-          seller: 0.025   // 2.5%
+          buyer: 0.025,
+          seller: 0.025
         },
         USD: {
-          buyer: 0.03,    // 3%
-          seller: 0.03    // 3%
+          buyer: 0.03,
+          seller: 0.03
         },
         EUR: {
-          buyer: 0.03,    // 3%
-          seller: 0.03    // 3%
+          buyer: 0.03,
+          seller: 0.03
         },
         GBP: {
-          buyer: 0.03,    // 3%
-          seller: 0.03    // 3%
+          buyer: 0.03,
+          seller: 0.03
         },
         crypto: {
-          buyer: 0.0125,  // 1.25%
-          seller: 0.0125  // 1.25%
+          buyer: 0.0125,
+          seller: 0.0125
         }
       },
       features: ['Fast processing', 'Priority support', '50 transactions/month', 'Advanced KYC options']
@@ -632,12 +712,12 @@ userSchema.methods.getTierLimits = function() {
     enterprise: {
       name: 'Enterprise',
       maxTransactionAmount: {
-        NGN: -1,  // Unlimited
-        USD: -1,  // Unlimited
-        EUR: -1,  // Unlimited
-        GBP: -1   // Unlimited
+        NGN: -1,
+        USD: -1,
+        EUR: -1,
+        GBP: -1
       },
-      maxTransactionsPerMonth: -1,  // Unlimited
+      maxTransactionsPerMonth: -1,
       monthlyCost: {
         NGN: 15000,
         USD: 30,
@@ -646,24 +726,24 @@ userSchema.methods.getTierLimits = function() {
       },
       fees: {
         NGN: {
-          buyer: 0.0225,  // 2.25%
-          seller: 0.0225  // 2.25%
+          buyer: 0.0225,
+          seller: 0.0225
         },
         USD: {
-          buyer: 0.0275,  // 2.75%
-          seller: 0.0275  // 2.75%
+          buyer: 0.0275,
+          seller: 0.0275
         },
         EUR: {
-          buyer: 0.0275,  // 2.75%
-          seller: 0.0275  // 2.75%
+          buyer: 0.0275,
+          seller: 0.0275
         },
         GBP: {
-          buyer: 0.0275,  // 2.75%
-          seller: 0.0275  // 2.75%
+          buyer: 0.0275,
+          seller: 0.0275
         },
         crypto: {
-          buyer: 0.009,   // 0.9%
-          seller: 0.009   // 0.9%
+          buyer: 0.009,
+          seller: 0.009
         }
       },
       features: ['Instant processing', 'Premium support', 'Unlimited transactions', 'Dedicated manager', 'Custom solutions']
@@ -672,12 +752,12 @@ userSchema.methods.getTierLimits = function() {
     api: {
       name: 'API Tier',
       maxTransactionAmount: {
-        NGN: -1,  // Unlimited
-        USD: -1,  // Unlimited
-        EUR: -1,  // Unlimited
-        GBP: -1   // Unlimited
+        NGN: -1,
+        USD: -1,
+        EUR: -1,
+        GBP: -1
       },
-      maxTransactionsPerMonth: -1,  // Unlimited
+      maxTransactionsPerMonth: -1,
       monthlyCost: {
         NGN: 50000,
         USD: 100,
@@ -692,24 +772,24 @@ userSchema.methods.getTierLimits = function() {
       },
       fees: {
         NGN: {
-          buyer: 0.02,    // 2%
-          seller: 0.02    // 2%
+          buyer: 0.02,
+          seller: 0.02
         },
         USD: {
-          buyer: 0.025,   // 2.5%
-          seller: 0.025   // 2.5%
+          buyer: 0.025,
+          seller: 0.025
         },
         EUR: {
-          buyer: 0.025,   // 2.5%
-          seller: 0.025   // 2.5%
+          buyer: 0.025,
+          seller: 0.025
         },
         GBP: {
-          buyer: 0.025,   // 2.5%
-          seller: 0.025   // 2.5%
+          buyer: 0.025,
+          seller: 0.025
         },
         crypto: {
-          buyer: 0.0075,  // 0.75%
-          seller: 0.0075  // 0.75%
+          buyer: 0.0075,
+          seller: 0.0075
         }
       },
       features: [
@@ -727,7 +807,7 @@ userSchema.methods.getTierLimits = function() {
   return limits[this.tier];
 };
 
-// ✅ UPDATED: Check if user can create transaction with KYC verification
+// Check if user can create transaction with KYC verification
 userSchema.methods.canCreateTransaction = function(amount, currency) {
   // Check KYC first
   const kycCheck = this.canAccessEscrow();
@@ -764,7 +844,7 @@ userSchema.methods.canCreateTransaction = function(amount, currency) {
   return { allowed: true };
 };
 
-// ✅ UPDATED: Get fees for specific transaction
+// Get fees for specific transaction
 userSchema.methods.getFeesForTransaction = function(amount, currency) {
   const limits = this.getTierLimits();
   const fees = limits.fees[currency] || limits.fees.USD;
@@ -783,7 +863,7 @@ userSchema.methods.getFeesForTransaction = function(amount, currency) {
   };
 };
 
-// ✅ NEW: Add audit log entry
+// Add audit log entry
 userSchema.methods.addAuditLog = function(action, description, ipAddress = '', userAgent = '', metadata = {}) {
   this.auditLog.push({
     action,
@@ -801,7 +881,7 @@ userSchema.methods.addAuditLog = function(action, description, ipAddress = '', u
   return this.save();
 };
 
-// ✅ NEW: Update login stats
+// Update login stats
 userSchema.methods.updateLoginStats = function(ipAddress = '', userAgent = '') {
   this.lastLogin = new Date();
   this.stats.totalLogins += 1;
@@ -816,7 +896,7 @@ userSchema.methods.updateLoginStats = function(ipAddress = '', userAgent = '') {
   return this.save();
 };
 
-// ✅ NEW: Check if user needs to upgrade tier
+// Check if user needs to upgrade tier
 userSchema.methods.needsTierUpgrade = function() {
   const limits = this.getTierLimits();
   
