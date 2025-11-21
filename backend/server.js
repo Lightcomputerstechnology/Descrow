@@ -238,18 +238,27 @@ app.get('/api/admin/fix-kyc-data', async (req, res) => {
     }
 
     console.log('🚀 Starting KYC data migration...');
-    const users = await User.find({});
+    
+    // Use raw MongoDB operations to avoid Mongoose schema validation
+    const db = mongoose.connection.db;
+    const usersCollection = db.collection('users');
+    
+    const users = await usersCollection.find({}).toArray();
     let fixedCount = 0;
     let errorCount = 0;
 
+    console.log(`📊 Found ${users.length} users to process...`);
+
     for (const user of users) {
       try {
-        let needsSave = false;
+        let needsUpdate = false;
+        let updateData = {};
 
-        // Fix string kycStatus
+        // Check if kycStatus is a string and needs fixing
         if (typeof user.kycStatus === 'string') {
-          console.log(`🛠️ Fixing KYC data for user: ${user.email}`);
-          user.kycStatus = {
+          console.log(`🛠️ Fixing KYC data for user: ${user.email || user._id}`);
+          
+          updateData.kycStatus = {
             status: user.kycStatus,
             tier: 'basic',
             submittedAt: null,
@@ -279,22 +288,28 @@ app.get('/api/admin/fix-kyc-data', async (req, res) => {
               website: null
             }
           };
-          needsSave = true;
+          needsUpdate = true;
+        }
+
+        // Fix missing or corrupted documents array
+        if (user.kycStatus && typeof user.kycStatus === 'object' && !Array.isArray(user.kycStatus.documents)) {
+          if (!updateData.kycStatus) {
+            updateData.kycStatus = { ...user.kycStatus };
+          }
+          updateData.kycStatus.documents = [];
+          needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+          await usersCollection.updateOne(
+            { _id: user._id },
+            { $set: updateData }
+          );
           fixedCount++;
-        }
-
-        // Fix missing documents array
-        if (user.kycStatus && !Array.isArray(user.kycStatus.documents)) {
-          user.kycStatus.documents = [];
-          needsSave = true;
-        }
-
-        if (needsSave) {
-          await user.save();
-          console.log(`✅ Fixed user: ${user.email}`);
+          console.log(`✅ Fixed user: ${user.email || user._id}`);
         }
       } catch (userError) {
-        console.error(`❌ Error fixing user ${user.email}:`, userError.message);
+        console.error(`❌ Error fixing user ${user.email || user._id}:`, userError.message);
         errorCount++;
       }
     }
@@ -317,7 +332,8 @@ app.get('/api/admin/fix-kyc-data', async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Migration failed',
-      error: error.message
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
