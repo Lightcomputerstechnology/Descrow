@@ -9,8 +9,9 @@ import {
   Loader,
   Award
 } from 'lucide-react';
-import profileService from 'services/profileService'; // ← fixed absolute import
+import profileService from 'services/profileService';
 import toast from 'react-hot-toast';
+
 const KYCTab = ({ user, onUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [kycStatus, setKycStatus] = useState(null);
@@ -46,9 +47,34 @@ const KYCTab = ({ user, onUpdate }) => {
       const response = await profileService.getKYCStatus();
       if (response.success) {
         setKycStatus(response.data);
+        
+        // If we have existing KYC data, pre-fill the form
+        if (response.data.personalInfo) {
+          setFormData(prev => ({
+            ...prev,
+            personalInfo: {
+              ...prev.personalInfo,
+              ...response.data.personalInfo
+            },
+            businessInfo: {
+              ...prev.businessInfo,
+              ...response.data.businessInfo
+            }
+          }));
+        }
+        
+        // Set the tier if available
+        if (response.data.tier) {
+          setSelectedTier(response.data.tier);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch KYC status:', error);
+      // Set default status if API fails
+      setKycStatus({
+        status: 'unverified',
+        tier: 'basic'
+      });
     }
   };
 
@@ -79,10 +105,15 @@ const KYCTab = ({ user, onUpdate }) => {
 
     try {
       setLoading(true);
-      const response = await profileService.submitKYC({
-        ...formData,
+      
+      // Prepare the data for the new backend structure
+      const kycData = {
+        personalInfo: formData.personalInfo,
+        businessInfo: formData.businessInfo,
         tier: selectedTier
-      });
+      };
+
+      const response = await profileService.submitKYC(kycData);
 
       if (response.success) {
         toast.success('KYC submitted successfully! We will review within 24-48 hours.');
@@ -198,12 +229,15 @@ const KYCTab = ({ user, onUpdate }) => {
           <div className="space-y-2 text-sm text-green-800 dark:text-green-300">
             <div className="flex justify-between">
               <span>Verification Tier:</span>
-              <span className="font-semibold capitalize">{kycStatus.tier}</span>
+              <span className="font-semibold capitalize">{kycStatus.tier || 'basic'}</span>
             </div>
             <div className="flex justify-between">
               <span>Approved On:</span>
               <span className="font-semibold">
-                {new Date(kycStatus.reviewedAt).toLocaleDateString()}
+                {kycStatus.reviewedAt 
+                  ? new Date(kycStatus.reviewedAt).toLocaleDateString()
+                  : 'Recently'
+                }
               </span>
             </div>
           </div>
@@ -245,17 +279,20 @@ const KYCTab = ({ user, onUpdate }) => {
         <div className="space-y-2 text-sm text-blue-800 dark:text-blue-300">
           <div className="flex justify-between">
             <span>Status:</span>
-            <span className="font-semibold capitalize">{kycStatus.status.replace('_', ' ')}</span>
+            <span className="font-semibold capitalize">{(kycStatus.status || 'pending').replace('_', ' ')}</span>
           </div>
           <div className="flex justify-between">
             <span>Submitted:</span>
             <span className="font-semibold">
-              {new Date(kycStatus.createdAt).toLocaleDateString()}
+              {kycStatus.submittedAt 
+                ? new Date(kycStatus.submittedAt).toLocaleDateString()
+                : 'Recently'
+              }
             </span>
           </div>
           <div className="flex justify-between">
             <span>Tier:</span>
-            <span className="font-semibold capitalize">{kycStatus.tier}</span>
+            <span className="font-semibold capitalize">{kycStatus.tier || 'basic'}</span>
           </div>
         </div>
       </div>
@@ -292,14 +329,14 @@ const KYCTab = ({ user, onUpdate }) => {
             </div>
           )}
 
-          {kycStatus.resubmissionAllowed && (
+          {(kycStatus.resubmissionAllowed !== false) && (
             <p className="text-sm text-red-700 dark:text-red-300">
               You can resubmit your verification below with corrected information.
             </p>
           )}
         </div>
 
-        {kycStatus.resubmissionAllowed && (
+        {(kycStatus.resubmissionAllowed !== false) && (
           <div className="text-center">
             <button
               onClick={() => setKycStatus({ ...kycStatus, status: 'unverified' })}
@@ -313,7 +350,7 @@ const KYCTab = ({ user, onUpdate }) => {
     );
   }
 
-  // KYC Form (for unverified users)
+  // KYC Form (for unverified users or if kycStatus is null)
   return (
     <div className="space-y-6">
       {/* Current Status */}
@@ -339,6 +376,7 @@ const KYCTab = ({ user, onUpdate }) => {
           {tiers.map((tier) => (
             <button
               key={tier.id}
+              type="button"
               onClick={() => setSelectedTier(tier.id)}
               className={`relative border-2 rounded-xl p-6 text-left transition ${
                 selectedTier === tier.id
@@ -555,56 +593,6 @@ const KYCTab = ({ user, onUpdate }) => {
             </div>
           </div>
         )}
-
-        {/* Document Upload */}
-        <div>
-          <h4 className="text-md font-semibold text-gray-900 dark:text-white mb-3">
-            Required Documents
-          </h4>
-          <div className="space-y-4">
-            <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 text-center hover:border-blue-400 dark:hover:border-blue-600 transition">
-              <Upload className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                Government ID (Front & Back)
-              </p>
-              <button
-                type="button"
-                className="mt-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition"
-              >
-                Choose Files
-              </button>
-            </div>
-
-            <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 text-center hover:border-blue-400 dark:hover:border-blue-600 transition">
-              <FileText className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                Proof of Address (Utility bill, Bank statement)
-              </p>
-              <button
-                type="button"
-                className="mt-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition"
-              >
-                Choose File
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Info Box */}
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <div className="flex gap-3">
-            <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-900 dark:text-blue-200">
-              <p className="font-medium mb-1">Verification Process:</p>
-              <ol className="list-decimal list-inside space-y-1 text-blue-800 dark:text-blue-300">
-                <li>Submit your information and documents</li>
-                <li>Our team reviews within 24-48 hours</li>
-                <li>You'll receive an email once approved</li>
-                <li>Start transacting with higher limits!</li>
-              </ol>
-            </div>
-          </div>
-        </div>
 
         {/* Submit Button */}
         <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-800">
