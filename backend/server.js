@@ -225,73 +225,48 @@ app.get('/api/health', async (req, res) => {
 });
 
 
-// ==================== TEMPORARY ADMIN CREATION ROUTE ====================
-// ⚠️ REMOVE THIS AFTER CREATING MASTER ADMIN!
+// Add this TEMPORARY route to your server.js
 const Admin = require('./models/Admin.model');
+const bcrypt = require('bcryptjs');
 
-app.post('/api/admin/create-master', async (req, res) => {
+app.post('/api/admin/reset-password', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { email, newPassword } = req.body;
 
-    if (!name || !email || !password) {
+    if (!email || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: 'Name, email, and password are required'
+        message: 'Email and new password are required'
       });
     }
 
-    // Check if master admin already exists
-    const existingMaster = await Admin.findOne({ role: 'master' });
-    if (existingMaster) {
-      return res.status(400).json({
+    const admin = await Admin.findOne({ email });
+    if (!admin) {
+      return res.status(404).json({
         success: false,
-        message: 'Master admin already exists'
+        message: 'Admin not found'
       });
     }
 
-    // Check if any admin exists with this email
-    const existingAdmin = await Admin.findOne({ email });
-    if (existingAdmin) {
-      return res.status(400).json({
-        success: false,
-        message: 'Admin with this email already exists'
-      });
-    }
-
-    // Create master admin
-    const masterAdmin = new Admin({
-      name,
-      email,
-      password,
-      role: 'master',
-      status: 'active'
-    });
-
-    await masterAdmin.save();
+    // Hash the new password
+    const salt = await bcrypt.genSalt(10);
+    admin.password = await bcrypt.hash(newPassword, salt);
+    await admin.save();
 
     res.json({
       success: true,
-      message: 'Master admin created successfully',
-      data: {
-        id: masterAdmin._id,
-        name: masterAdmin.name,
-        email: masterAdmin.email,
-        role: masterAdmin.role
-      }
+      message: 'Admin password reset successfully'
     });
 
-    console.log(`✅ Master admin created: ${email}`);
-
   } catch (error) {
-    console.error('Create master admin error:', error);
+    console.error('Reset admin password error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to create master admin',
+      message: 'Failed to reset admin password',
       error: error.message
     });
   }
 });
-
 
 // ==================== API ROUTES ====================
 
