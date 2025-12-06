@@ -508,4 +508,186 @@ class EmailService {
   }
 }
 
+async sendVerificationEmail(email, name, verificationToken) {
+  try {
+    const verificationUrl = `${this.frontendUrl}/verify-email?token=${verificationToken}`;
+
+    await this.resend.emails.send({
+      from: this.fromEmail,
+      to: email,
+      subject: '✉️ Verify Your Email - Dealcross',
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+    .button { display: inline-block; background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+    .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Welcome to Dealcross! 🎉</h1>
+    </div>
+    <div class="content">
+      <p>Hi ${name},</p>
+      
+      <p>Thanks for joining Dealcross! Please verify your email address to get started:</p>
+      
+      <a href="${verificationUrl}" class="button">Verify Email Address</a>
+      
+      <p>Or copy this link into your browser:</p>
+      <p style="word-break: break-all; background: #e5e7eb; padding: 10px; border-radius: 5px;">${verificationUrl}</p>
+      
+      <p>⏰ This link will expire in 7 days.</p>
+      
+      <p><strong>What you can do with Dealcross:</strong></p>
+      <ul>
+        <li>✅ Buy and sell with complete protection</li>
+        <li>💰 Funds held securely until delivery confirmed</li>
+        <li>⚖️ Dispute resolution support</li>
+        <li>💳 Multiple payment methods</li>
+      </ul>
+      
+      <p>If you didn't create this account, please ignore this email.</p>
+    </div>
+    <div class="footer">
+      <p>© ${new Date().getFullYear()} Dealcross. All rights reserved.</p>
+      <p>This is an automated email. Please do not reply.</p>
+    </div>
+  </div>
+</body>
+</html>
+      `
+    });
+
+    console.log(`✅ Verification email sent to ${email}`);
+    return { success: true };
+
+  } catch (error) {
+    console.error('❌ Failed to send verification email:', error);
+    throw error;
+  }
+}
+
+async sendPasswordChangedEmail(email, name) {
+  try {
+    await this.resend.emails.send({
+      from: this.fromEmail,
+      to: email,
+      subject: '🔐 Password Changed - Dealcross',
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+    .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🔐 Password Changed</h1>
+    </div>
+    <div class="content">
+      <p>Hi ${name},</p>
+      
+      <p>Your Dealcross password was successfully changed.</p>
+      
+      <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
+      
+      <p>⚠️ If you didn't make this change, please contact our support team immediately.</p>
+      
+      <p>For security, we recommend:</p>
+      <ul>
+        <li>Using a unique, strong password</li>
+        <li>Enabling two-factor authentication</li>
+        <li>Never sharing your password</li>
+      </ul>
+    </div>
+    <div class="footer">
+      <p>© ${new Date().getFullYear()} Dealcross. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+      `
+    });
+
+    console.log(`✅ Password changed email sent to ${email}`);
+    return { success: true };
+
+  } catch (error) {
+    console.error('❌ Failed to send password changed email:', error);
+    throw error;
+  }
+}
+
+async sendTierUpgradeEmail(email, name, tierName) {
+  try {
+    await this.resend.emails.send({
+      from: this.fromEmail,
+      to: email,
+      subject: `🎉 Welcome to ${tierName} Tier - Dealcross`,
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
+    .button { display: inline-block; background: #8b5cf6; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+    .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎉 Tier Upgrade Complete!</h1>
+    </div>
+    <div class="content">
+      <p>Hi ${name},</p>
+      
+      <p>Congratulations! You've successfully upgraded to <strong>${tierName}</strong> tier.</p>
+      
+      <p><strong>Your new benefits include:</strong></p>
+      <ul>
+        <li>✅ Lower transaction fees</li>
+        <li>💰 Higher transaction limits</li>
+        <li>⚡ Priority support</li>
+        <li>📊 Advanced analytics</li>
+      </ul>
+      
+      <a href="${this.frontendUrl}/dashboard" class="button">Go to Dashboard</a>
+      
+      <p>Thank you for choosing Dealcross!</p>
+    </div>
+    <div class="footer">
+      <p>© ${new Date().getFullYear()} Dealcross. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+      `
+    });
+
+    console.log(`✅ Tier upgrade email sent to ${email}`);
+    return { success: true };
+
+  } catch (error) {
+    console.error('❌ Failed to send tier upgrade email:', error);
+    throw error;
+  }
+}
 module.exports = new EmailService();
