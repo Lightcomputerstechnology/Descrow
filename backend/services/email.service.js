@@ -341,7 +341,7 @@ class EmailService {
     .header { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
     .content { background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }
     .button { display: inline-block; background: #ef4444; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-    .details { background: white; padding: 20px; border-radius: 8px; margin: 20px 0;​​​​​​​​​​​​​​​​border: 2px solid #fecaca; }
+    .details { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border: 2px solid #fecaca; }
     .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
   </style>
 </head>
@@ -506,17 +506,16 @@ class EmailService {
       throw error;
     }
   }
-}
 
-async sendVerificationEmail(email, name, verificationToken) {
-  try {
-    const verificationUrl = `${this.frontendUrl}/verify-email?token=${verificationToken}`;
+  async sendVerificationEmail(email, name, verificationToken) {
+    try {
+      const verificationUrl = `${this.frontendUrl}/verify-email?token=${verificationToken}`;
 
-    await this.resend.emails.send({
-      from: this.fromEmail,
-      to: email,
-      subject: '✉️ Verify Your Email - Dealcross',
-      html: `
+      await this.resend.emails.send({
+        from: this.fromEmail,
+        to: email,
+        subject: '✉️ Verify Your Email - Dealcross',
+        html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -563,25 +562,25 @@ async sendVerificationEmail(email, name, verificationToken) {
   </div>
 </body>
 </html>
-      `
-    });
+        `
+      });
 
-    console.log(`✅ Verification email sent to ${email}`);
-    return { success: true };
+      console.log(`✅ Verification email sent to ${email}`);
+      return { success: true };
 
-  } catch (error) {
-    console.error('❌ Failed to send verification email:', error);
-    throw error;
+    } catch (error) {
+      console.error('❌ Failed to send verification email:', error);
+      throw error;
+    }
   }
-}
 
-async sendPasswordChangedEmail(email, name) {
-  try {
-    await this.resend.emails.send({
-      from: this.fromEmail,
-      to: email,
-      subject: '🔐 Password Changed - Dealcross',
-      html: `
+  async sendPasswordChangedEmail(email, name) {
+    try {
+      await this.resend.emails.send({
+        from: this.fromEmail,
+        to: email,
+        subject: '🔐 Password Changed - Dealcross',
+        html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -620,25 +619,25 @@ async sendPasswordChangedEmail(email, name) {
   </div>
 </body>
 </html>
-      `
-    });
+        `
+      });
 
-    console.log(`✅ Password changed email sent to ${email}`);
-    return { success: true };
+      console.log(`✅ Password changed email sent to ${email}`);
+      return { success: true };
 
-  } catch (error) {
-    console.error('❌ Failed to send password changed email:', error);
-    throw error;
+    } catch (error) {
+      console.error('❌ Failed to send password changed email:', error);
+      throw error;
+    }
   }
-}
 
-async sendTierUpgradeEmail(email, name, tierName) {
-  try {
-    await this.resend.emails.send({
-      from: this.fromEmail,
-      to: email,
-      subject: `🎉 Welcome to ${tierName} Tier - Dealcross`,
-      html: `
+  async sendTierUpgradeEmail(email, name, tierName) {
+    try {
+      await this.resend.emails.send({
+        from: this.fromEmail,
+        to: email,
+        subject: `🎉 Welcome to ${tierName} Tier - Dealcross`,
+        html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -655,7 +654,7 @@ async sendTierUpgradeEmail(email, name, tierName) {
   <div class="container">
     <div class="header">
       <h1>🎉 Tier Upgrade Complete!</h1>
-    </div>
+      </div>
     <div class="content">
       <p>Hi ${name},</p>
       
@@ -679,15 +678,17 @@ async sendTierUpgradeEmail(email, name, tierName) {
   </div>
 </body>
 </html>
-      `
-    });
+        `
+      });
 
-    console.log(`✅ Tier upgrade email sent to ${email}`);
-    return { success: true };
+      console.log(`✅ Tier upgrade email sent to ${email}`);
+      return { success: true };
 
-  } catch (error) {
-    console.error('❌ Failed to send tier upgrade email:', error);
-    throw error;
+    } catch (error) {
+      console.error('❌ Failed to send tier upgrade email:', error);
+      throw error;
+    }
   }
 }
+
 module.exports = new EmailService();
