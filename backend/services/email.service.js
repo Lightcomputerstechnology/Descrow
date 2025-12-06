@@ -1,18 +1,19 @@
 // backend/services/email.service.js - PRODUCTION READY WITH RESEND
 const { Resend } = require('resend');
 
-constructor() {
-  this.resend = new Resend(process.env.RESEND_API_KEY);
-  this.fromEmail = process.env.FROM_EMAIL || 'noreply@dealcross.net';
-  
-  // ✅ FIX: Remove trailing slash from frontend URL
-  const baseUrl = process.env.FRONTEND_URL || 'https://dealcross.net';
-  this.frontendUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
-  
-  if (!process.env.RESEND_API_KEY) {
-    console.warn('⚠️ RESEND_API_KEY not configured - emails will fail');
+class EmailService {
+  constructor() {
+    this.resend = new Resend(process.env.RESEND_API_KEY);
+    this.fromEmail = process.env.FROM_EMAIL || 'noreply@dealcross.net';
+    
+    // ✅ FIX: Remove trailing slash from frontend URL
+    const baseUrl = process.env.FRONTEND_URL || 'https://dealcross.net';
+    this.frontendUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
+    
+    if (!process.env.RESEND_API_KEY) {
+      console.warn('⚠️ RESEND_API_KEY not configured - emails will fail');
+    }
   }
-}
 
   // ═════════════════════════════════════════════════════════════
   // PAYMENT CONFIRMATION EMAILS
@@ -454,7 +455,7 @@ constructor() {
 
   async sendPasswordResetEmail(email, name, resetToken) {
     try {
-      const resetUrl = `${this.frontendUrl.replace(/\/$/, '')}/reset-password?token=${resetToken}`;
+      const resetUrl = `${this.frontendUrl}/reset-password?token=${resetToken}`;
 
       await this.resend.emails.send({
         from: this.fromEmail,
@@ -655,8 +656,8 @@ constructor() {
 <body>
   <div class="container">
     <div class="header">
-      <h1>🎉 Tier Upgrade Complete!</h1>
-      </div>
+     <h1>🎉 Tier Upgrade Complete!</h1>
+    </div>
     <div class="content">
       <p>Hi ${name},</p>
       
